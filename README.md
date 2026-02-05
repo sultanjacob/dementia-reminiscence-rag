@@ -1,0 +1,1 @@
+This project implements an ethically designed conversational agent for individuals with early-stage dementia. Unlike standard chatbots, it utilizes a specialized RAG architecture to "anchor" conversations in the patient's real life history (photos, family details, past events), prioritizing emotional comfort and validation over raw information retrieval.
