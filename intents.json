@@ -9,7 +9,8 @@
                 "Hello",
                 "Good day",
                 "Whats up",
-                "Hey"
+                "Hey",
+                "greetings"
             ],
             "responses": [
                 "Hello!",
@@ -29,7 +30,8 @@
                 "I am Leaving",
                 "bye",
                 "quit",
-                "stop"
+                "stop",
+                "end chat"
             ],
             "responses": [
                 "Sad to see you go :(",
@@ -59,12 +61,57 @@
             ]
         },
         {
-            "tag": "noanswer",
-            "patterns": [],
+            "tag": "request_water",
+            "patterns": [
+                "I am thirsty",
+                "I want water",
+                "Can I have a drink",
+                "need water",
+                "thirsty",
+                "drink"
+            ],
             "responses": [
-                "Sorry, can't understand you",
-                "Please give me more info",
-                "Not sure I understand"
+                "Hydration is important! Do you have a glass of water nearby?",
+                "I can't pour it for you, but please go grab a drink."
+            ],
+            "context": [
+                ""
+            ]
+        },
+        {
+            "tag": "request_food",
+            "patterns": [
+                "I am hungry",
+                "I want food",
+                "Can I eat",
+                "need food",
+                "starving",
+                "lunch",
+                "dinner",
+                "breakfast",
+                "sandwich",
+                "soup"
+            ],
+            "responses": [
+                "You should definitely eat. What are you in the mood for?",
+                "Don't let yourself go hungry. Maybe a snack would help?"
+            ],
+            "context": [
+                ""
+            ]
+        },
+        {
+            "tag": "activity_walk",
+            "patterns": [
+                "I want to walk",
+                "go for a walk",
+                "stroll",
+                "go outside",
+                "fresh air"
+            ],
+            "responses": [
+                "A walk is a wonderful idea. Fresh air clears the mind.",
+                "If the weather is nice, you should definitely go for a walk."
             ],
             "context": [
                 ""
@@ -79,7 +126,9 @@
                 "OK",
                 "Okay",
                 "Please",
-                "I would like that"
+                "I would like that",
+                "yep",
+                "correct"
             ],
             "responses": [
                 "Great!",
@@ -98,28 +147,13 @@
                 "I don't",
                 "Never",
                 "Nah",
-                "Not really"
+                "Not really",
+                "wrong"
             ],
             "responses": [
                 "I understand.",
                 "That is okay.",
                 "We can talk about something else."
-            ],
-            "context": [
-                ""
-            ]
-        },
-        {
-            "tag": "identity",
-            "patterns": [
-                "who are you",
-                "what are you",
-                "what is your name",
-                "are you human"
-            ],
-            "responses": [
-                "I am Remi, your memory companion.",
-                "I am a bot designed to listen to your stories."
             ],
             "context": [
                 ""
@@ -134,46 +168,12 @@
                 "I am upset",
                 "Everything is wrong",
                 "I am depressed",
-                "I cry"
+                "cry",
+                "crying"
             ],
             "responses": [
                 "I am sorry to hear that. I am here to listen.",
                 "It's okay to feel down sometimes. Do you want to talk about it?"
-            ],
-            "context": [
-                ""
-            ]
-        },
-        {
-            "tag": "reminisce_childhood",
-            "patterns": [
-                "I was young",
-                "When I was a kid",
-                "My childhood",
-                "I grew up in",
-                "school days",
-                "younger"
-            ],
-            "responses": [
-                "Childhood memories are precious. What was your favorite game to play back then?",
-                "Tell me about the house you grew up in."
-            ],
-            "context": [
-                ""
-            ]
-        },
-        {
-            "tag": "entertainment",
-            "patterns": [
-                "Tell me a joke",
-                "I want a song",
-                "Sing for me",
-                "Do something fun",
-                "bored"
-            ],
-            "responses": [
-                "I can't sing, but I can recite poetry! 'Roses are red...'",
-                "Why did the chicken cross the road? To get to the other side!"
             ],
             "context": [
                 ""
