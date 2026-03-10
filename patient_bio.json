@@ -1,0 +1,15 @@
+{
+    "Basic_Info": {
+        "Name": "Arthur",
+        "Career": "Worked as a baker in London for 40 years."
+    },
+    "Family": {
+        "Spouse": "Martha (passed away in 2010, married 50 years)",
+        "Pets": "Golden retriever named Buster"
+    },
+    "Hobbies": [
+        "Gardening",
+        "Watching cricket"
+    ],
+    "Specific_Memories": []
+}
