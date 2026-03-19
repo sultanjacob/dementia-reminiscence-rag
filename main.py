@@ -5,7 +5,7 @@ import json
 import google.generativeai as genai
 
 # 1. SETUP GEMINI
-genai.configure(api_key='AIzaSyDbpkh2EdpJyJo7pT8oa-mtZAZB-zFy8uM')
+genai.configure(api_key='AIzaSyAw9h0NgcsEn2Xpbc2Qzf9AkoqFoz6FWXA')
 model = genai.GenerativeModel('gemini-1.5-flash')
 
 app = FastAPI()
