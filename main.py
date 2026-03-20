@@ -4,8 +4,15 @@ import os
 import json
 import google.generativeai as genai
 
-# 1. SETUP GEMINI
-genai.configure(api_key='AIzaSyAw9h0NgcsEn2Xpbc2Qzf9AkoqFoz6FWXA')
+# 1. LOAD THE SECRET KEY SAFELY
+from dotenv import load_dotenv
+
+# Tell it specifically to open keys.env
+load_dotenv("keys.env") 
+api_key = os.getenv("GEMINI_API_KEY") 
+
+genai.configure(api_key=api_key)
+model = genai.GenerativeModel('gemini-1.5-flash')
 model = genai.GenerativeModel('gemini-1.5-flash')
 
 app = FastAPI()
