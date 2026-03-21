@@ -6,30 +6,23 @@ import google.generativeai as genai
 
 # 1. LOAD THE SECRET KEY SAFELY
 from dotenv import load_dotenv
-
-# Tell it specifically to open keys.env
 load_dotenv("keys.env") 
 api_key = os.getenv("GEMINI_API_KEY") 
-
 genai.configure(api_key=api_key)
-model = genai.GenerativeModel('gemini-pro')
-model = genai.GenerativeModel('gemini-pro')
 
-app = FastAPI()
-PROFILES_DIR = r"D:\MLP\dementia-reminiscence-rag\profiles"
+# --- NEW AUTO-DETECT LOGIC ---
+working_model = 'gemini-1.5-flash' # Default fallback
+try:
+    for m in genai.list_models():
+        if 'generateContent' in m.supported_generation_methods:
+            working_model = m.name
+            break
+    print(f"✅ Google API accepted! Remi is using: {working_model}")
+except Exception as e:
+    print(f"❌ API Key Error: {e}")
 
-@app.get("/")
-def health_check():
-    return {"status": "online", "message": "Remi is Listening"}
-
-@app.get("/login/{patient_id}")
-def login(patient_id: str):
-    patient_id = patient_id.lower().strip()
-    bio_path = os.path.join(PROFILES_DIR, f"{patient_id}_bio.json")
-    if os.path.exists(bio_path):
-        with open(bio_path, "r", encoding="utf-8") as f:
-            return {"status": "success", "data": json.load(f)}
-    return {"status": "error", "message": "Profile not found"}
+model = genai.GenerativeModel(working_model)
+# -----------------------------
 
 # 2. THE CHAT ENDPOINT (The Voice)
 @app.get("/chat/{patient_id}")
