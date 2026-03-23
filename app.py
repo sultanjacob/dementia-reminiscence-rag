@@ -1,8 +1,6 @@
 import streamlit as st
 import requests
 from streamlit_mic_recorder import speech_to_text
-from gtts import gTTS
-import io
 
 # Set up the page
 st.set_page_config(page_title="Remi Companion", page_icon="🧠")
@@ -22,6 +20,9 @@ if "messages" not in st.session_state:
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
+        # If there was a photo attached to this past message, show it again
+        if "photo" in msg:
+            st.image(msg["photo"]["url"], caption=msg["photo"]["caption"])
 
 st.write("---")
 st.write("🎤 **Click the microphone to speak, or type below:**")
@@ -61,20 +62,29 @@ if user_input:
         except requests.exceptions.ConnectionError:
             remi_reply = "🚨 Connection failed! Is `main.py` running in your other terminal?"
 
-    # Show Remi's text response
-    st.session_state.messages.append({"role": "assistant", "content": remi_reply})
+    # --- NEW: PHOTO MEMORIES TRIGGER ---
+    # Check if we should show a photo based on keywords
+    photo_data = None
+    if "library" in remi_reply.lower():
+        # Using a free placeholder image of a classic library
+        photo_data = {
+            "url": "https://images.unsplash.com/photo-1507842217343-583bb7270b66?w=600&q=80",
+            "caption": "The Central Library project you worked on."
+        }
+    elif "piano" in remi_reply.lower():
+        photo_data = {
+            "url": "https://images.unsplash.com/photo-1552422535-c45813c61732?w=600&q=80",
+            "caption": "A piano, just like the one you used to play."
+        }
+
+    # Save and Show Remi's text and photo
+    message_data = {"role": "assistant", "content": remi_reply}
+    if photo_data:
+        message_data["photo"] = photo_data
+        
+    st.session_state.messages.append(message_data)
+    
     with st.chat_message("assistant"):
         st.markdown(remi_reply)
-        
-        # --- NEW: TEXT TO SPEECH (The Voice) ---
-        if "Error" not in remi_reply and "Connection failed" not in remi_reply:
-            # Convert text to audio
-            tts = gTTS(text=remi_reply, lang='en', slow=False)
-            
-            # Save it to a temporary memory buffer so we don't clutter your hard drive
-            audio_bytes = io.BytesIO()
-            tts.write_to_fp(audio_bytes)
-            audio_bytes.seek(0)
-            
-            # Play the audio automatically!
-            st.audio(audio_bytes, format="audio/mp3", autoplay=True)
+        if photo_data:
+            st.image(photo_data["url"], caption=photo_data["caption"])
