@@ -1,6 +1,8 @@
 import streamlit as st
 import requests
 from streamlit_mic_recorder import speech_to_text
+from gtts import gTTS
+import io
 
 # Set up the page
 st.set_page_config(page_title="Remi Companion", page_icon="🧠")
@@ -20,18 +22,17 @@ if "messages" not in st.session_state:
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
-        # If there was a photo attached to this past message, show it again
         if "photo" in msg:
             st.image(msg["photo"]["url"], caption=msg["photo"]["caption"])
 
 st.write("---")
-st.write("🎤 **Click the microphone to speak, or type below:**")
+st.write("🎤 **Click the button below to speak, or type in the box:**")
 
-# 1. Voice Input
+# 1. Voice Input (The Button)
 spoken_text = speech_to_text(
     language='en',
     start_prompt="Click to Start Recording",
-    stop_prompt="Click to Stop",
+    stop_prompt="Click to Stop Recording",
     just_once=True,
     key='STT'
 )
@@ -62,11 +63,9 @@ if user_input:
         except requests.exceptions.ConnectionError:
             remi_reply = "🚨 Connection failed! Is `main.py` running in your other terminal?"
 
-    # --- NEW: PHOTO MEMORIES TRIGGER ---
-    # Check if we should show a photo based on keywords
+    # --- PHOTO MEMORIES TRIGGER ---
     photo_data = None
     if "library" in remi_reply.lower():
-        # Using a free placeholder image of a classic library
         photo_data = {
             "url": "https://images.unsplash.com/photo-1507842217343-583bb7270b66?w=600&q=80",
             "caption": "The Central Library project you worked on."
@@ -88,3 +87,11 @@ if user_input:
         st.markdown(remi_reply)
         if photo_data:
             st.image(photo_data["url"], caption=photo_data["caption"])
+            
+        # --- TEXT TO SPEECH (The Voice is back!) ---
+        if "Error" not in remi_reply and "Connection failed" not in remi_reply:
+            tts = gTTS(text=remi_reply, lang='en', slow=False)
+            audio_bytes = io.BytesIO()
+            tts.write_to_fp(audio_bytes)
+            audio_bytes.seek(0)
+            st.audio(audio_bytes, format="audio/mp3", autoplay=True)
