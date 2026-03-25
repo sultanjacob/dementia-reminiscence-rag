@@ -1,1 +1,2 @@
 #In this app, we are going to develop a multi app
+#There are steps to follow like installing an app to my phone and using it to test what I have done so far, installing nodejs and other environmental apps
