@@ -13,7 +13,7 @@ async def root():
     
     try:
         # 2. Read the "Memory" file you just created
-        with open(memory_path, "r") as file:
+        with open(memory_path, "r", encoding="utf-8") as file:
             facts = file.readlines()
             # Grab the first fact for now to test the brain
             first_memory = facts[0].strip() if facts else "I have no memories yet."
