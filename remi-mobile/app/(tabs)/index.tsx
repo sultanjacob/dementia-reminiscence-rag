@@ -1,42 +1,49 @@
 import React, { useState } from 'react';
-import { ActivityIndicator, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 export default function Index() {
-  const [status, setStatus] = useState("Ready to chat!");
+  const [question, setQuestion] = useState("");
+  const [answer, setAnswer] = useState("Ask Remi about a family memory.");
   const [loading, setLoading] = useState(false);
 
-  // PASTE YOUR TUNNEL URL BELOW (Keep the / at the end)
-  const tunnelUrl = "https://ssk3gx0p-8080.uks1.devtunnels.ms/"; 
+  // PASTE YOUR TUNNEL URL HERE (Ends with /)
+  const tunnelUrl = "https://YOUR_LINK_HERE/"; 
 
-  const testConnection = async () => {
+  const askRemi = async () => {
+    if (!question) return;
     setLoading(true);
-    setStatus("Connecting to Remi...");
     try {
-      const response = await fetch(tunnelUrl);
+      // We are sending the question to the server
+      const response = await fetch(`${tunnelUrl}ask?q=${encodeURIComponent(question)}`);
       const data = await response.json();
-      setStatus(`Remi says: ${data.message}`);
+      setAnswer(data.message);
     } catch (error) {
-      setStatus("Error: Could not reach the server.");
-      console.log(error);
+      setAnswer("Error: Remi couldn't hear you.");
     }
     setLoading(false);
   };
 
   return (
-    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f0f4f8', padding: 20 }}>
-      <Text style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 10 }}>Remi Mobile 🧠</Text>
-      <Text style={{ fontSize: 16, textAlign: 'center', marginBottom: 30 }}>{status}</Text>
+    <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f0f4f8', padding: 20 }}>
+      <Text style={{ fontSize: 28, fontWeight: 'bold', color: '#003366', marginBottom: 10 }}>Remi 🧠</Text>
       
-      {loading ? (
-        <ActivityIndicator size="large" color="#007AFF" />
-      ) : (
-        <TouchableOpacity 
-          onPress={testConnection}
-          style={{ backgroundColor: '#007AFF', padding: 15, borderRadius: 10, width: '80%' }}
-        >
-          <Text style={{ color: 'white', textAlign: 'center', fontWeight: 'bold' }}>Wake Up Remi</Text>
-        </TouchableOpacity>
-      )}
-    </View>
+      <View style={{ backgroundColor: 'white', padding: 20, borderRadius: 15, width: '100%', marginBottom: 20, elevation: 3 }}>
+        <Text style={{ fontSize: 18, color: '#333', lineHeight: 24 }}>{answer}</Text>
+      </View>
+
+      <TextInput
+        style={{ backgroundColor: 'white', width: '100%', padding: 15, borderRadius: 10, marginBottom: 15, borderWidth: 1, borderColor: '#ddd' }}
+        placeholder="Type your question here..."
+        value={question}
+        onChangeText={setQuestion}
+      />
+
+      <TouchableOpacity 
+        onPress={askRemi}
+        style={{ backgroundColor: '#007AFF', padding: 15, borderRadius: 10, width: '100%' }}
+      >
+        {loading ? <ActivityIndicator color="white" /> : <Text style={{ color: 'white', textAlign: 'center', fontWeight: 'bold', fontSize: 16 }}>Ask Remi</Text>}
+      </TouchableOpacity>
+    </ScrollView>
   );
 }
