@@ -17,7 +17,7 @@ app.add_middleware(
 # PASTE YOUR GEMINI API KEY HERE
 GEMINI_API_KEY = "AIzaSyC6bSAcGY8EiuHWi5zaxBcxxCGq2cUeUzQ"
 genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel('gemini-1.5-flash')
+model = genai.GenerativeModel('gemini-1.5-flash-latest')
 
 @app.get("/ask")
 async def ask_remi(q: str = ""):
