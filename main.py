@@ -1,4 +1,21 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware  # ADD THIS LINE
+import os
+
+app = FastAPI()
+
+# ADD THESE LINES BELOW
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # This allows your phone to connect
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+@app.get("/ask")
+async def ask_remi(q: str = ""):
+    # ... (the rest of your code stays the same)
+from fastapi import FastAPI
 import os
 
 app = FastAPI()
