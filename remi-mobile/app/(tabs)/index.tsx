@@ -7,7 +7,7 @@ export default function Index() {
   const [loading, setLoading] = useState(false);
 
   // PASTE YOUR TUNNEL URL HERE (Ends with /)
-  const tunnelUrl = "https://ssk3gx0p-8080.uks1.devtunnels.ms/"; 
+  const tunnelUrl = "https://ssk3gx0p-8000.uks1.devtunnels.ms/"; 
 
   const askRemi = async () => {
     if (!question) return;
