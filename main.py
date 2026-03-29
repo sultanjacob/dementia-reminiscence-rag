@@ -1,10 +1,10 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+import google.generativeai as genai
 import os
 
 app = FastAPI()
 
-# This is the "Security Pass" that lets your phone talk to your computer
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -13,27 +13,39 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# --- CONFIGURATION ---
+# PASTE YOUR GEMINI API KEY HERE
+GEMINI_API_KEY = "YOUR_GEMINI_API_KEY_HERE"
+genai.configure(api_key=GEMINI_API_KEY)
+model = genai.GenerativeModel('gemini-1.5-flash')
+
 @app.get("/ask")
 async def ask_remi(q: str = ""):
     memory_path = "memories/family_facts.txt"
     try:
-        # We use utf-8 to handle any special characters
+        # 1. Read your family facts
         with open(memory_path, "r", encoding="utf-8") as file:
-            facts = file.readlines()
+            family_context = file.read()
             
-        # This searches your text file for the word you typed on your phone
-        found_facts = [f.strip() for f in facts if q.lower() in f.lower()]
+        # 2. Create the prompt for Gemini
+        prompt = f"""
+        You are Remi, a supportive dementia reminiscence assistant. 
+        Use the following family memories to answer the user's question. 
+        If the answer isn't in the memories, be gentle and say you don't recall that yet.
         
-        if found_facts:
-            response = found_facts[0]
-        else:
-            response = "I don't remember that specific detail yet. Should we add it?"
-            
-        return {"message": response}
+        Memories:
+        {family_context}
+        
+        User Question: {q}
+        """
+        
+        # 3. Get the answer from Gemini
+        response = model.generate_content(prompt)
+        
+        return {"message": response.text}
     except Exception as e:
-        return {"message": f"My brain is a bit fuzzy: {str(e)}"}
+        return {"message": f"Remi's brain is a bit fuzzy: {str(e)}"}
 
 if __name__ == "__main__":
     import uvicorn
-    # This starts the server on port 8080
-    uvicorn.run(app, host="0.0.0.0", port=8080)
+    uvicorn.run(app, host="0.0.0.0", port=8000)
