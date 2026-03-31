@@ -24,15 +24,23 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 3. Securely get the API Key from your keys.env file
-# TEMPORARY: Paste your key here directly to bypass the file error
-GEMINI_API_KEY = "AIzaSyYourNewFreshKeyHere" 
+# --- THE SECURE CONFIGURATION ---
+# This path is usually where keys.env hides. 
+# If it's in a different folder, we will find out in a second!
+load_dotenv("keys.env") 
+
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+
+# IF THE ABOVE FAILS, WE TRY THE SUBFOLDER
+if not GEMINI_API_KEY:
+    load_dotenv("remi-mobile/keys.env")
+    GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 if not GEMINI_API_KEY:
-    print("❌ Still no key!")
+    print("❌ STILL NO KEY! Please check your file name.")
 else:
     genai.configure(api_key=GEMINI_API_KEY)
-    print("✅ Gemini Brain successfully connected MANUALLY!")
+    print("✅ GEMINI IS CONNECTED PRIVATELY!")
 
 # 4. Use the stable model name
 model = genai.GenerativeModel('gemini-1.5-flash')
