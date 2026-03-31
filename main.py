@@ -40,7 +40,7 @@ else:
     genai.configure(api_key=GEMINI_API_KEY)
     print("✅ GEMINI IS CONNECTED PRIVATELY!")
 
-model = genai.GenerativeModel('gemini-1.5-flash')
+model = genai.GenerativeModel('models/gemini-1.5-flash-latest')
 
 # --- 4. THE ASK REMI ENDPOINT ---
 @app.get("/ask")
