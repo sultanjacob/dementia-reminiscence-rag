@@ -41,7 +41,7 @@ else:
 
 # We are using the most standard name. 
 # If the terminal list shows something different, we will change this!
-model = genai.GenerativeModel(' models/gemini-2.5-flash')
+model = genai.GenerativeModel('gemini-2.5-flash')
 
 # --- 4. THE ASK REMI ENDPOINT ---
 @app.get("/ask")
