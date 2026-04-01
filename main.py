@@ -6,19 +6,8 @@ from dotenv import load_dotenv
 
 # --- 1. SMART PATH CONFIGURATION ---
 basedir = os.path.abspath(os.path.dirname(__file__))
-
-# This tries multiple common locations for your keys.env file
-paths_to_check = [
-    os.path.join(basedir, "keys.env"),                # Root folder
-    os.path.join(basedir, "remi-mobile", "keys.env"),   # Subfolder
-]
-
-# Loop through paths until one works
-for path in paths_to_check:
-    if os.path.exists(path):
-        load_dotenv(path)
-        print(f"📍 Found keys.env at: {path}")
-        break
+dotenv_path = os.path.join(basedir, 'keys.env')
+load_dotenv(dotenv_path)
 
 app = FastAPI()
 
@@ -31,21 +20,32 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- 3. GEMINI SETUP ---
+# --- 3. GEMINI SETUP & DIAGNOSTICS ---
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 if not GEMINI_API_KEY:
-    print("❌ STILL NO KEY! Please ensure 'keys.env' contains: GEMINI_API_KEY=your_key")
+    print("❌ ERROR: No API Key found in keys.env!")
 else:
     genai.configure(api_key=GEMINI_API_KEY)
     print("✅ GEMINI IS CONNECTED PRIVATELY!")
+    
+    # --- THIS PART IS THE NUCLEAR DIAGNOSTIC ---
+    print("\n--- 📜 LIST OF MODELS YOUR KEY CAN SEE ---")
+    try:
+        for m in genai.list_models():
+            if 'generateContent' in m.supported_generation_methods:
+                print(f"AVAILABLE MODEL: {m.name}")
+    except Exception as e:
+        print(f"Could not list models: {e}")
+    print("-------------------------------------------\n")
 
-model = genai.GenerativeModel('models/gemini-1.5-flash')
+# We are using the most standard name. 
+# If the terminal list shows something different, we will change this!
+model = genai.GenerativeModel('gemini-1.5-flash')
 
 # --- 4. THE ASK REMI ENDPOINT ---
 @app.get("/ask")
 async def ask_remi(q: str = ""):
-    # Look for memories inside the 'memories' folder
     memory_path = os.path.join(basedir, "memories", "family_facts.txt")
     
     try:
@@ -70,9 +70,9 @@ async def ask_remi(q: str = ""):
         return {"message": response.text}
         
     except Exception as e:
+        # This error message will help us see if the 404 persists
         return {"message": f"Remi's brain is a bit fuzzy: {str(e)}"}
 
 if __name__ == "__main__":
     import uvicorn
-    # Port 8000 matches your VS Code Tunnel setup
     uvicorn.run(app, host="0.0.0.0", port=8000)
