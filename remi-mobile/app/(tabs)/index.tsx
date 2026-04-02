@@ -13,9 +13,9 @@ export default function Index() {
   // Function to make Remi talk
   const speakResponse = (text: string) => {
     Speech.speak(text, {
-      language: 'en-US',
+      language: 'en-GB',
       pitch: 1.0,
-      rate: 0.9, // Slightly slower is better for clarity
+      rate: 0.85, // Slightly slower is better for clarity
     });
   };
 
@@ -39,6 +39,14 @@ export default function Index() {
     setLoading(false);
   };
 
+  React.useEffect(() => {
+  const checkVoices = async () => {
+    const voices = await Speech.getAvailableVoicesAsync();
+    console.log("--- 🎙️ VOICES ON THIS PHONE ---");
+    voices.forEach(v => console.log(`${v.name} (${v.identifier})`));
+  };
+  checkVoices();
+}, []);
   return (
     <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f0f4f8', padding: 20 }}>
       <Text style={{ fontSize: 28, fontWeight: 'bold', color: '#003366', marginBottom: 10 }}>Remi 🧠</Text>
