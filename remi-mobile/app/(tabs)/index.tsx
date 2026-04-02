@@ -7,37 +7,46 @@ export default function Index() {
   const [answer, setAnswer] = useState("Ask Remi about a family memory.");
   const [loading, setLoading] = useState(false);
 
-  // PASTE YOUR TUNNEL URL HERE (Ends with /)
+  // ⚠️ Remember: Update this if your VS Code Tunnel URL changes!
   const tunnelUrl = "https://ssk3gx0p-8000.uks1.devtunnels.ms/"; 
+
+  // Function to make Remi talk
+  const speakResponse = (text: string) => {
+    Speech.speak(text, {
+      language: 'en-US',
+      pitch: 1.0,
+      rate: 0.9, // Slightly slower is better for clarity
+    });
+  };
 
   const askRemi = async () => {
     if (!question) return;
     setLoading(true);
     try {
-    const response = await fetch(`${tunnelUrl}/ask?q=${encodeURIComponent(userQuery)}`);
-    const data = await response.json();
-    setRemiResponse(data.message);
+      // 1. Send the question to the Python Brain
+      const response = await fetch(`${tunnelUrl}ask?q=${encodeURIComponent(question)}`);
+      const data = await response.json();
+      
+      const remiMessage = data.message;
+      setAnswer(remiMessage);
 
-    // --- NEW: TELL REMI TO SPEAK ---
-    Speech.speak(data.message, {
-      language: 'en-US', // You can change to 'en-GB' for a British accent!
-      pitch: 1.0,
-      rate: 0.9, // Slightly slower is often better for dementia care
-    });
+      // 2. Speak the answer automatically
+      speakResponse(remiMessage);
 
-  } catch (error) {
-    setRemiResponse("Remi's brain is a bit fuzzy: " + error.message);
-  } finally {
+    } catch (error) {
+      setAnswer("Error: Remi couldn't hear you.");
+    }
     setLoading(false);
-  }
-};
+  };
+
   return (
     <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f0f4f8', padding: 20 }}>
       <Text style={{ fontSize: 28, fontWeight: 'bold', color: '#003366', marginBottom: 10 }}>Remi 🧠</Text>
       
       <View style={{ backgroundColor: 'white', padding: 20, borderRadius: 15, width: '100%', marginBottom: 20, elevation: 3 }}>
         <Text style={{ fontSize: 18, color: '#333', lineHeight: 24 }}>{answer}</Text>
-      {/* --- NEW: LISTEN AGAIN BUTTON --- */}
+        
+        {/* --- NEW: LISTEN AGAIN BUTTON --- */}
         {answer !== "Ask Remi about a family memory." && !loading && (
           <TouchableOpacity 
             onPress={() => speakResponse(answer)}
