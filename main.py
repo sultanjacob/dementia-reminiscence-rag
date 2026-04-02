@@ -72,7 +72,40 @@ async def ask_remi(q: str = ""):
     except Exception as e:
         # This error message will help us see if the 404 persists
         return {"message": f"Remi's brain is a bit fuzzy: {str(e)}"}
+import base64
 
+@app.post("/describe-image")
+async def describe_image(data: dict):
+    try:
+        # 1. Get the image data from the phone
+        image_data = data.get("image") # This will be a base64 string
+        
+        # 2. Read your family facts for context
+        basedir = os.path.abspath(os.path.dirname(__file__))
+        memory_path = os.path.join(basedir, "memories", "family_facts.txt")
+        with open(memory_path, "r", encoding="utf-8") as file:
+            family_context = file.read()
+
+        # 3. Prepare the image for Gemini
+        image_bytes = base64.b64decode(image_data)
+        
+        # 4. Ask Gemini to look and remember
+        prompt = f"""
+        Look at this photo. Using these family memories, identify who is in the photo 
+        and tell a warm story about them. 
+        
+        Memories: {family_context}
+        """
+        
+        # This is the "Vision" call
+        response = model.generate_content([
+            prompt, 
+            {"mime_type": "image/jpeg", "data": image_bytes}
+        ])
+        
+        return {"message": response.text}
+    except Exception as e:
+        return {"message": f"Remi's eyes are a bit blurry: {str(e)}"}
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
