@@ -1,4 +1,4 @@
-import * as ImagePicker from 'expo-image-picker'; // --- NEW: Import the Camera ---
+import * as ImagePicker from 'expo-image-picker';
 import * as Speech from 'expo-speech';
 import React, { useState } from 'react';
 import { ActivityIndicator, Image, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
@@ -9,13 +9,13 @@ export default function Index() {
   const [loading, setLoading] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
+  // ⚠️ Remember to double-check this URL if you restart VS Code!
   const tunnelUrl = "https://ssk3gx0p-8000.uks1.devtunnels.ms/"; 
 
   const speakResponse = (text: string) => {
     Speech.speak(text, { language: 'en-GB', pitch: 1.0, rate: 0.85 });
   };
 
-  // --- NEW: Take a Photo and send to Remi ---
   const takePhoto = async () => {
     const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
     if (permissionResult.granted === false) {
@@ -25,14 +25,17 @@ export default function Index() {
 
     const result = await ImagePicker.launchCameraAsync({
       allowsEditing: true,
-      quality: 0.5, // Lower quality for faster upload
-      base64: true, // IMPORTANT: We need the base64 string for Python
+      aspect: [1, 1], // Square photos use less data
+      quality: 0.2,   // <--- IMPORTANT: Lower quality bypasses tunnel limits
+      base64: true, 
     });
 
     if (!result.canceled && result.assets[0].base64) {
       setSelectedImage(result.assets[0].uri);
       setLoading(true);
       setAnswer("Remi is looking at the photo...");
+      
+      console.log("📤 Sending photo to Python server...");
 
       try {
         const response = await fetch(`${tunnelUrl}describe-image`, {
@@ -41,13 +44,18 @@ export default function Index() {
           body: JSON.stringify({ image: result.assets[0].base64 }),
         });
 
+        if (!response.ok) throw new Error("Server connection failed");
+
         const data = await response.json();
+        console.log("✅ Response received from Remi!");
         setAnswer(data.message);
         speakResponse(data.message);
       } catch (error) {
-        setAnswer("Remi's eyes are a bit blurry right now.");
+        console.log("❌ Photo Upload Error:", error);
+        setAnswer("Remi's eyes are a bit blurry. Try taking the photo again.");
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     }
   };
 
@@ -55,14 +63,17 @@ export default function Index() {
     if (!question) return;
     setLoading(true);
     try {
+      console.log("💬 Sending text question...");
       const response = await fetch(`${tunnelUrl}ask?q=${encodeURIComponent(question)}`);
       const data = await response.json();
       setAnswer(data.message);
       speakResponse(data.message);
     } catch (error) {
+      console.log("❌ Text Question Error:", error);
       setAnswer("Error: Remi couldn't hear you.");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   return (
@@ -70,11 +81,20 @@ export default function Index() {
       <Text style={{ fontSize: 28, fontWeight: 'bold', color: '#003366', marginBottom: 10 }}>Remi 🧠</Text>
       
       <View style={{ backgroundColor: 'white', padding: 20, borderRadius: 15, width: '100%', marginBottom: 20, elevation: 3 }}>
-        {selectedImage && <Image source={{ uri: selectedImage }} style={{ width: '100%', height: 200, borderRadius: 10, marginBottom: 15 }} />}
+        {selectedImage && (
+          <Image 
+            source={{ uri: selectedImage }} 
+            style={{ width: '100%', height: 250, borderRadius: 10, marginBottom: 15 }} 
+            resizeMode="cover"
+          />
+        )}
         <Text style={{ fontSize: 18, color: '#333', lineHeight: 24 }}>{answer}</Text>
         
         {answer !== "Ask Remi about a family memory or show her a photo." && !loading && (
-          <TouchableOpacity onPress={() => speakResponse(answer)} style={{ marginTop: 15, padding: 10, backgroundColor: '#eef2f6', borderRadius: 8, alignSelf: 'flex-start' }}>
+          <TouchableOpacity 
+            onPress={() => speakResponse(answer)} 
+            style={{ marginTop: 15, padding: 10, backgroundColor: '#eef2f6', borderRadius: 8, alignSelf: 'flex-start' }}
+          >
             <Text style={{ color: '#007AFF', fontWeight: 'bold' }}>🔈 Listen Again</Text>
           </TouchableOpacity>
         )}
@@ -87,13 +107,20 @@ export default function Index() {
         onChangeText={setQuestion}
       />
 
-      <TouchableOpacity onPress={askRemi} style={{ backgroundColor: '#007AFF', padding: 15, borderRadius: 10, width: '100%', marginBottom: 10 }}>
-        {loading ? <ActivityIndicator color="white" /> : <Text style={{ color: 'white', textAlign: 'center', fontWeight: 'bold' }}>Ask Remi</Text>}
+      <TouchableOpacity 
+        onPress={askRemi} 
+        style={{ backgroundColor: '#007AFF', padding: 15, borderRadius: 10, width: '100%', marginBottom: 10 }}
+        disabled={loading}
+      >
+        {loading && !selectedImage ? <ActivityIndicator color="white" /> : <Text style={{ color: 'white', textAlign: 'center', fontWeight: 'bold' }}>Ask Remi</Text>}
       </TouchableOpacity>
 
-      {/* --- NEW: CAMERA BUTTON --- */}
-      <TouchableOpacity onPress={takePhoto} style={{ backgroundColor: '#34C759', padding: 15, borderRadius: 10, width: '100%' }}>
-        <Text style={{ color: 'white', textAlign: 'center', fontWeight: 'bold' }}>📸 Show a Photo</Text>
+      <TouchableOpacity 
+        onPress={takePhoto} 
+        style={{ backgroundColor: '#34C759', padding: 15, borderRadius: 10, width: '100%' }}
+        disabled={loading}
+      >
+        {loading && selectedImage ? <ActivityIndicator color="white" /> : <Text style={{ color: 'white', textAlign: 'center', fontWeight: 'bold' }}>📸 Show a Photo</Text>}
       </TouchableOpacity>
     </ScrollView>
   );
