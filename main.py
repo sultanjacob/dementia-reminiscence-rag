@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import google.generativeai as genai
 import os
+import base64
 from dotenv import load_dotenv
 
 # --- 1. SMART PATH CONFIGURATION ---
@@ -29,8 +30,8 @@ else:
     genai.configure(api_key=GEMINI_API_KEY)
     print("✅ GEMINI IS CONNECTED PRIVATELY!")
     
-    # --- THIS PART IS THE NUCLEAR DIAGNOSTIC ---
-    print("\n--- 📜 LIST OF MODELS YOUR KEY CAN SEE ---")
+    # Check for the correct model
+    print("\n--- 📜 RE-CHECKING AVAILABLE MODELS ---")
     try:
         for m in genai.list_models():
             if 'generateContent' in m.supported_generation_methods:
@@ -39,13 +40,13 @@ else:
         print(f"Could not list models: {e}")
     print("-------------------------------------------\n")
 
-# We are using the most standard name. 
-# If the terminal list shows something different, we will change this!
+# Use the model name that worked previously
 model = genai.GenerativeModel('gemini-2.5-flash')
 
-# --- 4. THE ASK REMI ENDPOINT ---
+# --- 4. THE ASK REMI ENDPOINT (TEXT ONLY) ---
 @app.get("/ask")
 async def ask_remi(q: str = ""):
+    print(f"💬 Received text question: {q}")
     memory_path = os.path.join(basedir, "memories", "family_facts.txt")
     
     try:
@@ -70,18 +71,22 @@ async def ask_remi(q: str = ""):
         return {"message": response.text}
         
     except Exception as e:
-        # This error message will help us see if the 404 persists
         return {"message": f"Remi's brain is a bit fuzzy: {str(e)}"}
-import base64
 
+# --- 5. THE VISION ENDPOINT (PHOTO RECOGNITION) ---
 @app.post("/describe-image")
 async def describe_image(data: dict):
+    print("📸 RECEIVED A PHOTO REQUEST!") 
     try:
         # 1. Get the image data from the phone
-        image_data = data.get("image") # This will be a base64 string
-        
-        # 2. Read your family facts for context
-        basedir = os.path.abspath(os.path.dirname(__file__))
+        image_data = data.get("image") 
+        if not image_data:
+            print("⚠️ No image data found in request!")
+            return {"message": "I didn't receive a photo."}
+
+        print(f"📦 Image received! Size: {len(image_data)} characters.")
+
+        # 2. Read family facts for context
         memory_path = os.path.join(basedir, "memories", "family_facts.txt")
         with open(memory_path, "r", encoding="utf-8") as file:
             family_context = file.read()
@@ -92,20 +97,26 @@ async def describe_image(data: dict):
         # 4. Ask Gemini to look and remember
         prompt = f"""
         Look at this photo. Using these family memories, identify who is in the photo 
-        and tell a warm story about them. 
+        and tell a warm story about them. If you aren't sure, describe what you see 
+        kindly.
         
         Memories: {family_context}
         """
         
-        # This is the "Vision" call
+        print("🧠 Remi is looking at the photo and searching memories...")
         response = model.generate_content([
             prompt, 
             {"mime_type": "image/jpeg", "data": image_bytes}
         ])
         
+        print("✅ Remi found a match!")
         return {"message": response.text}
+
     except Exception as e:
+        print(f"❌ Error during vision processing: {str(e)}")
         return {"message": f"Remi's eyes are a bit blurry: {str(e)}"}
+
 if __name__ == "__main__":
     import uvicorn
+    # Start the server
     uvicorn.run(app, host="0.0.0.0", port=8000)
