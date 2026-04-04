@@ -43,40 +43,34 @@ async def ask_remi(q: str = ""):
     return {"message": response.text}
 
 # --- 3. PHOTO ENDPOINT (THE FIX) ---
+from fastapi import UploadFile, File, Form
+
 @app.post("/describe-image")
-async def describe_image(request: Request):
-    print("📸 !!! PHOTO SIGNAL DETECTED !!!") 
+async def describe_image(image: UploadFile = File(...)):
+    print("📸 !!! PHOTO SIGNAL RECEIVED via FORM !!!") 
     try:
-        # Get raw data to ensure nothing is missed
-        data = await request.json()
-        image_data = data.get("image")
-        
-        if not image_data:
-            print("⚠️ Blank image received")
-            return {"message": "The photo was empty."}
+        # Read the file directly
+        contents = await image.read()
+        print(f"📦 Image received! Size: {len(contents)} bytes")
 
-        print(f"📦 Successfully unpacked image ({len(image_data)} chars)")
-
+        # Load memories
         memory_path = os.path.join(basedir, "memories", "family_facts.txt")
         with open(memory_path, "r", encoding="utf-8") as file:
             family_context = file.read()
 
-        image_bytes = base64.b64decode(image_data)
+        # Ask Gemini
         prompt = f"Identify the person in this photo using these memories: {family_context}"
-        
-        print("🧠 Remi is thinking...")
         response = model.generate_content([
             prompt, 
-            {"mime_type": "image/jpeg", "data": image_bytes}
+            {"mime_type": "image/jpeg", "data": contents}
         ])
         
-        print("✅ Success!")
+        print("✅ Remi successfully processed the image!")
         return {"message": response.text}
 
     except Exception as e:
         print(f"❌ Error: {str(e)}")
-        return {"message": f"Error: {str(e)}"}
-
+        return {"message": f"Remi's eyes are a bit blurry: {str(e)}"}
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
