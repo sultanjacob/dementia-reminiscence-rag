@@ -76,7 +76,7 @@ async def ask_remi(q: str = ""):
 # --- 5. THE VISION ENDPOINT (PHOTO RECOGNITION) ---
 @app.post("/describe-image")
 async def describe_image(data: dict):
-    print("📸 RECEIVED A PHOTO REQUEST!") 
+    print("📸 !!! PHOTO REQUEST RECEIVED !!!") 
     try:
         # 1. Get the image data from the phone
         image_data = data.get("image") 
