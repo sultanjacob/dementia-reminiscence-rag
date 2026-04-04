@@ -9,66 +9,80 @@ export default function Index() {
   const [loading, setLoading] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
-  // ⚠️ Remember to double-check this URL if you restart VS Code!
+  // ⚠️ Double-check this URL in VS Code Ports tab if you restart!
   const tunnelUrl = "https://ssk3gx0p-8000.uks1.devtunnels.ms/"; 
 
   const speakResponse = (text: string) => {
     Speech.speak(text, { language: 'en-GB', pitch: 1.0, rate: 0.85 });
   };
 
-const takePhoto = async () => {
+  const takePhoto = async () => {
     const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
     if (!permissionResult.granted) {
-      alert("Permission denied!");
+      alert("Remi needs camera permission!");
       return;
     }
 
     const result = await ImagePicker.launchCameraAsync({
       allowsEditing: true,
       aspect: [1, 1],
-      quality: 0.1, // THE SMALLEST POSSIBLE QUALITY
-      base64: true,
+      quality: 0.2, // Low quality for faster tunnel transfer
     });
 
-    if (!result.canceled && result.assets[0].base64) {
-      setSelectedImage(result.assets[0].uri);
+    if (!result.canceled) {
+      const imageUri = result.assets[0].uri;
+      setSelectedImage(imageUri);
       setLoading(true);
-      setAnswer("Remi is looking...");
+      setAnswer("Remi is looking at the photo...");
+
+      // --- NEW: Using FormData instead of JSON/Base64 ---
+      const formData = new FormData();
+      // @ts-ignore
+      formData.append('image', {
+        uri: imageUri,
+        name: 'photo.jpg',
+        type: 'image/jpeg',
+      });
 
       try {
-        console.log("📤 Sending photo...");
+        console.log("📤 Uploading via FormData...");
         const response = await fetch(`${tunnelUrl}describe-image`, {
           method: 'POST',
+          body: formData,
           headers: {
             'Accept': 'application/json',
-            'Content-Type': 'application/json',
+            // Note: Don't set Content-Type header manually when using FormData
           },
-          body: JSON.stringify({ image: result.assets[0].base64 }),
         });
+
+        if (!response.ok) {
+            throw new Error(`Server responded with ${response.status}`);
+        }
 
         const data = await response.json();
         setAnswer(data.message);
         speakResponse(data.message);
       } catch (error) {
-        // THIS ALERT IS THE KEY - TELL ME WHAT IT SAYS!
-        alert("Photo Error: " + error.message); 
-        setAnswer("Connection timed out while sending the photo.");
+        console.log("❌ Photo Error:", error);
+        alert("Photo Error: " + error.message);
+        setAnswer("Remi's eyes are a bit blurry. Check if your VS Code Port is set to 'Public'.");
       } finally {
         setLoading(false);
       }
     }
   };
+
   const askRemi = async () => {
     if (!question) return;
     setLoading(true);
     try {
-      console.log("💬 Sending text question...");
+      console.log("💬 Sending text...");
       const response = await fetch(`${tunnelUrl}ask?q=${encodeURIComponent(question)}`);
       const data = await response.json();
       setAnswer(data.message);
       speakResponse(data.message);
     } catch (error) {
-      console.log("❌ Text Question Error:", error);
+      console.log("❌ Text Error:", error);
       setAnswer("Error: Remi couldn't hear you.");
     } finally {
       setLoading(false);
