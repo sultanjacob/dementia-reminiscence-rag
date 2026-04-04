@@ -16,49 +16,48 @@ export default function Index() {
     Speech.speak(text, { language: 'en-GB', pitch: 1.0, rate: 0.85 });
   };
 
-  const takePhoto = async () => {
+const takePhoto = async () => {
     const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
-    if (permissionResult.granted === false) {
-      alert("Remi needs permission to use your camera!");
+    if (!permissionResult.granted) {
+      alert("Permission denied!");
       return;
     }
 
     const result = await ImagePicker.launchCameraAsync({
       allowsEditing: true,
-      aspect: [1, 1], // Square photos use less data
-      quality: 0.2,   // <--- IMPORTANT: Lower quality bypasses tunnel limits
-      base64: true, 
+      aspect: [1, 1],
+      quality: 0.1, // THE SMALLEST POSSIBLE QUALITY
+      base64: true,
     });
 
     if (!result.canceled && result.assets[0].base64) {
       setSelectedImage(result.assets[0].uri);
       setLoading(true);
-      setAnswer("Remi is looking at the photo...");
-      
-      console.log("📤 Sending photo to Python server...");
+      setAnswer("Remi is looking...");
 
       try {
+        console.log("📤 Sending photo...");
         const response = await fetch(`${tunnelUrl}describe-image`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+          },
           body: JSON.stringify({ image: result.assets[0].base64 }),
         });
 
-        if (!response.ok) throw new Error("Server connection failed");
-
         const data = await response.json();
-        console.log("✅ Response received from Remi!");
         setAnswer(data.message);
         speakResponse(data.message);
       } catch (error) {
-        console.log("❌ Photo Upload Error:", error);
-        setAnswer("Remi's eyes are a bit blurry. Try taking the photo again.");
+        // THIS ALERT IS THE KEY - TELL ME WHAT IT SAYS!
+        alert("Photo Error: " + error.message); 
+        setAnswer("Connection timed out while sending the photo.");
       } finally {
         setLoading(false);
       }
     }
   };
-
   const askRemi = async () => {
     if (!question) return;
     setLoading(true);
