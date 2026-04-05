@@ -24,7 +24,7 @@ export default function Index() {
     }
 
     const result = await ImagePicker.launchCameraAsync({
-      allowsEditing: true,
+      allowsEditing: false,
       aspect: [1, 1],
       quality: 0.2, // Low quality for faster tunnel transfer
     });
