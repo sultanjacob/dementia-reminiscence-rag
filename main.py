@@ -80,6 +80,36 @@ async def describe_image(image: UploadFile = File(...)):
     except Exception as e:
         print(f"❌ Error: {str(e)}")
         return {"message": f"Remi's eyes are a bit blurry: {str(e)}"}
+import uuid
+
+# Create a folder for photos if it doesn't exist
+UPLOAD_FOLDER = os.path.join(basedir, "memories", "photos")
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+@app.post("/teach-remi")
+async def teach_remi(image: UploadFile = File(...), description: str = Form(...)):
+    print(f"📖 TEACHING REMI: {description}")
+    try:
+        # 1. Save the Photo with a unique name
+        file_extension = image.filename.split(".")[-1]
+        unique_filename = f"{uuid.uuid4()}.{file_extension}"
+        file_path = os.path.join(UPLOAD_FOLDER, unique_filename)
+        
+        contents = await image.read()
+        with open(file_path, "wb") as f:
+            f.write(contents)
+
+        # 2. Append the description to your family_facts.txt
+        memory_path = os.path.join(basedir, "memories", "family_facts.txt")
+        with open(memory_path, "a", encoding="utf-8") as file:
+            file.write(f"\n- NEW MEMORY: {description} (Photo saved as {unique_filename})")
+
+        print("✅ Memory saved successfully!")
+        return {"message": f"I've tucked that memory away! I now know: {description}"}
+
+    except Exception as e:
+        print(f"❌ Failed to learn: {e}")
+        return {"message": "I'm sorry, I couldn't save that memory right now."}
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
