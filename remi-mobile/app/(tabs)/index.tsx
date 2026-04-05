@@ -13,7 +13,11 @@ export default function Index() {
   const tunnelUrl = "https://ssk3gx0p-8000.uks1.devtunnels.ms/"; 
 
   const speakResponse = (text: string) => {
-    Speech.speak(text, { language: 'en-GB', pitch: 1.0, rate: 0.85 });
+    Speech.speak(text, { 
+      language: 'en-GB', 
+      pitch: 0.9,  // Lowering pitch slightly makes it sound warmer/older
+      rate: 0.8,   // Slowing it down further helps with clarity for dementia care
+    });
   };
 
   const takePhoto = async () => {
