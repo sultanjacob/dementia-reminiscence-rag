@@ -59,7 +59,16 @@ async def describe_image(image: UploadFile = File(...)):
             family_context = file.read()
 
         # Ask Gemini
-        prompt = f"Identify the person in this photo using these memories: {family_context}"
+       # 4. Ask Gemini to look and remember (Updated for warmth)
+        prompt = f"""
+        Identify the person in this photo using these memories: {family_context}
+        
+        IMPORTANT INSTRUCTIONS FOR YOUR RESPONSE:
+        1. Speak directly to the user as Remi.
+        2. Do NOT use any bullet points, stars (**), or special characters.
+        3. Keep the answer warm, brief (2-3 sentences), and conversational.
+        4. If it's Sarah, say something like 'Oh, I see Sarah! She has such a lovely smile.'
+        """
         response = model.generate_content([
             prompt, 
             {"mime_type": "image/jpeg", "data": contents}
