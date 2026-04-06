@@ -98,7 +98,41 @@ async def teach_remi(image: UploadFile = File(...), description: str = Form(...)
     except Exception as e:
         print(f"❌ Failed to learn: {e}")
         return {"message": f"I'm sorry, I couldn't save that: {str(e)}"}
+from datetime import datetime
 
+@app.get("/check-routine")
+async def check_routine():
+    print("⏰ Checking the daily routine...")
+    try:
+        # 1. Get the current time
+        now = datetime.now().strftime("%H:%M")
+        
+        # 2. Read the routine file
+        routine_path = os.path.join(basedir, "memories", "routine.txt")
+        if not os.path.exists(routine_path):
+            return {"message": "I don't have a schedule set for today yet."}
+            
+        with open(routine_path, "r", encoding="utf-8") as file:
+            routine_context = file.read()
+
+        # 3. Ask Gemini to be the "Clock"
+        prompt = f"""
+        You are Remi. The current time is {now}. 
+        Here is the user's daily routine:
+        {routine_context}
+        
+        Look at the time. If there is an event happening now or in the next 30 minutes, 
+        remind the user in a very gentle, warm way. 
+        If nothing is happening soon, just give a warm greeting like 'It's a lovely {now} in the afternoon, just enjoy your quiet time.'
+        
+        Do not use any special characters or stars.
+        """
+        
+        response = model.generate_content(prompt)
+        return {"message": response.text}
+
+    except Exception as e:
+        return {"message": f"I lost track of time for a moment: {str(e)}"}
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
