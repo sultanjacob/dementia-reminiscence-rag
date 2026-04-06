@@ -1,15 +1,8 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 import google.generativeai as genai
 import os
-import base64
-from dotenv import load_dotenv
-
-from fastapi import FastAPI, Request
-from fastapi.middleware.cors import CORSMiddleware
-import google.generativeai as genai
-import os
-import base64
+import uuid
 from dotenv import load_dotenv
 
 # --- 1. SETUP ---
@@ -18,6 +11,7 @@ load_dotenv(os.path.join(basedir, 'keys.env'))
 
 app = FastAPI()
 
+# SECURITY (CORS)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -26,11 +20,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# GEMINI CONFIG
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 genai.configure(api_key=GEMINI_API_KEY)
 model = genai.GenerativeModel('gemini-2.5-flash')
 
-# --- 2. TEXT ENDPOINT (WORKING) ---
+# Create a folder for photos if it doesn't exist
+UPLOAD_FOLDER = os.path.join(basedir, "memories", "photos")
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+# --- 2. TEXT ENDPOINT ---
 @app.get("/ask")
 async def ask_remi(q: str = ""):
     print(f"💬 TEXT RECEIVED: {q}")
@@ -42,74 +41,64 @@ async def ask_remi(q: str = ""):
     response = model.generate_content(prompt)
     return {"message": response.text}
 
-# --- 3. PHOTO ENDPOINT (THE FIX) ---
-from fastapi import UploadFile, File, Form
-
+# --- 3. PHOTO RECOGNITION ENDPOINT ---
 @app.post("/describe-image")
 async def describe_image(image: UploadFile = File(...)):
-    print("📸 !!! PHOTO SIGNAL RECEIVED via FORM !!!") 
+    print("📸 !!! PHOTO SIGNAL RECEIVED (ASK MODE) !!!") 
     try:
-        # Read the file directly
         contents = await image.read()
-        print(f"📦 Image received! Size: {len(contents)} bytes")
-
-        # Load memories
+        
         memory_path = os.path.join(basedir, "memories", "family_facts.txt")
         with open(memory_path, "r", encoding="utf-8") as file:
             family_context = file.read()
 
-        # Ask Gemini
-       # 4. Ask Gemini to look and remember (Updated for warmth)
         prompt = f"""
         Identify the person in this photo using these memories: {family_context}
         
-        IMPORTANT INSTRUCTIONS FOR YOUR RESPONSE:
+        IMPORTANT INSTRUCTIONS:
         1. Speak directly to the user as Remi.
         2. Do NOT use any bullet points, stars (**), or special characters.
         3. Keep the answer warm, brief (2-3 sentences), and conversational.
-        4. If it's Sarah, say something like 'Oh, I see Sarah! She has such a lovely smile.'
         """
+        
         response = model.generate_content([
             prompt, 
             {"mime_type": "image/jpeg", "data": contents}
         ])
         
-        print("✅ Remi successfully processed the image!")
+        print("✅ Remi successfully identified the person!")
         return {"message": response.text}
 
     except Exception as e:
         print(f"❌ Error: {str(e)}")
         return {"message": f"Remi's eyes are a bit blurry: {str(e)}"}
-import uuid
 
-# Create a folder for photos if it doesn't exist
-UPLOAD_FOLDER = os.path.join(basedir, "memories", "photos")
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-
+# --- 4. TEACH REMI ENDPOINT ---
 @app.post("/teach-remi")
 async def teach_remi(image: UploadFile = File(...), description: str = Form(...)):
-    print(f"📖 TEACHING REMI: {description}")
+    print(f"📖 TEACHING MODE: {description}")
     try:
-        # 1. Save the Photo with a unique name
-        file_extension = image.filename.split(".")[-1]
-        unique_filename = f"{uuid.uuid4()}.{file_extension}"
-        file_path = os.path.join(UPLOAD_FOLDER, unique_filename)
+        # Save the Photo
+        file_ext = image.filename.split(".")[-1] if "." in image.filename else "jpg"
+        unique_name = f"{uuid.uuid4()}.{file_ext}"
+        file_path = os.path.join(UPLOAD_FOLDER, unique_name)
         
         contents = await image.read()
         with open(file_path, "wb") as f:
             f.write(contents)
 
-        # 2. Append the description to your family_facts.txt
+        # Update the memory file
         memory_path = os.path.join(basedir, "memories", "family_facts.txt")
         with open(memory_path, "a", encoding="utf-8") as file:
-            file.write(f"\n- NEW MEMORY: {description} (Photo saved as {unique_filename})")
+            file.write(f"\n- {description}")
 
-        print("✅ Memory saved successfully!")
+        print("✅ Memory saved to text file!")
         return {"message": f"I've tucked that memory away! I now know: {description}"}
 
     except Exception as e:
         print(f"❌ Failed to learn: {e}")
-        return {"message": "I'm sorry, I couldn't save that memory right now."}
+        return {"message": f"I'm sorry, I couldn't save that: {str(e)}"}
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
