@@ -10,10 +10,26 @@ export default function Index() {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [isTeachingMode, setIsTeachingMode] = useState(false); // Toggle between Ask and Teach
 
+  // ⚠️ Ensure this matches your VS Code Ports tab URL!
   const tunnelUrl = "https://ssk3gx0p-8000.uks1.devtunnels.ms/"; 
 
   const speakResponse = (text: string) => {
     Speech.speak(text, { language: 'en-GB', pitch: 0.9, rate: 0.8 });
+  };
+
+  // --- NEW: Check Daily Routine ---
+  const checkRoutine = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch(`${tunnelUrl}check-routine`);
+      const data = await response.json();
+      setAnswer(data.message);
+      speakResponse(data.message);
+    } catch (error) {
+      setAnswer("I'm not sure what's next on the schedule.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleAction = async () => {
@@ -54,7 +70,7 @@ export default function Index() {
           const data = await response.json();
           setAnswer(data.message);
           speakResponse(data.message);
-          setInputText(""); // Clear text after learning
+          setInputText(""); 
         } else {
           // --- ASK MODE ---
           const response = await fetch(`${tunnelUrl}describe-image`, {
@@ -77,6 +93,15 @@ export default function Index() {
     <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f0f4f8', padding: 20 }}>
       <Text style={{ fontSize: 28, fontWeight: 'bold', color: '#003366', marginBottom: 5 }}>Remi 🧠</Text>
       
+      {/* NEW: ROUTINE BUTTON */}
+      <TouchableOpacity 
+        onPress={checkRoutine} 
+        style={{ backgroundColor: '#FF9500', padding: 12, borderRadius: 25, marginBottom: 15, width: '70%', elevation: 2 }}
+        disabled={loading}
+      >
+        <Text style={{ color: 'white', textAlign: 'center', fontWeight: 'bold', fontSize: 16 }}>🕒 What should I do now?</Text>
+      </TouchableOpacity>
+
       {/* MODE SWITCHER */}
       <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 15 }}>
         <Text style={{ marginRight: 10, color: isTeachingMode ? '#666' : '#007AFF', fontWeight: 'bold' }}>Ask Mode</Text>
@@ -112,6 +137,9 @@ export default function Index() {
           </Text>
         )}
       </TouchableOpacity>
+    </ScrollView>
+  );
+}
     </ScrollView>
   );
 }
