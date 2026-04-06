@@ -140,6 +140,3 @@ export default function Index() {
     </ScrollView>
   );
 }
-    </ScrollView>
-  );
-}
