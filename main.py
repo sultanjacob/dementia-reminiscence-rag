@@ -10,7 +10,8 @@ basedir = os.path.abspath(os.path.dirname(__file__))
 load_dotenv(os.path.join(basedir, 'keys.env'))
 
 app = FastAPI()
-
+# This tells Python to let the app see the photos folder directly
+app.mount("/photos", StaticFiles(directory=os.path.join(basedir, "memories", "photos")), name="photos")
 # SECURITY (CORS)
 app.add_middleware(
     CORSMiddleware,
