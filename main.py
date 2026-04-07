@@ -4,7 +4,7 @@ import google.generativeai as genai
 import os
 import uuid
 from dotenv import load_dotenv
-
+from fastapi.staticfiles import StaticFiles
 # --- 1. SETUP ---
 basedir = os.path.abspath(os.path.dirname(__file__))
 load_dotenv(os.path.join(basedir, 'keys.env'))
