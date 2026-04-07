@@ -133,6 +133,23 @@ async def check_routine():
 
     except Exception as e:
         return {"message": f"I lost track of time for a moment: {str(e)}"}
+@app.get("/get-memories")
+async def get_memories():
+    print("🖼️ Fetching the memory gallery...")
+    try:
+        photo_dir = os.path.join(basedir, "memories", "photos")
+        if not os.path.exists(photo_dir):
+            return {"memories": []}
+
+        # List all photo files
+        photos = os.listdir(photo_dir)
+        
+        # We will return the filenames. 
+        # Note: In a real app, we'd link these to the specific descriptions, 
+        # but for now, let's just get the images showing!
+        return {"photos": photos}
+    except Exception as e:
+        return {"error": str(e)}
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
