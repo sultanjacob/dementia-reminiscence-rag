@@ -5,6 +5,22 @@ import os
 import uuid
 from dotenv import load_dotenv
 from fastapi.staticfiles import StaticFiles
+from fastapi.staticfiles import StaticFiles
+
+# Add this right after app = FastAPI()
+app.mount("/photos", StaticFiles(directory=os.path.join(basedir, "memories", "photos")), name="photos")
+
+@app.get("/get-memories")
+async def get_memories():
+    try:
+        photo_dir = os.path.join(basedir, "memories", "photos")
+        if not os.path.exists(photo_dir):
+            return {"photos": []}
+        # Get all filenames in the folder
+        photos = [f for f in os.listdir(photo_dir) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
+        return {"photos": photos}
+    except Exception as e:
+        return {"error": str(e)}
 # --- 1. SETUP ---
 basedir = os.path.abspath(os.path.dirname(__file__))
 load_dotenv(os.path.join(basedir, 'keys.env'))
