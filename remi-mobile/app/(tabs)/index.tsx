@@ -3,6 +3,8 @@ import * as Speech from 'expo-speech';
 import React, { useState } from 'react';
 import { ActivityIndicator, Image, Modal, ScrollView, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
+const [galleryOpen, setGalleryOpen] = useState(false);
+const [galleryImages, setGalleryImages] = useState([]);
 export default function Index() {
   const [inputText, setInputText] = useState("");
   const [answer, setAnswer] = useState("Ask Remi a question or teach her a new memory.");
