@@ -65,7 +65,20 @@ export default function Index() {
       }
     }
   };
-
+const openGallery = async () => {
+  setMenuOpen(false); // Close sidebar
+  setLoading(true);
+  try {
+    const response = await fetch(`${tunnelUrl}get-memories`);
+    const data = await response.json();
+    setGalleryImages(data.photos || []);
+    setGalleryOpen(true);
+  } catch (error) {
+    alert("Could not load gallery.");
+  } finally {
+    setLoading(false);
+  }
+};
   return (
     <View style={{ flex: 1, backgroundColor: '#f0f4f8' }}>
       {/* --- TOP BAR WITH 3 LINES --- */}
