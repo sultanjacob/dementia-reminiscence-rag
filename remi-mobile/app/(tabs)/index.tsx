@@ -3,15 +3,16 @@ import * as Speech from 'expo-speech';
 import React, { useState } from 'react';
 import { ActivityIndicator, Image, Modal, ScrollView, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
-const [galleryOpen, setGalleryOpen] = useState(false);
-const [galleryImages, setGalleryImages] = useState([]);
 export default function Index() {
+  // --- 1. ALL STATES MUST BE INSIDE THE FUNCTION ---
   const [inputText, setInputText] = useState("");
   const [answer, setAnswer] = useState("Ask Remi a question or teach her a new memory.");
   const [loading, setLoading] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [isTeachingMode, setIsTeachingMode] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false); // Controls the "3 lines" menu
+  const [menuOpen, setMenuOpen] = useState(false); 
+  const [galleryOpen, setGalleryOpen] = useState(false);
+  const [galleryImages, setGalleryImages] = useState([]);
 
   const tunnelUrl = "https://ssk3gx0p-8000.uks1.devtunnels.ms/"; 
 
@@ -20,7 +21,7 @@ export default function Index() {
   };
 
   const checkRoutine = async () => {
-    setMenuOpen(false); // Close menu when starting action
+    setMenuOpen(false); 
     setLoading(true);
     try {
       const response = await fetch(`${tunnelUrl}check-routine`);
@@ -29,6 +30,21 @@ export default function Index() {
       speakResponse(data.message);
     } catch (error) {
       setAnswer("I'm not sure what's next on the schedule.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const openGallery = async () => {
+    setMenuOpen(false); 
+    setLoading(true);
+    try {
+      const response = await fetch(`${tunnelUrl}get-memories`);
+      const data = await response.json();
+      setGalleryImages(data.photos || []);
+      setGalleryOpen(true);
+    } catch (error) {
+      alert("Could not load gallery.");
     } finally {
       setLoading(false);
     }
@@ -65,33 +81,19 @@ export default function Index() {
       }
     }
   };
-const openGallery = async () => {
-  setMenuOpen(false); // Close sidebar
-  setLoading(true);
-  try {
-    const response = await fetch(`${tunnelUrl}get-memories`);
-    const data = await response.json();
-    setGalleryImages(data.photos || []);
-    setGalleryOpen(true);
-  } catch (error) {
-    alert("Could not load gallery.");
-  } finally {
-    setLoading(false);
-  }
-};
+
   return (
     <View style={{ flex: 1, backgroundColor: '#f0f4f8' }}>
-      {/* --- TOP BAR WITH 3 LINES --- */}
+      {/* --- TOP BAR --- */}
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 50, paddingBottom: 10, backgroundColor: 'white', elevation: 2 }}>
         <TouchableOpacity onPress={() => setMenuOpen(true)}>
           <Text style={{ fontSize: 30, color: '#003366' }}>☰</Text>
         </TouchableOpacity>
         <Text style={{ fontSize: 22, fontWeight: 'bold', color: '#003366' }}>Remi 🧠</Text>
-        <View style={{ width: 30 }} /> {/* Spacer to keep title centered */}
+        <View style={{ width: 30 }} />
       </View>
 
       <ScrollView contentContainerStyle={{ padding: 20, alignItems: 'center' }}>
-        {/* MODE SWITCHER */}
         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 15 }}>
           <Text style={{ marginRight: 10, color: isTeachingMode ? '#666' : '#007AFF', fontWeight: 'bold' }}>Ask Mode</Text>
           <Switch value={isTeachingMode} onValueChange={setIsTeachingMode} trackColor={{ false: "#767577", true: "#34C759" }} />
@@ -120,7 +122,7 @@ const openGallery = async () => {
         </TouchableOpacity>
       </ScrollView>
 
-      {/* --- POP-OUT MENU (DRAWER) --- */}
+      {/* --- SIDE MENU --- */}
       <Modal visible={menuOpen} animationType="slide" transparent={true} onRequestClose={() => setMenuOpen(false)}>
         <View style={{ flex: 1, flexDirection: 'row' }}>
           <View style={{ width: '75%', backgroundColor: '#003366', padding: 40, paddingTop: 80 }}>
@@ -130,7 +132,7 @@ const openGallery = async () => {
               <Text style={{ color: 'white', fontSize: 18 }}>🕒 Daily Routine</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={{ marginBottom: 30 }} onPress={() => alert("Gallery coming in the next step!")}>
+            <TouchableOpacity style={{ marginBottom: 30 }} onPress={openGallery}>
               <Text style={{ color: 'white', fontSize: 18 }}>🖼️ Memory Gallery</Text>
             </TouchableOpacity>
 
@@ -142,9 +144,34 @@ const openGallery = async () => {
               <Text style={{ color: '#88aacc', fontSize: 12 }}>Remi Assistant v1.0</Text>
             </View>
           </View>
-          
-          {/* Transparent area to click and close */}
           <TouchableOpacity style={{ width: '25%', backgroundColor: 'rgba(0,0,0,0.5)' }} onPress={() => setMenuOpen(false)} />
+        </View>
+      </Modal>
+
+      {/* --- GALLERY SCREEN --- */}
+      <Modal visible={galleryOpen} animationType="fade" onRequestClose={() => setGalleryOpen(false)}>
+        <View style={{ flex: 1, backgroundColor: 'white', paddingTop: 60 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20, marginBottom: 20 }}>
+            <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#003366' }}>Family Gallery 🖼️</Text>
+            <TouchableOpacity onPress={() => setGalleryOpen(false)}>
+              <Text style={{ fontSize: 18, color: '#007AFF', fontWeight: 'bold' }}>Close</Text>
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView contentContainerStyle={{ flexDirection: 'row', flexWrap: 'wrap', padding: 10 }}>
+            {galleryImages.length === 0 ? (
+              <Text style={{ textAlign: 'center', width: '100%', marginTop: 50, color: '#666' }}>No memories saved yet.</Text>
+            ) : (
+              galleryImages.map((imgName, index) => (
+                <View key={index} style={{ width: '50%', padding: 5 }}>
+                  <Image 
+                    source={{ uri: `${tunnelUrl}photos/${imgName}` }} 
+                    style={{ width: '100%', height: 150, borderRadius: 10, backgroundColor: '#eee' }} 
+                  />
+                </View>
+              ))
+            )}
+          </ScrollView>
         </View>
       </Modal>
     </View>
