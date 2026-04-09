@@ -17,6 +17,11 @@ export default function Index() {
   const tunnelUrl = "https://ssk3gx0p-8000.uks1.devtunnels.ms/"; 
 
   const speakResponse = (text: string) => {
+    // If text is empty, broken, or not a string, don't try to speak it!
+    if (!text || typeof text !== 'string') {
+      console.log("⚠️ Speech skipped: No valid text to speak.");
+      return;
+    }
     Speech.speak(text, { language: 'en-GB', pitch: 0.9, rate: 0.8 });
   };
 
