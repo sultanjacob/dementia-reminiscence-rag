@@ -77,7 +77,7 @@ async def describe_image(image: UploadFile = File(...)):
 
 # ROUTE: SAVE MEMORY (Teach Mode)
 @app.post("/teach-remi")
-async def teach_remi(image: UploadFile = File(...), description: str = Form(...)):
+async def teach_remi(image: UploadFile = File(...), description: str = Form("")):
     print(f"📖 TEACHING MODE: {description}")
     try:
         file_ext = image.filename.split(".")[-1] if "." in image.filename else "jpg"
