@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { ActivityIndicator, Image, Modal, ScrollView, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 export default function Index() {
-  // --- 1. ALL STATES MUST BE INSIDE THE FUNCTION ---
+  // --- 1. STATES ---
   const [inputText, setInputText] = useState("");
   const [answer, setAnswer] = useState("Ask Remi a question or teach her a new memory.");
   const [loading, setLoading] = useState(false);
@@ -17,7 +17,7 @@ export default function Index() {
   const tunnelUrl = "https://ssk3gx0p-8000.uks1.devtunnels.ms/"; 
 
   const speakResponse = (text: string) => {
-    // If text is empty, broken, or not a string, don't try to speak it!
+    // Safety check to prevent speech engine crashes on empty/error text
     if (!text || typeof text !== 'string') {
       console.log("⚠️ Speech skipped: No valid text to speak.");
       return;
@@ -72,13 +72,29 @@ export default function Index() {
 
       try {
         const endpoint = isTeachingMode ? "teach-remi" : "describe-image";
-        if (isTeachingMode) formData.append('description', inputText);
         
-        const response = await fetch(`${tunnelUrl}${endpoint}`, { method: 'POST', body: formData });
+        // --- NEW SAFETY CHECK: Prevent empty descriptions in Teach Mode ---
+        if (isTeachingMode) {
+          if (!inputText.trim()) {
+            alert("Please type a description before saving the memory!");
+            setLoading(false);
+            return; // Stop here if box is empty
+          }
+          formData.append('description', inputText);
+        }
+        
+        const response = await fetch(`${tunnelUrl}${endpoint}`, { 
+          method: 'POST', 
+          body: formData 
+        });
+
         const data = await response.json();
         setAnswer(data.message);
         speakResponse(data.message);
+
+        // Clear the text box after a successful teaching moment
         if (isTeachingMode) setInputText(""); 
+
       } catch (error) {
         alert("Error: " + error.message);
       } finally {
@@ -99,6 +115,7 @@ export default function Index() {
       </View>
 
       <ScrollView contentContainerStyle={{ padding: 20, alignItems: 'center' }}>
+        {/* MODE SWITCHER */}
         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 15 }}>
           <Text style={{ marginRight: 10, color: isTeachingMode ? '#666' : '#007AFF', fontWeight: 'bold' }}>Ask Mode</Text>
           <Switch value={isTeachingMode} onValueChange={setIsTeachingMode} trackColor={{ false: "#767577", true: "#34C759" }} />
