@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { ActivityIndicator, Image, Modal, ScrollView, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 export default function Index() {
+  // --- 1. STATES ---
   const [inputText, setInputText] = useState("");
   const [answer, setAnswer] = useState("Ask Remi a question or teach her a new memory.");
   const [loading, setLoading] = useState(false);
@@ -13,10 +14,14 @@ export default function Index() {
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [galleryImages, setGalleryImages] = useState([]);
 
+  // ⚠️ Double check this matches your current VS Code tunnel!
   const tunnelUrl = "https://ssk3gx0p-8000.uks1.devtunnels.ms/"; 
 
   const speakResponse = (text: string) => {
-    if (!text || typeof text !== 'string') return;
+    if (!text || typeof text !== 'string') {
+      console.log("⚠️ Speech skipped: No valid text.");
+      return;
+    }
     Speech.speak(text, { language: 'en-GB', pitch: 0.9, rate: 0.8 });
   };
 
@@ -91,6 +96,7 @@ export default function Index() {
 
   return (
     <View style={{ flex: 1, backgroundColor: '#f0f4f8' }}>
+      {/* Top Bar */}
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 50, paddingBottom: 10, backgroundColor: 'white', elevation: 2 }}>
         <TouchableOpacity onPress={() => setMenuOpen(true)}>
           <Text style={{ fontSize: 30, color: '#003366' }}>☰</Text>
@@ -128,7 +134,7 @@ export default function Index() {
         </TouchableOpacity>
       </ScrollView>
 
-      {/* Side Menu Modal */}
+      {/* Side Menu */}
       <Modal visible={menuOpen} animationType="slide" transparent={true} onRequestClose={() => setMenuOpen(false)}>
         <View style={{ flex: 1, flexDirection: 'row' }}>
           <View style={{ width: '75%', backgroundColor: '#003366', padding: 40, paddingTop: 80 }}>
@@ -141,7 +147,7 @@ export default function Index() {
         </View>
       </Modal>
 
-      {/* Gallery Modal */}
+      {/* Gallery */}
       <Modal visible={galleryOpen} animationType="fade" onRequestClose={() => setGalleryOpen(false)}>
         <View style={{ flex: 1, backgroundColor: 'white', paddingTop: 60 }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20, marginBottom: 20 }}>
