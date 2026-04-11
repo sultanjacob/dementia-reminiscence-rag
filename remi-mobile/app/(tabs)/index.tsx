@@ -1,7 +1,5 @@
 import * as ImagePicker from 'expo-image-picker';
 import * as Speech from 'expo-speech';
-// --- NEW IMPORT ---
-import { ExpoSpeechRecognitionModule, useSpeechRecognitionEvent } from "expo-speech-recognition";
 import React, { useState } from 'react';
 import { ActivityIndicator, Image, Modal, ScrollView, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
@@ -14,44 +12,14 @@ export default function Index() {
   const [menuOpen, setMenuOpen] = useState(false); 
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [galleryImages, setGalleryImages] = useState([]);
-  
-  // --- NEW STATE FOR VOICE ---
-  const [isListening, setIsListening] = useState(false);
 
   const tunnelUrl = "https://ssk3gx0p-8000.uks1.devtunnels.ms/"; 
-
-  // --- VOICE LOGIC ---
-  useSpeechRecognitionEvent("result", (event) => {
-    setInputText(event.results[0].transcript);
-  });
-
-  useSpeechRecognitionEvent("error", (event) => {
-    console.log("Speech error:", event.error);
-    setIsListening(false);
-  });
-
-  const handleVoiceInput = async () => {
-    if (isListening) {
-      ExpoSpeechRecognitionModule.stop();
-      setIsListening(false);
-    } else {
-      const result = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
-      if (!result.granted) {
-        alert("Microphone permission required!");
-        return;
-      }
-      setInputText(""); // Clear box for new voice input
-      setIsListening(true);
-      ExpoSpeechRecognitionModule.start({ lang: "en-GB" });
-    }
-  };
 
   const speakResponse = (text: string) => {
     if (!text || typeof text !== 'string') return;
     Speech.speak(text, { language: 'en-GB', pitch: 0.9, rate: 0.8 });
   };
 
-  // ... (keep checkRoutine, openGallery, and handleAction exactly as they are) ...
   const checkRoutine = async () => {
     setMenuOpen(false); 
     setLoading(true);
@@ -101,7 +69,7 @@ export default function Index() {
         const endpoint = isTeachingMode ? "teach-remi" : "describe-image";
         if (isTeachingMode) {
           if (!inputText.trim()) {
-            alert("Please speak or type a description first!");
+            alert("Please type a description first!");
             setLoading(false);
             return;
           }
@@ -123,7 +91,6 @@ export default function Index() {
 
   return (
     <View style={{ flex: 1, backgroundColor: '#f0f4f8' }}>
-      {/* Top Bar */}
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 50, paddingBottom: 10, backgroundColor: 'white', elevation: 2 }}>
         <TouchableOpacity onPress={() => setMenuOpen(true)}>
           <Text style={{ fontSize: 30, color: '#003366' }}>☰</Text>
@@ -144,22 +111,13 @@ export default function Index() {
           <Text style={{ fontSize: 18, color: '#333', lineHeight: 24 }}>{answer}</Text>
         </View>
 
-        {/* --- TEXT INPUT WITH MIC BUTTON --- */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', width: '100%', marginBottom: 15 }}>
-          <TextInput
-            style={{ flex: 1, backgroundColor: 'white', padding: 15, borderRadius: 10, borderWidth: 1, borderColor: isListening ? '#34C759' : '#ddd' }}
-            placeholder={isListening ? "Listening..." : "Speak or type..."}
-            value={inputText}
-            onChangeText={setInputText}
-            multiline
-          />
-          <TouchableOpacity 
-            onPress={handleVoiceInput} 
-            style={{ marginLeft: 10, backgroundColor: isListening ? '#FF3B30' : '#007AFF', padding: 15, borderRadius: 50 }}
-          >
-            <Text style={{ fontSize: 20 }}>{isListening ? "🛑" : "🎤"}</Text>
-          </TouchableOpacity>
-        </View>
+        <TextInput
+          style={{ backgroundColor: 'white', width: '100%', padding: 15, borderRadius: 10, marginBottom: 15, borderWidth: 1, borderColor: '#ddd' }}
+          placeholder={isTeachingMode ? "Describe this photo..." : "Type a question..."}
+          value={inputText}
+          onChangeText={setInputText}
+          multiline
+        />
 
         <TouchableOpacity onPress={handleAction} style={{ backgroundColor: isTeachingMode ? '#34C759' : '#007AFF', padding: 18, borderRadius: 12, width: '100%' }} disabled={loading}>
           {loading ? <ActivityIndicator color="white" /> : (
@@ -170,7 +128,7 @@ export default function Index() {
         </TouchableOpacity>
       </ScrollView>
 
-      {/* Side Menu and Gallery Modals stay the same as before */}
+      {/* Side Menu Modal */}
       <Modal visible={menuOpen} animationType="slide" transparent={true} onRequestClose={() => setMenuOpen(false)}>
         <View style={{ flex: 1, flexDirection: 'row' }}>
           <View style={{ width: '75%', backgroundColor: '#003366', padding: 40, paddingTop: 80 }}>
@@ -183,6 +141,7 @@ export default function Index() {
         </View>
       </Modal>
 
+      {/* Gallery Modal */}
       <Modal visible={galleryOpen} animationType="fade" onRequestClose={() => setGalleryOpen(false)}>
         <View style={{ flex: 1, backgroundColor: 'white', paddingTop: 60 }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20, marginBottom: 20 }}>
