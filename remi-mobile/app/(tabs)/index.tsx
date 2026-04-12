@@ -40,13 +40,14 @@ export default function Index() {
     }
   };
 
-  const openGallery = async () => {
+const openGallery = async () => {
     setMenuOpen(false); 
     setLoading(true);
     try {
       const response = await fetch(`${tunnelUrl}get-memories`);
       const data = await response.json();
-      setGalleryImages(data.photos || []);
+      // Notice we use data.memories now instead of data.photos
+      setGalleryImages(data.memories || []);
       setGalleryOpen(true);
     } catch (error) {
       alert("Could not load gallery.");
