@@ -124,7 +124,6 @@ async def check_routine():
 # ROUTE: GET GALLERY PHOTOS
 @app.get("/get-memories")
 async def get_memories():
-    print("🖼️ Fetching memory gallery with descriptions...")
     try:
         photo_dir = os.path.join(basedir, "memories", "photos")
         fact_path = os.path.join(basedir, "memories", "family_facts.txt")
@@ -134,20 +133,19 @@ async def get_memories():
 
         photos = [f for f in os.listdir(photo_dir) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
         
-        # Read the facts to find descriptions for these photos
         descriptions = {}
         if os.path.exists(fact_path):
             with open(fact_path, "r", encoding="utf-8") as f:
-                lines = f.readlines()
+                content = f.read()
+                # Split by lines and look for the filename
+                lines = content.split('\n')
                 for line in lines:
-                    # Look for the pattern: "- Description (Photo saved as filename)"
-                    if "(Photo saved as " in line:
-                        parts = line.split("(Photo saved as ")
-                        desc = parts[0].replace("- ", "").strip()
-                        fname = parts[1].replace(")", "").strip()
-                        descriptions[fname] = desc
+                    for p in photos:
+                        if p in line:
+                            # Extract the text before the (Photo saved as...) part
+                            desc = line.split("(Photo saved as")[0].replace("- NEW MEMORY:", "").strip()
+                            descriptions[p] = desc
 
-        # Create a list of objects containing both image and text
         memory_list = []
         for p in photos:
             memory_list.append({
@@ -157,7 +155,6 @@ async def get_memories():
 
         return {"memories": memory_list}
     except Exception as e:
-        print(f"❌ Gallery Error: {e}")
         return {"error": str(e)}
 
 # --- 5. START SERVER ---
