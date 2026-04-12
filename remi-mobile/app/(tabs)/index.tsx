@@ -40,13 +40,13 @@ export default function Index() {
     }
   };
 
-const openGallery = async () => {
+  const openGallery = async () => {
     setMenuOpen(false); 
     setLoading(true);
     try {
       const response = await fetch(`${tunnelUrl}get-memories`);
       const data = await response.json();
-      // Notice we use data.memories now instead of data.photos
+      // Updated to use the new "memories" key from your backend
       setGalleryImages(data.memories || []);
       setGalleryOpen(true);
     } catch (error) {
@@ -156,11 +156,25 @@ const openGallery = async () => {
             <TouchableOpacity onPress={() => setGalleryOpen(false)}><Text style={{ fontSize: 18, color: '#007AFF', fontWeight: 'bold' }}>Close</Text></TouchableOpacity>
           </View>
           <ScrollView contentContainerStyle={{ flexDirection: 'row', flexWrap: 'wrap', padding: 10 }}>
-            {galleryImages.map((imgName, index) => (
-              <View key={index} style={{ width: '50%', padding: 5 }}>
-                <Image source={{ uri: `${tunnelUrl}photos/${imgName}` }} style={{ width: '100%', height: 150, borderRadius: 10, backgroundColor: '#eee' }} />
-              </View>
-            ))}
+            {galleryImages.length === 0 ? (
+              <Text style={{ textAlign: 'center', width: '100%', marginTop: 50, color: '#666' }}>No memories saved yet.</Text>
+            ) : (
+              galleryImages.map((item: any, index: number) => (
+                <TouchableOpacity 
+                  key={index} 
+                  style={{ width: '50%', padding: 5 }}
+                  onPress={() => speakResponse(item.description)}
+                >
+                  <Image 
+                    source={{ uri: `${tunnelUrl}photos/${item.url}` }} 
+                    style={{ width: '100%', height: 150, borderRadius: 10, backgroundColor: '#eee' }} 
+                  />
+                  <Text style={{ fontSize: 12, color: '#003366', marginTop: 5, textAlign: 'center' }} numberOfLines={1}>
+                    {item.description}
+                  </Text>
+                </TouchableOpacity>
+              ))
+            )}
           </ScrollView>
         </View>
       </Modal>
