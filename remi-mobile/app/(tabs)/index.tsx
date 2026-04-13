@@ -94,7 +94,22 @@ export default function Index() {
       }
     }
   };
-
+const handleTextChat = async () => {
+    if (!inputText.trim()) return;
+    setLoading(true);
+    try {
+      // Calls the /ask endpoint we built earlier
+      const response = await fetch(`${tunnelUrl}ask?q=${encodeURIComponent(inputText)}`);
+      const data = await response.json();
+      setAnswer(data.message);
+      speakResponse(data.message);
+      setInputText(""); // Clear after sending
+    } catch (error) {
+      setAnswer("I'm having trouble connecting right now.");
+    } finally {
+      setLoading(false);
+    }
+  };
   return (
     <View style={{ flex: 1, backgroundColor: '#f0f4f8' }}>
       {/* Top Bar */}
