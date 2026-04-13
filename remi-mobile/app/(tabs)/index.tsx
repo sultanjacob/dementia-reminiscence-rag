@@ -25,6 +25,25 @@ export default function Index() {
     Speech.speak(text, { language: 'en-GB', pitch: 0.9, rate: 0.8 });
   };
 
+  // --- 2. LOGIC FUNCTIONS ---
+
+  // TEXT ONLY CHAT
+  const handleTextChat = async () => {
+    if (!inputText.trim()) return;
+    setLoading(true);
+    try {
+      const response = await fetch(`${tunnelUrl}ask?q=${encodeURIComponent(inputText)}`);
+      const data = await response.json();
+      setAnswer(data.message);
+      speakResponse(data.message);
+      setInputText(""); // Clear after sending
+    } catch (error) {
+      setAnswer("I'm having trouble connecting to Remi right now.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const checkRoutine = async () => {
     setMenuOpen(false); 
     setLoading(true);
@@ -46,7 +65,6 @@ export default function Index() {
     try {
       const response = await fetch(`${tunnelUrl}get-memories`);
       const data = await response.json();
-      // Updated to use the new "memories" key from your backend
       setGalleryImages(data.memories || []);
       setGalleryOpen(true);
     } catch (error) {
@@ -94,22 +112,7 @@ export default function Index() {
       }
     }
   };
-const handleTextChat = async () => {
-    if (!inputText.trim()) return;
-    setLoading(true);
-    try {
-      // Calls the /ask endpoint we built earlier
-      const response = await fetch(`${tunnelUrl}ask?q=${encodeURIComponent(inputText)}`);
-      const data = await response.json();
-      setAnswer(data.message);
-      speakResponse(data.message);
-      setInputText(""); // Clear after sending
-    } catch (error) {
-      setAnswer("I'm having trouble connecting right now.");
-    } finally {
-      setLoading(false);
-    }
-  };
+
   return (
     <View style={{ flex: 1, backgroundColor: '#f0f4f8' }}>
       {/* Top Bar */}
@@ -122,30 +125,65 @@ const handleTextChat = async () => {
       </View>
 
       <ScrollView contentContainerStyle={{ padding: 20, alignItems: 'center' }}>
+        {/* MODE SWITCHER */}
         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 15 }}>
           <Text style={{ marginRight: 10, color: isTeachingMode ? '#666' : '#007AFF', fontWeight: 'bold' }}>Ask Mode</Text>
           <Switch value={isTeachingMode} onValueChange={setIsTeachingMode} trackColor={{ false: "#767577", true: "#34C759" }} />
           <Text style={{ marginLeft: 10, color: isTeachingMode ? '#34C759' : '#666', fontWeight: 'bold' }}>Teach Mode</Text>
         </View>
 
+        {/* RESPONSE BOX */}
         <View style={{ backgroundColor: 'white', padding: 20, borderRadius: 15, width: '100%', marginBottom: 20, elevation: 3 }}>
           {selectedImage && <Image source={{ uri: selectedImage }} style={{ width: '100%', height: 250, borderRadius: 10, marginBottom: 15 }} resizeMode="cover" />}
           <Text style={{ fontSize: 18, color: '#333', lineHeight: 24 }}>{answer}</Text>
         </View>
 
-        <TextInput
-          style={{ backgroundColor: 'white', width: '100%', padding: 15, borderRadius: 10, marginBottom: 15, borderWidth: 1, borderColor: '#ddd' }}
-          placeholder={isTeachingMode ? "Describe this photo..." : "Type a question..."}
-          value={inputText}
-          onChangeText={setInputText}
-          multiline
-        />
+        {/* --- TEXT INPUT WITH SEND BUTTON --- */}
+        <View style={{ 
+          flexDirection: 'row', 
+          alignItems: 'center', 
+          backgroundColor: 'white', 
+          borderRadius: 12, 
+          borderWidth: 1, 
+          borderColor: '#ddd',
+          paddingHorizontal: 12,
+          marginBottom: 15,
+          width: '100%'
+        }}>
+          <TextInput
+            style={{ flex: 1, paddingVertical: 12, fontSize: 16 }}
+            placeholder={isTeachingMode ? "Describe this photo..." : "Type or use keyboard mic..."}
+            value={inputText}
+            onChangeText={setInputText}
+            multiline
+          />
+          {/* THE NEW ENTER BUTTON */}
+          <TouchableOpacity onPress={handleTextChat} disabled={loading || isTeachingMode}>
+             <Text style={{ fontSize: 28, color: isTeachingMode ? '#ccc' : '#007AFF' }}>➡️</Text>
+          </TouchableOpacity>
+        </View>
 
-        <TouchableOpacity onPress={handleAction} style={{ backgroundColor: isTeachingMode ? '#34C759' : '#007AFF', padding: 18, borderRadius: 12, width: '100%' }} disabled={loading}>
+        {/* PHOTO BUTTON */}
+        <TouchableOpacity 
+          onPress={handleAction} 
+          style={{ 
+            backgroundColor: isTeachingMode ? '#34C759' : '#007AFF', 
+            padding: 18, 
+            borderRadius: 12, 
+            width: '100%',
+            flexDirection: 'row',
+            justifyContent: 'center',
+            alignItems: 'center'
+          }} 
+          disabled={loading}
+        >
           {loading ? <ActivityIndicator color="white" /> : (
-            <Text style={{ color: 'white', textAlign: 'center', fontWeight: 'bold', fontSize: 18 }}>
-              {isTeachingMode ? "📸 Save to Memory" : "📸 Ask About This"}
-            </Text>
+            <>
+              <Text style={{ fontSize: 22, marginRight: 10 }}>📸</Text>
+              <Text style={{ color: 'white', textAlign: 'center', fontWeight: 'bold', fontSize: 18 }}>
+                {isTeachingMode ? "Save to Memory" : "Ask About Photo"}
+              </Text>
+            </>
           )}
         </TouchableOpacity>
       </ScrollView>
