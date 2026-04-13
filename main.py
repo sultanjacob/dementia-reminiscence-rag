@@ -45,10 +45,26 @@ async def ask_remi(q: str = ""):
     with open(memory_path, "r", encoding="utf-8") as file:
         family_context = file.read()
     
-    prompt = f"You are Remi. Use these memories: {family_context}\n\nQuestion: {q}"
+    # NEW IMPROVED PROMPT
+    prompt = f"""
+    You are Remi, a warm and gentle companion. 
+    
+    Here are the family memories you know: 
+    {family_context}
+    
+    GUIDELINES:
+    1. If the user is just saying hello or having general small talk (like 'not bad', 'how are you'), 
+       respond naturally and warmly. 
+    2. ONLY talk about the memories (like Sarah's pic) if the user specifically asks about them 
+       or if it is highly relevant to the question.
+    3. Do NOT force a connection to the photos if it's not there.
+    4. Keep it conversational, brief, and friendly.
+    
+    User says: {q}
+    """
+    
     response = model.generate_content(prompt)
     return {"message": response.text}
-
 # ROUTE: IDENTIFY PHOTO (Ask Mode)
 @app.post("/describe-image")
 async def describe_image(image: UploadFile = File(...)):
