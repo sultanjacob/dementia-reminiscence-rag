@@ -1,7 +1,7 @@
 import * as ImagePicker from 'expo-image-picker';
 import * as Speech from 'expo-speech';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, Modal, ScrollView, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Modal, ScrollView, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 export default function Index() {
   const [inputText, setInputText] = useState("");
@@ -15,7 +15,6 @@ export default function Index() {
 
   const tunnelUrl = "https://ssk3gx0p-8000.uks1.devtunnels.ms/"; 
 
-  // Greet the user when they open the app
   useEffect(() => {
     speakResponse("Hello! I'm Remi. It is lovely to see you.");
   }, []);
@@ -25,6 +24,7 @@ export default function Index() {
     Speech.speak(text, { language: 'en-GB', pitch: 0.9, rate: 0.8 });
   };
 
+  // --- 1. CHAT LOGIC ---
   const handleTextChat = async () => {
     if (!inputText.trim()) return;
     setLoading(true);
@@ -36,6 +36,81 @@ export default function Index() {
       setInputText("");
     } catch (error) {
       setAnswer("I'm having a little trouble connecting. Is the server running?");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // --- 2. CAMERA LOGIC ---
+  const handleAction = async () => {
+    const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
+    if (!permissionResult.granted) {
+      Alert.alert("Permission needed", "Please allow camera access to use Remi's eyes.");
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({ allowsEditing: false, quality: 0.2 });
+
+    if (!result.canceled) {
+      const imageUri = result.assets[0].uri;
+      setSelectedImage(imageUri);
+
+      // In Ask Mode, we process immediately. In Teach Mode, we wait for the user to type.
+      if (!isTeachingMode) {
+        processImageAsk(imageUri);
+      } else {
+        setAnswer("Great photo! Now describe it and tap 'Save Memory' below.");
+      }
+    }
+  };
+
+  // --- 3. CLOUD SAVE LOGIC (TEACH MODE) ---
+  const saveMemoryToCloud = async () => {
+    if (!selectedImage) {
+      Alert.alert("No photo", "Please take a photo first!");
+      return;
+    }
+    if (!inputText.trim()) {
+      Alert.alert("Missing description", "Please describe the photo so I can remember it.");
+      return;
+    }
+
+    setLoading(true);
+    const formData = new FormData();
+    // @ts-ignore
+    formData.append('image', { uri: selectedImage, name: 'photo.jpg', type: 'image/jpeg' });
+    formData.append('description', inputText);
+
+    try {
+      const response = await fetch(`${tunnelUrl}teach-remi`, { method: 'POST', body: formData });
+      const data = await response.json();
+      setAnswer(data.message);
+      speakResponse(data.message);
+      
+      // Clear inputs after successful save
+      setInputText(""); 
+      setSelectedImage(null);
+    } catch (error) {
+      Alert.alert("Save failed", error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // --- 4. IMAGE IDENTIFICATION (ASK MODE) ---
+  const processImageAsk = async (uri: string) => {
+    setLoading(true);
+    const formData = new FormData();
+    // @ts-ignore
+    formData.append('image', { uri: uri, name: 'photo.jpg', type: 'image/jpeg' });
+
+    try {
+      const response = await fetch(`${tunnelUrl}describe-image`, { method: 'POST', body: formData });
+      const data = await response.json();
+      setAnswer(data.message);
+      speakResponse(data.message);
+    } catch (error) {
+      setAnswer("I'm sorry, my eyes are a bit blurry right now.");
     } finally {
       setLoading(false);
     }
@@ -65,38 +140,9 @@ export default function Index() {
       setGalleryImages(data.memories || []);
       setGalleryOpen(true);
     } catch (error) {
-      alert("Could not load gallery.");
+      Alert.alert("Error", "Could not load gallery.");
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleAction = async () => {
-    const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
-    if (!permissionResult.granted) return;
-    const result = await ImagePicker.launchCameraAsync({ allowsEditing: false, quality: 0.2 });
-
-    if (!result.canceled) {
-      const imageUri = result.assets[0].uri;
-      setSelectedImage(imageUri);
-      setLoading(true);
-      const formData = new FormData();
-      // @ts-ignore
-      formData.append('image', { uri: imageUri, name: 'photo.jpg', type: 'image/jpeg' });
-
-      try {
-        const endpoint = isTeachingMode ? "teach-remi" : "describe-image";
-        if (isTeachingMode) formData.append('description', inputText);
-        const response = await fetch(`${tunnelUrl}${endpoint}`, { method: 'POST', body: formData });
-        const data = await response.json();
-        setAnswer(data.message);
-        speakResponse(data.message);
-        if (isTeachingMode) setInputText(""); 
-      } catch (error) {
-        alert("Error: " + error.message);
-      } finally {
-        setLoading(false);
-      }
     }
   };
 
@@ -117,7 +163,7 @@ export default function Index() {
         {/* MODE TOGGLE */}
         <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', padding: 8, borderRadius: 25, marginBottom: 20, elevation: 1 }}>
           <Text style={{ marginHorizontal: 10, color: isTeachingMode ? '#666' : '#007AFF', fontWeight: 'bold' }}>Ask</Text>
-          <Switch value={isTeachingMode} onValueChange={setIsTeachingMode} trackColor={{ false: "#767577", true: "#34C759" }} />
+          <Switch value={isTeachingMode} onValueChange={(val) => { setIsTeachingMode(val); setSelectedImage(null); }} trackColor={{ false: "#767577", true: "#34C759" }} />
           <Text style={{ marginHorizontal: 10, color: isTeachingMode ? '#34C759' : '#666', fontWeight: 'bold' }}>Teach</Text>
         </View>
 
@@ -141,24 +187,24 @@ export default function Index() {
           </TouchableOpacity>
         </View>
 
-        {/* CAMERA BUTTON */}
+        {/* MAIN BUTTON (Action or Save) */}
         <TouchableOpacity 
-          onPress={handleAction} 
+          onPress={isTeachingMode ? (selectedImage ? saveMemoryToCloud : handleAction) : handleAction} 
           style={{ backgroundColor: isTeachingMode ? '#34C759' : '#003366', padding: 20, borderRadius: 15, width: '100%', flexDirection: 'row', justifyContent: 'center', alignItems: 'center', elevation: 2 }} 
           disabled={loading}
         >
           {loading ? <ActivityIndicator color="white" /> : (
             <>
-              <Text style={{ fontSize: 24, marginRight: 12 }}>📸</Text>
+              <Text style={{ fontSize: 24, marginRight: 12 }}>{isTeachingMode ? (selectedImage ? "💾" : "📸") : "📸"}</Text>
               <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 18 }}>
-                {isTeachingMode ? "Save Memory" : "Identify Photo"}
+                {isTeachingMode ? (selectedImage ? "Save Memory" : "Take Photo") : "Identify Photo"}
               </Text>
             </>
           )}
         </TouchableOpacity>
       </ScrollView>
 
-      {/* MODALS (Menu & Gallery) */}
+      {/* MODALS */}
       <Modal visible={menuOpen} animationType="slide" transparent={true}>
         <View style={{ flex: 1, flexDirection: 'row' }}>
           <View style={{ width: '80%', backgroundColor: '#003366', padding: 40, paddingTop: 80 }}>
