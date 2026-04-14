@@ -31,8 +31,8 @@ app.mount("/photos", StaticFiles(directory=UPLOAD_FOLDER), name="photos")
 
 # --- 3. CLOUD & AI CONFIGURATION ---
 # Replace these with your actual keys from Supabase Settings > API
-SUPABASE_URL = "YOUR_SUPABASE_URL"
-SUPABASE_KEY = "YOUR_SUPABASE_ANON_KEY"
+SUPABASE_URL = "https://bphmzxsidlxfawqkvksr.supabase.co"
+SUPABASE_KEY = "sb_publishable_-RYTM7gdaV_1IE3d6F9GNQ_OEoAH3lY"
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
