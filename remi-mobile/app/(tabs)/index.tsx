@@ -3,7 +3,16 @@ import * as Speech from 'expo-speech';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Modal, ScrollView, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
+// This pulls in the 'supabase' tool from your helper file
+import { supabase } from './supabase';
+
 export default function Index() {
+  // --- 1. AUTHENTICATION STATES ---
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [user, setUser] = useState<any>(null);
+
+  // --- 2. APP STATES ---
   const [inputText, setInputText] = useState("");
   const [answer, setAnswer] = useState("Hello! I'm Remi. How can I help you today?");
   const [loading, setLoading] = useState(false);
@@ -13,18 +22,61 @@ export default function Index() {
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [galleryImages, setGalleryImages] = useState([]);
 
+  // ⚠️ Double check this matches your current VS Code tunnel!
   const tunnelUrl = "https://ssk3gx0p-8000.uks1.devtunnels.ms/"; 
 
+  // --- 3. AUTH LOGIC ---
+
+  // Check if user is already logged in on startup
   useEffect(() => {
-    speakResponse("Hello! I'm Remi. It is lovely to see you.");
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+    });
+
+    // Listen for changes (login/logout)
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
   }, []);
+
+  const handleSignUp = async () => {
+    setLoading(true);
+    const { error } = await supabase.auth.signUp({ email, password });
+    setLoading(false);
+    if (error) Alert.alert("Error", error.message);
+    else Alert.alert("Success", "Account created! You are now logged in.");
+  };
+
+  const handleLogin = async () => {
+    setLoading(true);
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    setLoading(false);
+    if (error) Alert.alert("Error", error.message);
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setUser(null);
+    setMenuOpen(false);
+  };
+
+  // --- 4. APP LOGIC ---
+
+  useEffect(() => {
+    if (user) {
+      speakResponse("Hello! I'm Remi. It is lovely to see you.");
+    }
+  }, [user]);
 
   const speakResponse = (text: string) => {
     if (!text || typeof text !== 'string') return;
     Speech.speak(text, { language: 'en-GB', pitch: 0.9, rate: 0.8 });
   };
 
-  // --- 1. CHAT LOGIC ---
   const handleTextChat = async () => {
     if (!inputText.trim()) return;
     setLoading(true);
@@ -41,7 +93,6 @@ export default function Index() {
     }
   };
 
-  // --- 2. CAMERA LOGIC ---
   const handleAction = async () => {
     const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
     if (!permissionResult.granted) {
@@ -55,7 +106,6 @@ export default function Index() {
       const imageUri = result.assets[0].uri;
       setSelectedImage(imageUri);
 
-      // In Ask Mode, we process immediately. In Teach Mode, we wait for the user to type.
       if (!isTeachingMode) {
         processImageAsk(imageUri);
       } else {
@@ -64,7 +114,6 @@ export default function Index() {
     }
   };
 
-  // --- 3. CLOUD SAVE LOGIC (TEACH MODE) ---
   const saveMemoryToCloud = async () => {
     if (!selectedImage) {
       Alert.alert("No photo", "Please take a photo first!");
@@ -86,8 +135,6 @@ export default function Index() {
       const data = await response.json();
       setAnswer(data.message);
       speakResponse(data.message);
-      
-      // Clear inputs after successful save
       setInputText(""); 
       setSelectedImage(null);
     } catch (error) {
@@ -97,7 +144,6 @@ export default function Index() {
     }
   };
 
-  // --- 4. IMAGE IDENTIFICATION (ASK MODE) ---
   const processImageAsk = async (uri: string) => {
     setLoading(true);
     const formData = new FormData();
@@ -146,9 +192,43 @@ export default function Index() {
     }
   };
 
+  // --- 5. AUTH SCREEN UI ---
+  if (!user) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', padding: 30, backgroundColor: '#f0f4f8' }}>
+        <Text style={{ fontSize: 40, textAlign: 'center', marginBottom: 10 }}>🧠</Text>
+        <Text style={{ fontSize: 32, fontWeight: 'bold', color: '#003366', textAlign: 'center', marginBottom: 40 }}>Remi AI</Text>
+        
+        <TextInput 
+          style={{ backgroundColor: 'white', padding: 15, borderRadius: 12, marginBottom: 15, borderWidth: 1, borderColor: '#ddd' }} 
+          placeholder="Email Address" 
+          value={email} 
+          onChangeText={setEmail} 
+          autoCapitalize="none"
+          keyboardType="email-address"
+        />
+        <TextInput 
+          style={{ backgroundColor: 'white', padding: 15, borderRadius: 12, marginBottom: 25, borderWidth: 1, borderColor: '#ddd' }} 
+          placeholder="Password" 
+          value={password} 
+          onChangeText={setPassword} 
+          secureTextEntry 
+        />
+
+        <TouchableOpacity onPress={handleLogin} style={{ backgroundColor: '#003366', padding: 18, borderRadius: 15, marginBottom: 15 }}>
+          {loading ? <ActivityIndicator color="white" /> : <Text style={{ color: 'white', textAlign: 'center', fontWeight: 'bold', fontSize: 18 }}>Login</Text>}
+        </TouchableOpacity>
+
+        <TouchableOpacity onPress={handleSignUp}>
+          <Text style={{ color: '#003366', textAlign: 'center', fontSize: 16 }}>New here? Create an account</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  // --- 6. MAIN APP UI (Visible only when logged in) ---
   return (
     <View style={{ flex: 1, backgroundColor: '#f0f4f8' }}>
-      {/* HEADER */}
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 50, paddingBottom: 15, backgroundColor: 'white', borderBottomWidth: 1, borderBottomColor: '#eee' }}>
         <TouchableOpacity onPress={() => setMenuOpen(true)}>
           <Text style={{ fontSize: 32, color: '#003366' }}>☰</Text>
@@ -160,23 +240,20 @@ export default function Index() {
       </View>
 
       <ScrollView contentContainerStyle={{ padding: 20, alignItems: 'center' }}>
-        {/* MODE TOGGLE */}
         <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', padding: 8, borderRadius: 25, marginBottom: 20, elevation: 1 }}>
           <Text style={{ marginHorizontal: 10, color: isTeachingMode ? '#666' : '#007AFF', fontWeight: 'bold' }}>Ask</Text>
           <Switch value={isTeachingMode} onValueChange={(val) => { setIsTeachingMode(val); setSelectedImage(null); }} trackColor={{ false: "#767577", true: "#34C759" }} />
           <Text style={{ marginHorizontal: 10, color: isTeachingMode ? '#34C759' : '#666', fontWeight: 'bold' }}>Teach</Text>
         </View>
 
-        {/* MAIN RESPONSE CARD */}
-        <View style={{ backgroundColor: 'white', padding: 20, borderRadius: 20, width: '100%', marginBottom: 20, elevation: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4 }}>
+        <View style={{ backgroundColor: 'white', padding: 20, borderRadius: 20, width: '100%', marginBottom: 20, elevation: 4 }}>
           {selectedImage && <Image source={{ uri: selectedImage }} style={{ width: '100%', height: 250, borderRadius: 15, marginBottom: 15 }} resizeMode="cover" />}
-          <Text style={{ fontSize: 20, color: '#333', lineHeight: 28, textAlign: 'center', fontWeight: '500' }}>{answer}</Text>
+          <Text style={{ fontSize: 20, color: '#333', lineHeight: 28, textAlign: 'center' }}>{answer}</Text>
         </View>
 
-        {/* INPUT AREA */}
         <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'white', borderRadius: 15, borderWidth: 1, borderColor: '#ddd', paddingHorizontal: 15, marginBottom: 15, width: '100%' }}>
           <TextInput
-            style={{ flex: 1, paddingVertical: 15, fontSize: 18, color: '#333' }}
+            style={{ flex: 1, paddingVertical: 15, fontSize: 18 }}
             placeholder={isTeachingMode ? "What is this memory?" : "Message Remi..."}
             value={inputText}
             onChangeText={setInputText}
@@ -187,10 +264,9 @@ export default function Index() {
           </TouchableOpacity>
         </View>
 
-        {/* MAIN BUTTON (Action or Save) */}
         <TouchableOpacity 
           onPress={isTeachingMode ? (selectedImage ? saveMemoryToCloud : handleAction) : handleAction} 
-          style={{ backgroundColor: isTeachingMode ? '#34C759' : '#003366', padding: 20, borderRadius: 15, width: '100%', flexDirection: 'row', justifyContent: 'center', alignItems: 'center', elevation: 2 }} 
+          style={{ backgroundColor: isTeachingMode ? '#34C759' : '#003366', padding: 20, borderRadius: 15, width: '100%', flexDirection: 'row', justifyContent: 'center', alignItems: 'center' }} 
           disabled={loading}
         >
           {loading ? <ActivityIndicator color="white" /> : (
@@ -204,24 +280,26 @@ export default function Index() {
         </TouchableOpacity>
       </ScrollView>
 
-      {/* MODALS */}
+      {/* Side Menu */}
       <Modal visible={menuOpen} animationType="slide" transparent={true}>
         <View style={{ flex: 1, flexDirection: 'row' }}>
           <View style={{ width: '80%', backgroundColor: '#003366', padding: 40, paddingTop: 80 }}>
             <Text style={{ color: 'white', fontSize: 28, fontWeight: 'bold', marginBottom: 40 }}>Remi Menu</Text>
             <TouchableOpacity style={{ marginBottom: 35 }} onPress={checkRoutine}><Text style={{ color: 'white', fontSize: 20 }}>🕒 Daily Routine</Text></TouchableOpacity>
             <TouchableOpacity style={{ marginBottom: 35 }} onPress={openGallery}><Text style={{ color: 'white', fontSize: 20 }}>🖼️ Memory Gallery</Text></TouchableOpacity>
-            <TouchableOpacity style={{ marginBottom: 35 }} onPress={() => setMenuOpen(false)}><Text style={{ color: 'white', fontSize: 20 }}>🏠 Home Screen</Text></TouchableOpacity>
+            <TouchableOpacity style={{ marginBottom: 35 }} onPress={handleLogout}><Text style={{ color: '#FF3B30', fontSize: 20 }}>🚪 Log Out</Text></TouchableOpacity>
+            <TouchableOpacity style={{ marginTop: 50 }} onPress={() => setMenuOpen(false)}><Text style={{ color: 'white', opacity: 0.6 }}>🏠 Close Menu</Text></TouchableOpacity>
           </View>
           <TouchableOpacity style={{ width: '20%', backgroundColor: 'rgba(0,0,0,0.4)' }} onPress={() => setMenuOpen(false)} />
         </View>
       </Modal>
 
+      {/* Gallery */}
       <Modal visible={galleryOpen} animationType="slide">
         <View style={{ flex: 1, backgroundColor: 'white', paddingTop: 60 }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 25, marginBottom: 20, alignItems: 'center' }}>
             <Text style={{ fontSize: 26, fontWeight: 'bold', color: '#003366' }}>Your Memories 🖼️</Text>
-            <TouchableOpacity onPress={() => setGalleryOpen(false)}><Text style={{ fontSize: 18, color: '#007AFF', fontWeight: '600' }}>Back</Text></TouchableOpacity>
+            <TouchableOpacity onPress={() => setGalleryOpen(false)}><Text style={{ fontSize: 18, color: '#007AFF' }}>Back</Text></TouchableOpacity>
           </View>
           <ScrollView contentContainerStyle={{ flexDirection: 'row', flexWrap: 'wrap', padding: 10 }}>
             {galleryImages.map((item: any, index: number) => (
