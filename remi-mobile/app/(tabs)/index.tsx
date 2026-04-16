@@ -181,7 +181,8 @@ export default function Index() {
     setMenuOpen(false); 
     setLoading(true);
     try {
-      const response = await fetch(`${tunnelUrl}get-memories`);
+      // We pass the user_id in the URL so the server knows whose photos to get
+      const response = await fetch(`${tunnelUrl}get-memories?user_id=${user.id}`);
       const data = await response.json();
       setGalleryImages(data.memories || []);
       setGalleryOpen(true);
