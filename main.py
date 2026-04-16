@@ -109,7 +109,10 @@ async def teach_remi(image: UploadFile = File(...), description: str = Form(""),
 
 # ROUTE: GET GALLERY (UPDATED FOR CLOUD)
 @app.get("/get-memories")
-async def get_memories():
+async def get_memories(user_id: str):
+    # Only select memories that belong to this specific user!
+    response = supabase.table("memories").select("*").eq("user_id", user_id).execute()
+    # ... rest of the formatting stays the same
     try:
         # Fetch everything from the cloud table
         response = supabase.table("memories").select("*").order("created_at", desc=True).execute()
