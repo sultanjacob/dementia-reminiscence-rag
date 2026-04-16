@@ -129,7 +129,7 @@ export default function Index() {
     // @ts-ignore
     formData.append('image', { uri: selectedImage, name: 'photo.jpg', type: 'image/jpeg' });
     formData.append('description', inputText);
-
+    formData.append('user_id', user.id);
     try {
       const response = await fetch(`${tunnelUrl}teach-remi`, { method: 'POST', body: formData });
       const data = await response.json();
