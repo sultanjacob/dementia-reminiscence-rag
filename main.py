@@ -86,22 +86,20 @@ async def describe_image(image: UploadFile = File(...)):
 
 # ROUTE: SAVE MEMORY (Teach Mode - UPDATED FOR CLOUD)
 @app.post("/teach-remi")
-async def teach_remi(image: UploadFile = File(...), description: str = Form("")):
-    print(f"📖 TEACHING MODE: {description}")
+async def teach_remi(image: UploadFile = File(...), description: str = Form(""), user_id: str = Form(...)):
     try:
-        # 1. Save locally for the gallery display
-        file_ext = image.filename.split(".")[-1] if "." in image.filename else "jpg"
-        unique_name = f"{uuid.uuid4()}.{file_ext}"
-        file_path = os.path.join(UPLOAD_FOLDER, unique_name)
-        
+        # Save image locally
         contents = await image.read()
+        unique_name = f"{uuid.uuid4()}_{image.filename}"
+        file_path = os.path.join(UPLOAD_FOLDER, unique_name)
         with open(file_path, "wb") as f:
             f.write(contents)
-
+        
         # 2. SAVE TO SUPABASE CLOUD
         memory_data = {
             "description": description,
-            "image_url": unique_name
+            "image_url": unique_name,
+            "user_id": user_id
         }
         supabase.table("memories").insert(memory_data).execute()
 
