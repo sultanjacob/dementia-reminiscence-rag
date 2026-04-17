@@ -27,13 +27,11 @@ export default function Index() {
 
   // --- 3. AUTH LOGIC ---
 
-  // Check if user is already logged in on startup
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
     });
 
-    // Listen for changes (login/logout)
     const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
     });
@@ -181,7 +179,6 @@ export default function Index() {
     setMenuOpen(false); 
     setLoading(true);
     try {
-      // We pass the user_id in the URL so the server knows whose photos to get
       const response = await fetch(`${tunnelUrl}get-memories?user_id=${user.id}`);
       const data = await response.json();
       setGalleryImages(data.memories || []);
@@ -227,7 +224,7 @@ export default function Index() {
     );
   }
 
-  // --- 6. MAIN APP UI (Visible only when logged in) ---
+  // --- 6. MAIN APP UI ---
   return (
     <View style={{ flex: 1, backgroundColor: '#f0f4f8' }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 50, paddingBottom: 15, backgroundColor: 'white', borderBottomWidth: 1, borderBottomColor: '#eee' }}>
@@ -295,17 +292,23 @@ export default function Index() {
         </View>
       </Modal>
 
-      {/* Gallery */}
+      {/* Gallery Modal - UPDATED FOR CLOUD STORAGE */}
       <Modal visible={galleryOpen} animationType="slide">
         <View style={{ flex: 1, backgroundColor: 'white', paddingTop: 60 }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 25, marginBottom: 20, alignItems: 'center' }}>
+          <div style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 25, marginBottom: 20, alignItems: 'center' }}>
             <Text style={{ fontSize: 26, fontWeight: 'bold', color: '#003366' }}>Your Memories 🖼️</Text>
             <TouchableOpacity onPress={() => setGalleryOpen(false)}><Text style={{ fontSize: 18, color: '#007AFF' }}>Back</Text></TouchableOpacity>
-          </View>
+          </div>
           <ScrollView contentContainerStyle={{ flexDirection: 'row', flexWrap: 'wrap', padding: 10 }}>
             {galleryImages.map((item: any, index: number) => (
               <TouchableOpacity key={index} style={{ width: '50%', padding: 8 }} onPress={() => speakResponse(item.description)}>
-                <Image source={{ uri: `${tunnelUrl}photos/${item.url}` }} style={{ width: '100%', height: 160, borderRadius: 15, backgroundColor: '#f9f9f9' }} />
+                {/* The Image component now pulls the FULL URL stored in the DB.
+                  No more tunnelUrl prefix needed here!
+                */}
+                <Image 
+                  source={{ uri: item.url }} 
+                  style={{ width: '100%', height: 160, borderRadius: 15, backgroundColor: '#f9f9f9' }} 
+                />
                 <Text style={{ fontSize: 14, color: '#444', marginTop: 8, textAlign: 'center' }} numberOfLines={1}>{item.description}</Text>
               </TouchableOpacity>
             ))}
