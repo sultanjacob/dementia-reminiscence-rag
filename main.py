@@ -88,25 +88,36 @@ async def describe_image(image: UploadFile = File(...)):
 @app.post("/teach-remi")
 async def teach_remi(image: UploadFile = File(...), description: str = Form(""), user_id: str = Form(...)):
     try:
-        # Save image locally
-        contents = await image.read()
-        unique_name = f"{uuid.uuid4()}_{image.filename}"
-        file_path = os.path.join(UPLOAD_FOLDER, unique_name)
-        with open(file_path, "wb") as f:
-            f.write(contents)
+        # 1. Generate a unique filename
+        file_ext = image.filename.split(".")[-1] if "." in image.filename else "jpg"
+        unique_name = f"{user_id}/{uuid.uuid4()}.{file_ext}" # Organized by user folder!
         
-        # 2. SAVE TO SUPABASE CLOUD
+        # 2. Read the image bits
+        contents = await image.read()
+
+        # 3. UPLOAD TO SUPABASE STORAGE
+        # This replaces the 'with open... write' logic
+        supabase.storage.from_("photos").upload(
+            path=unique_name,
+            file=contents,
+            file_options={"content-type": f"image/{file_ext}"}
+        )
+
+        # 4. GET THE PUBLIC URL
+        public_url = supabase.storage.from_("photos").get_public_url(unique_name)
+
+        # 5. SAVE RECORD TO DATABASE
         memory_data = {
             "description": description,
-            "image_url": unique_name,
+            "image_url": public_url, # Now saving the FULL web link!
             "user_id": user_id
         }
         supabase.table("memories").insert(memory_data).execute()
 
-        return {"message": f"I've tucked that memory into the cloud! I'll remember: {description}"}
+        return {"message": "Memory saved to the cloud storage!"}
     except Exception as e:
-        return {"message": f"I couldn't save that to the cloud: {str(e)}"}
-
+        print(f"Error: {e}")
+        return {"message": f"Cloud upload failed: {str(e)}"}
 # ROUTE: GET GALLERY (UPDATED FOR CLOUD)
 @app.get("/get-memories")
 async def get_memories(user_id: str):
