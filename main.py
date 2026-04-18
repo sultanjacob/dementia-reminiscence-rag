@@ -118,27 +118,61 @@ async def teach_remi(image: UploadFile = File(...), description: str = Form(""),
     except Exception as e:
         print(f"Error: {e}")
         return {"message": f"Cloud upload failed: {str(e)}"}
-# ROUTE: GET GALLERY (UPDATED FOR CLOUD)
+# ... (Keep imports and setup the same)
+
+# ROUTE: IDENTIFY PHOTO (Ask Mode) - UPDATED TO FILTER BY USER
+@app.post("/describe-image")
+async def describe_image(image: UploadFile = File(...), user_id: str = Form("anonymous")):
+    try:
+        contents = await image.read()
+        
+        # Fetch cloud context ONLY for this user
+        response = supabase.table("memories").select("description").eq("user_id", user_id).execute()
+        family_context = "\n".join([row['description'] for row in response.data])
+
+        prompt = f"""
+        Identify the item or person in this photo using these memories: 
+        {family_context}
+        
+        If it's not in the memories, just describe what you see warmly.
+        Speak as Remi, be warm and brief.
+        """
+        
+        res = model.generate_content([
+            prompt, 
+            {"mime_type": "image/jpeg", "data": contents}
+        ])
+        return {"message": res.text}
+    except Exception as e:
+        print(f"Error in describe-image: {e}")
+        return {"message": "Remi's eyes are a bit blurry right now."}
+
+# ROUTE: GET GALLERY - UPDATED TO FIX RENDER ERROR
 @app.get("/get-memories")
 async def get_memories(user_id: str):
-    # Only select memories that belong to this specific user!
-    response = supabase.table("memories").select("*").eq("user_id", user_id).execute()
-    # ... rest of the formatting stays the same
     try:
-        # Fetch everything from the cloud table
-        response = supabase.table("memories").select("*").order("created_at", desc=True).execute()
+        # 1. Fetch memories belonging ONLY to this user
+        # 2. Order by newest first
+        response = supabase.table("memories")\
+            .select("*")\
+            .eq("user_id", user_id)\
+            .order("created_at", desc=True)\
+            .execute()
         
         memory_list = []
         for row in response.data:
             memory_list.append({
-                "url": row["image_url"],
+                # We use "image_url" to match the frontend 'item.image_url'
+                "image_url": row["image_url"], 
                 "description": row["description"]
             })
 
         return {"memories": memory_list}
     except Exception as e:
-        return {"error": str(e)}
+        print(f"Gallery Error: {e}")
+        return {"error": str(e), "memories": []}
 
+# ... (Keep the rest of your code the same)
 # ROUTE: CHECK DAILY ROUTINE (Kept local for now)
 @app.get("/check-routine")
 async def check_routine():
