@@ -26,7 +26,6 @@ export default function Index() {
   const tunnelUrl = "https://ssk3gx0p-8000.uks1.devtunnels.ms/"; 
 
   // --- 3. AUTH LOGIC ---
-
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
@@ -42,6 +41,7 @@ export default function Index() {
   }, []);
 
   const handleSignUp = async () => {
+    if (!email || !password) return Alert.alert("Error", "Enter email and password");
     setLoading(true);
     const { error } = await supabase.auth.signUp({ email, password });
     setLoading(false);
@@ -50,6 +50,7 @@ export default function Index() {
   };
 
   const handleLogin = async () => {
+    if (!email || !password) return Alert.alert("Error", "Enter email and password");
     setLoading(true);
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     setLoading(false);
@@ -63,7 +64,6 @@ export default function Index() {
   };
 
   // --- 4. APP LOGIC ---
-
   useEffect(() => {
     if (user) {
       speakResponse("Hello! I'm Remi. It is lovely to see you.");
@@ -85,7 +85,7 @@ export default function Index() {
       speakResponse(data.message);
       setInputText("");
     } catch (error) {
-      setAnswer("I'm having a little trouble connecting. Is the server running?");
+      setAnswer("I'm having a little trouble connecting.");
     } finally {
       setLoading(false);
     }
@@ -94,7 +94,7 @@ export default function Index() {
   const handleAction = async () => {
     const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
     if (!permissionResult.granted) {
-      Alert.alert("Permission needed", "Please allow camera access to use Remi's eyes.");
+      Alert.alert("Permission needed", "Please allow camera access.");
       return;
     }
 
@@ -113,12 +113,8 @@ export default function Index() {
   };
 
   const saveMemoryToCloud = async () => {
-    if (!selectedImage) {
-      Alert.alert("No photo", "Please take a photo first!");
-      return;
-    }
-    if (!inputText.trim()) {
-      Alert.alert("Missing description", "Please describe the photo so I can remember it.");
+    if (!selectedImage || !inputText.trim()) {
+      Alert.alert("Error", "Photo and description required.");
       return;
     }
 
@@ -128,6 +124,7 @@ export default function Index() {
     formData.append('image', { uri: selectedImage, name: 'photo.jpg', type: 'image/jpeg' });
     formData.append('description', inputText);
     formData.append('user_id', user.id);
+    
     try {
       const response = await fetch(`${tunnelUrl}teach-remi`, { method: 'POST', body: formData });
       const data = await response.json();
@@ -147,6 +144,7 @@ export default function Index() {
     const formData = new FormData();
     // @ts-ignore
     formData.append('image', { uri: uri, name: 'photo.jpg', type: 'image/jpeg' });
+    formData.append('user_id', user.id);
 
     try {
       const response = await fetch(`${tunnelUrl}describe-image`, { method: 'POST', body: formData });
@@ -154,7 +152,7 @@ export default function Index() {
       setAnswer(data.message);
       speakResponse(data.message);
     } catch (error) {
-      setAnswer("I'm sorry, my eyes are a bit blurry right now.");
+      setAnswer("I'm sorry, my eyes are a bit blurry.");
     } finally {
       setLoading(false);
     }
@@ -169,7 +167,7 @@ export default function Index() {
       setAnswer(data.message);
       speakResponse(data.message);
     } catch (error) {
-      setAnswer("I'm not sure what's next on the schedule.");
+      setAnswer("I'm not sure what's next.");
     } finally {
       setLoading(false);
     }
@@ -196,14 +194,12 @@ export default function Index() {
       <View style={{ flex: 1, justifyContent: 'center', padding: 30, backgroundColor: '#f0f4f8' }}>
         <Text style={{ fontSize: 40, textAlign: 'center', marginBottom: 10 }}>🧠</Text>
         <Text style={{ fontSize: 32, fontWeight: 'bold', color: '#003366', textAlign: 'center', marginBottom: 40 }}>Remi AI</Text>
-        
         <TextInput 
           style={{ backgroundColor: 'white', padding: 15, borderRadius: 12, marginBottom: 15, borderWidth: 1, borderColor: '#ddd' }} 
           placeholder="Email Address" 
           value={email} 
           onChangeText={setEmail} 
           autoCapitalize="none"
-          keyboardType="email-address"
         />
         <TextInput 
           style={{ backgroundColor: 'white', padding: 15, borderRadius: 12, marginBottom: 25, borderWidth: 1, borderColor: '#ddd' }} 
@@ -212,11 +208,9 @@ export default function Index() {
           onChangeText={setPassword} 
           secureTextEntry 
         />
-
         <TouchableOpacity onPress={handleLogin} style={{ backgroundColor: '#003366', padding: 18, borderRadius: 15, marginBottom: 15 }}>
           {loading ? <ActivityIndicator color="white" /> : <Text style={{ color: 'white', textAlign: 'center', fontWeight: 'bold', fontSize: 18 }}>Login</Text>}
         </TouchableOpacity>
-
         <TouchableOpacity onPress={handleSignUp}>
           <Text style={{ color: '#003366', textAlign: 'center', fontSize: 16 }}>New here? Create an account</Text>
         </TouchableOpacity>
@@ -292,21 +286,19 @@ export default function Index() {
         </View>
       </Modal>
 
-      {/* Gallery Modal - UPDATED FOR CLOUD STORAGE */}
+      {/* Gallery Modal */}
       <Modal visible={galleryOpen} animationType="slide">
         <View style={{ flex: 1, backgroundColor: 'white', paddingTop: 60 }}>
-          <div style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 25, marginBottom: 20, alignItems: 'center' }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 25, marginBottom: 20, alignItems: 'center' }}>
             <Text style={{ fontSize: 26, fontWeight: 'bold', color: '#003366' }}>Your Memories 🖼️</Text>
             <TouchableOpacity onPress={() => setGalleryOpen(false)}><Text style={{ fontSize: 18, color: '#007AFF' }}>Back</Text></TouchableOpacity>
-          </div>
+          </View>
           <ScrollView contentContainerStyle={{ flexDirection: 'row', flexWrap: 'wrap', padding: 10 }}>
             {galleryImages.map((item: any, index: number) => (
               <TouchableOpacity key={index} style={{ width: '50%', padding: 8 }} onPress={() => speakResponse(item.description)}>
-                {/* The Image component now pulls the FULL URL stored in the DB.
-                  No more tunnelUrl prefix needed here!
-                */}
+                {/* Fixed item.url to item.image_url */}
                 <Image 
-                  source={{ uri: item.url }} 
+                  source={{ uri: item.image_url }} 
                   style={{ width: '100%', height: 160, borderRadius: 15, backgroundColor: '#f9f9f9' }} 
                 />
                 <Text style={{ fontSize: 14, color: '#444', marginTop: 8, textAlign: 'center' }} numberOfLines={1}>{item.description}</Text>
