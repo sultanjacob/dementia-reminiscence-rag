@@ -172,7 +172,7 @@ async def get_memories(user_id: str):
         print(f"Gallery Error: {e}")
         return {"error": str(e), "memories": []}
 
-# ... (Keep the rest of your code the same)
+
 # ROUTE: CHECK DAILY ROUTINE (Kept local for now)
 @app.get("/check-routine")
 async def check_routine():
