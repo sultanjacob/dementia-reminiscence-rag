@@ -134,7 +134,7 @@ async def describe_image(image: UploadFile = File(...), user_id: str = Form("ano
         Identify the item or person in this photo using these memories: 
         {family_context}
         
-        If it's not in the memories, just describe what you see warmly.
+        If it's not in the memories, just describe what you see warmly and in a friendly tone.
         Speak as Remi, be warm and brief.
         """
         
