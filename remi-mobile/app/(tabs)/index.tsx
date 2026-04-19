@@ -298,14 +298,15 @@ export default function Index() {
               <TouchableOpacity key={index} style={{ width: '50%', padding: 8 }} onPress={() => speakResponse(item.description)}>
                 {/* Fixed item.url to item.image_url */}
                 <Image 
+  <Image 
   source={{ uri: item.image_url }} 
   style={{ 
     width: '100%', 
     height: 160, 
     borderRadius: 15, 
-    backgroundColor: '#eee' // This helps you see the box while it loads
+    backgroundColor: '#cccccc' // This shows a grey box while loading
   }}
-  resizeMode="cover" // Forces the image to fill the space
+  resizeMode="cover"
 />
                 <Text style={{ fontSize: 14, color: '#444', marginTop: 8, textAlign: 'center' }} numberOfLines={1}>{item.description}</Text>
               </TouchableOpacity>
