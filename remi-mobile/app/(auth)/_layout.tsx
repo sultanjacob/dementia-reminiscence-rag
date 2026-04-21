@@ -1,7 +1,7 @@
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
-import { supabase } from '../supabase';
+import { supabase } from '../../supabase';
 
 export default function RootLayout() {
   const [initializing, setInitializing] = useState(true);
