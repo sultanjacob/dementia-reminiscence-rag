@@ -280,4 +280,38 @@ export default function Index() {
             <TouchableOpacity style={{ marginBottom: 35 }} onPress={checkRoutine}><Text style={{ color: 'white', fontSize: 20 }}>🕒 Daily Routine</Text></TouchableOpacity>
             <TouchableOpacity style={{ marginBottom: 35 }} onPress={openGallery}><Text style={{ color: 'white', fontSize: 20 }}>🖼️ Memory Gallery</Text></TouchableOpacity>
             <TouchableOpacity style={{ marginBottom: 35 }} onPress={handleLogout}><Text style={{ color: '#FF3B30', fontSize: 20 }}>🚪 Log Out</Text></TouchableOpacity>
-            <TouchableOpacity style={{ marginTop: 50 }} onPress
+            <TouchableOpacity style={{ marginTop: 50 }} onPress={() => setMenuOpen(false)}><Text style={{ color: 'white', opacity: 0.6 }}>🏠 Close Menu</Text></TouchableOpacity>
+          </View>
+          <TouchableOpacity style={{ width: '20%', backgroundColor: 'rgba(0,0,0,0.4)' }} onPress={() => setMenuOpen(false)} />
+        </View>
+      </Modal>
+
+      {/* Gallery Modal */}
+      <Modal visible={galleryOpen} animationType="slide">
+        <View style={{ flex: 1, backgroundColor: 'white', paddingTop: 60 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 25, marginBottom: 20, alignItems: 'center' }}>
+            <Text style={{ fontSize: 26, fontWeight: 'bold', color: '#003366' }}>Your Memories 🖼️</Text>
+            <TouchableOpacity onPress={() => setGalleryOpen(false)}><Text style={{ fontSize: 18, color: '#007AFF' }}>Back</Text></TouchableOpacity>
+          </View>
+          <ScrollView contentContainerStyle={{ flexDirection: 'row', flexWrap: 'wrap', padding: 10 }}>
+            {galleryImages.map((item: any, index: number) => (
+              <TouchableOpacity key={index} style={{ width: '50%', padding: 8 }} onPress={() => speakResponse(item.description)}>
+                <Image 
+                  source={{ uri: item.image_url }} 
+                  style={{ 
+                    width: '100%', 
+                    height: 160, 
+                    borderRadius: 15, 
+                    backgroundColor: '#cccccc' 
+                  }}
+                  resizeMode="cover"
+                />
+                <Text style={{ fontSize: 14, color: '#444', marginTop: 8, textAlign: 'center' }} numberOfLines={1}>{item.description}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      </Modal>
+    </View>
+  );
+}
