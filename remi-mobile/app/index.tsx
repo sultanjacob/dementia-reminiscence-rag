@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Modal, ScrollView, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 // This pulls in the 'supabase' tool from your helper file
-import { supabase } from '../../supabase';
+import { supabase } from '../supabase';
 
 export default function Index() {
   // --- 1. AUTHENTICATION STATES ---
