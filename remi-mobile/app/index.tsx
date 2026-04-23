@@ -7,19 +7,26 @@ export default function LoginScreen() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleLogin = async () => {
-    setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) Alert.alert("Error", error.message);
+ const handleSignUp = async () => {
+  setLoading(true);
+  try {
+    const { data, error } = await supabase.auth.signUp({ email, password });
+    
+    if (error) {
+      Alert.alert("Error", error.message);
+    } else if (data.session) {
+      // If the toggle is OFF in Supabase, data.session will exist instantly!
+      console.log("Success! Logged in immediately.");
+    } else {
+      // This only happens if the toggle is still ON in Supabase
+      Alert.alert("Check Email", "Please click the link in your inbox to finish.");
+    }
+  } catch (err) {
+    Alert.alert("Error", "Something went wrong.");
+  } finally {
     setLoading(false);
-  };
-
-  const handleSignUp = async () => {
-    setLoading(true);
-    const { error } = await supabase.auth.signUp({ email, password });
-    if (error) Alert.alert("Error", "Check your email for the confirmation link!");
-    setLoading(false);
-  };
+  }
+};
 
   return (
     <View style={styles.container}>
