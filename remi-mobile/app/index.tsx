@@ -7,39 +7,63 @@ export default function LoginScreen() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
- const handleSignUp = async () => {
-  setLoading(true);
-  try {
-    const { data, error } = await supabase.auth.signUp({ email, password });
-    
-    if (error) {
-      Alert.alert("Error", error.message);
-    } else if (data.session) {
-      // If the toggle is OFF in Supabase, data.session will exist instantly!
-      console.log("Success! Logged in immediately.");
-    } else {
-      // This only happens if the toggle is still ON in Supabase
-      Alert.alert("Check Email", "Please click the link in your inbox to finish.");
-    }
-  } catch (err) {
-    Alert.alert("Error", "Something went wrong.");
-  } finally {
+  // --- FIX: Added back the missing handleLogin function ---
+  const handleLogin = async () => {
+    if (!email || !password) return Alert.alert("Error", "Please enter email and password");
+    setLoading(true);
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) Alert.alert("Error", error.message);
     setLoading(false);
-  }
-};
+  };
+
+  // --- The improved handleSignUp function ---
+  const handleSignUp = async () => {
+    if (!email || !password) return Alert.alert("Error", "Please enter email and password");
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.auth.signUp({ email, password });
+      
+      if (error) {
+        Alert.alert("Error", error.message);
+      } else if (data.session) {
+        // Successful instant login!
+        console.log("Logged in immediately.");
+      } else {
+        Alert.alert("Check Email", "Confirmation link sent! (Check your spam if not found)");
+      }
+    } catch (err) {
+      Alert.alert("Error", "Something went wrong.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <View style={styles.container}>
       <Text style={styles.emoji}>🧠</Text>
       <Text style={styles.title}>Remi AI</Text>
-      <TextInput style={styles.input} placeholder="Email" value={email} onChangeText={setEmail} autoCapitalize="none" />
-      <TextInput style={styles.input} placeholder="Password" value={password} onChangeText={setPassword} secureTextEntry />
+      
+      <TextInput 
+        style={styles.input} 
+        placeholder="Email" 
+        value={email} 
+        onChangeText={setEmail} 
+        autoCapitalize="none" 
+      />
+      
+      <TextInput 
+        style={styles.input} 
+        placeholder="Password" 
+        value={password} 
+        onChangeText={setPassword} 
+        secureTextEntry 
+      />
       
       <TouchableOpacity style={styles.button} onPress={handleLogin} disabled={loading}>
         {loading ? <ActivityIndicator color="white" /> : <Text style={styles.buttonText}>Login</Text>}
       </TouchableOpacity>
       
-      <TouchableOpacity onPress={handleSignUp}>
+      <TouchableOpacity onPress={handleSignUp} disabled={loading}>
         <Text style={styles.linkText}>New family member? Create Account</Text>
       </TouchableOpacity>
     </View>
