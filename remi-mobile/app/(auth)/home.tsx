@@ -25,44 +25,52 @@ export default function HomeScreen() {
   };
 
   // --- VOICE LOGIC ---
+  // --- IMPROVED VOICE LOGIC ---
   async function startRecording() {
     try {
       const permission = await Audio.requestPermissionsAsync();
       if (permission.status !== 'granted') return Alert.alert("Permission", "Need microphone access");
 
-      await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
-      const { recording } = await Audio.Recording.createAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
+      // 1. Set the audio mode explicitly for recording
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+      });
+
+      // 2. Create the recording object
+      const { recording } = await Audio.Recording.createAsync(
+        Audio.RecordingOptionsPresets.HIGH_QUALITY
+      );
+      
       setRecording(recording);
       setAnswer("Listening... 👂");
-    } catch (err) { console.error('Failed to start recording', err); }
+    } catch (err) {
+      console.error('Failed to start recording', err);
+      setAnswer("Could not start recording.");
+    }
   }
 
   async function stopRecording() {
     if (!recording) return;
-    setRecording(null);
-    await recording.stopAndUnloadAsync();
-    const uri = recording.getURI();
-    if (uri) processVoiceChat(uri);
-  }
-
-  const processVoiceChat = async (audioUri: string) => {
-    setLoading(true);
-    const formData = new FormData();
-    // @ts-ignore
-    formData.append('file', { uri: audioUri, name: 'voice.m4a', type: 'audio/m4a' });
-    formData.append('user_id', user.id);
 
     try {
-      // Note: We'll need to create a /voice-chat endpoint in your Python script next!
-      const res = await fetch(`${tunnelUrl}voice-chat`, { method: 'POST', body: formData });
-      const data = await res.json();
-      setAnswer(data.message);
-      speak(data.message);
-    } catch (e) {
-      setAnswer("I heard you, but I couldn't understand. Is the cloud server on?");
-    } finally { setLoading(false); }
-  };
-
+      setRecording(null);
+      // Give it a tiny moment to finish the buffer
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      await recording.stopAndUnloadAsync();
+      const uri = recording.getURI();
+      
+      if (uri) {
+        processVoiceChat(uri);
+      } else {
+        setAnswer("I didn't catch that. Please hold the brain longer.");
+      }
+    } catch (error) {
+      console.error("Stop recording error:", error);
+      setAnswer("I had trouble hearing that. Try again?");
+    }
+  }
   // --- CAMERA LOGIC ---
   const handleCameraAction = async () => {
     const result = await ImagePicker.launchCameraAsync({ allowsEditing: false, quality: 0.2 });
