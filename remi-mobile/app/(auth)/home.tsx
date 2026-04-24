@@ -142,9 +142,20 @@ export default function HomeScreen() {
         </TouchableOpacity>
 
         {/* ROUTINE QUICK CHECK */}
-        <TouchableOpacity style={styles.sideButton} onPress={() => speak("Checking your schedule...")}>
-          <Text style={{ fontSize: 30 }}>🕒</Text>
-        </TouchableOpacity>
+       <TouchableOpacity 
+  style={styles.sideButton} 
+  onPress={async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`${tunnelUrl}check-routine?user_id=${user.id}`);
+      const data = await res.json();
+      setAnswer(data.message);
+      speak(data.message);
+    } finally { setLoading(false); }
+  }}
+>
+  <Text style={{ fontSize: 30 }}>🕒</Text>
+</TouchableOpacity>
       </View>
       
       <Text style={styles.hint}>Hold 🧠 to talk • Tap 📸 for eyes</Text>
