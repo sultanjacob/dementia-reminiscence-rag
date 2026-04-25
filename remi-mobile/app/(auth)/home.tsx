@@ -1,19 +1,20 @@
-import { Audio } from 'expo-av'; // New: Audio recording
+import React, { useState, useEffect } from 'react';
+import { View, Text, TouchableOpacity, ActivityIndicator, Image, StyleSheet, Switch, TextInput, ScrollView, Alert } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as Speech from 'expo-speech';
-import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Image, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Audio } from 'expo-av';
 import { supabase } from '../../supabase';
 
 export default function HomeScreen() {
   const [user, setUser] = useState<any>(null);
-  const [answer, setAnswer] = useState("Hello! I'm Remi. Hold the brain to speak or tap for a photo.");
+  const [answer, setAnswer] = useState("Hello! I'm Remi. Hold the brain to talk.");
   const [loading, setLoading] = useState(false);
   const [isTeachingMode, setIsTeachingMode] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [description, setDescription] = useState("");
   const [recording, setRecording] = useState<Audio.Recording | null>(null);
 
+  // ⚠️ Ensure this matches your active VS Code tunnel!
   const tunnelUrl = "https://ssk3gx0p-8000.uks1.devtunnels.ms/"; 
 
   useEffect(() => {
@@ -21,79 +22,77 @@ export default function HomeScreen() {
   }, []);
 
   const speak = (text: string) => {
+    if (!text) return;
     Speech.speak(text, { language: 'en-GB', pitch: 0.9, rate: 0.8 });
   };
 
-  // --- VOICE LOGIC ---
-  // --- IMPROVED VOICE LOGIC ---
+  // --- 1. VOICE PROCESSING ---
+  const processVoiceChat = async (audioUri: string) => {
+    setLoading(true);
+    const formData = new FormData();
+    // @ts-ignore
+    formData.append('file', { uri: audioUri, name: 'voice.m4a', type: 'audio/m4a' });
+    formData.append('user_id', user.id);
+
+    try {
+      const res = await fetch(`${tunnelUrl}voice-chat`, { method: 'POST', body: formData });
+      const data = await res.json();
+      setAnswer(data.message);
+      speak(data.message);
+    } catch (e) {
+      setAnswer("I heard you, but I'm having trouble connecting to my brain.");
+    } finally { setLoading(false); }
+  };
+
   async function startRecording() {
     try {
       const permission = await Audio.requestPermissionsAsync();
       if (permission.status !== 'granted') return Alert.alert("Permission", "Need microphone access");
 
-      // 1. Set the audio mode explicitly for recording
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
-      });
-
-      // 2. Create the recording object
-      const { recording } = await Audio.Recording.createAsync(
-        Audio.RecordingOptionsPresets.HIGH_QUALITY
-      );
-      
+      await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
+      const { recording } = await Audio.Recording.createAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
       setRecording(recording);
       setAnswer("Listening... 👂");
-    } catch (err) {
-      console.error('Failed to start recording', err);
-      setAnswer("Could not start recording.");
-    }
+    } catch (err) { setAnswer("Microphone error."); }
   }
 
   async function stopRecording() {
     if (!recording) return;
-
     try {
+      const currentRecording = recording;
       setRecording(null);
-      // Give it a tiny moment to finish the buffer
+      // Tiny delay to ensure buffer is full
       await new Promise(resolve => setTimeout(resolve, 500));
-      
-      await recording.stopAndUnloadAsync();
-      const uri = recording.getURI();
-      
-      if (uri) {
-        processVoiceChat(uri);
-      } else {
-        setAnswer("I didn't catch that. Please hold the brain longer.");
-      }
+      await currentRecording.stopAndUnloadAsync();
+      const uri = currentRecording.getURI();
+      if (uri) processVoiceChat(uri);
     } catch (error) {
-      console.error("Stop recording error:", error);
       setAnswer("I had trouble hearing that. Try again?");
     }
   }
-  // --- CAMERA LOGIC ---
+
+  // --- 2. IMAGE PROCESSING ---
   const handleCameraAction = async () => {
     const result = await ImagePicker.launchCameraAsync({ allowsEditing: false, quality: 0.2 });
     if (!result.canceled) {
       const uri = result.assets[0].uri;
       setSelectedImage(uri);
-      if (!isTeachingMode) processImageAsk(uri);
-      else setAnswer("I see it! Now describe this memory.");
+      if (!isTeachingMode) {
+        setLoading(true);
+        const formData = new FormData();
+        // @ts-ignore
+        formData.append('image', { uri, name: 'photo.jpg', type: 'image/jpeg' });
+        formData.append('user_id', user.id);
+        try {
+          const res = await fetch(`${tunnelUrl}describe-image`, { method: 'POST', body: formData });
+          const data = await res.json();
+          setAnswer(data.message);
+          speak(data.message);
+        } finally { setLoading(false); }
+      } else {
+        setAnswer("I see it! Who is this in the photo?");
+      }
     }
-  };
-
-  const processImageAsk = async (uri: string) => {
-    setLoading(true);
-    const formData = new FormData();
-    // @ts-ignore
-    formData.append('image', { uri, name: 'photo.jpg', type: 'image/jpeg' });
-    formData.append('user_id', user.id);
-    try {
-      const res = await fetch(`${tunnelUrl}describe-image`, { method: 'POST', body: formData });
-      const data = await res.json();
-      setAnswer(data.message);
-      speak(data.message);
-    } finally { setLoading(false); }
   };
 
   const saveToCloud = async () => {
@@ -106,8 +105,8 @@ export default function HomeScreen() {
     formData.append('user_id', user.id);
     try {
       await fetch(`${tunnelUrl}teach-remi`, { method: 'POST', body: formData });
-      setAnswer("I've remembered that for you. 🖼️");
-      speak("I've remembered that for you.");
+      setAnswer("Memory saved! I'll remember that.");
+      speak("Memory saved! I'll remember that.");
       setSelectedImage(null);
       setDescription("");
     } finally { setLoading(false); }
@@ -128,18 +127,16 @@ export default function HomeScreen() {
 
       {isTeachingMode && selectedImage && (
         <View style={styles.inputArea}>
-          <TextInput style={styles.input} placeholder="Who or what is this?" value={description} onChangeText={setDescription} />
+          <TextInput style={styles.input} placeholder="Who is this?" value={description} onChangeText={setDescription} />
           <TouchableOpacity style={styles.saveBtn} onPress={saveToCloud}><Text style={styles.saveBtnText}>Save Memory</Text></TouchableOpacity>
         </View>
       )}
 
       <View style={styles.buttonRow}>
-        {/* CAMERA BUTTON */}
         <TouchableOpacity style={styles.sideButton} onPress={handleCameraAction}>
           <Text style={{ fontSize: 30 }}>📸</Text>
         </TouchableOpacity>
 
-        {/* VOICE BUTTON (Hold to talk) */}
         <TouchableOpacity 
           style={[styles.micButton, { backgroundColor: recording ? '#FF3B30' : 'white' }]} 
           onLongPress={startRecording}
@@ -149,21 +146,20 @@ export default function HomeScreen() {
           {loading ? <ActivityIndicator color="#003366" /> : <Text style={{ fontSize: 50 }}>🧠</Text>}
         </TouchableOpacity>
 
-        {/* ROUTINE QUICK CHECK */}
-       <TouchableOpacity 
-  style={styles.sideButton} 
-  onPress={async () => {
-    setLoading(true);
-    try {
-      const res = await fetch(`${tunnelUrl}check-routine?user_id=${user.id}`);
-      const data = await res.json();
-      setAnswer(data.message);
-      speak(data.message);
-    } finally { setLoading(false); }
-  }}
->
-  <Text style={{ fontSize: 30 }}>🕒</Text>
-</TouchableOpacity>
+        <TouchableOpacity 
+          style={styles.sideButton} 
+          onPress={async () => {
+            setLoading(true);
+            try {
+              const res = await fetch(`${tunnelUrl}check-routine?user_id=${user.id}`);
+              const data = await res.json();
+              setAnswer(data.message);
+              speak(data.message);
+            } finally { setLoading(false); }
+          }}
+        >
+          <Text style={{ fontSize: 30 }}>🕒</Text>
+        </TouchableOpacity>
       </View>
       
       <Text style={styles.hint}>Hold 🧠 to talk • Tap 📸 for eyes</Text>
@@ -178,7 +174,7 @@ const styles = StyleSheet.create({
   preview: { width: '100%', height: 200, borderRadius: 20, marginBottom: 15 },
   aiText: { fontSize: 20, color: '#003366', textAlign: 'center', lineHeight: 30, fontWeight: '500' },
   inputArea: { width: '100%', marginBottom: 20 },
-  input: { backgroundColor: 'white', padding: 15, borderRadius: 15, borderWidth: 1, borderColor: '#ddd', marginBottom: 10 },
+  input: { backgroundColor: 'white', padding: 15, borderRadius: 15, borderBottomWidth: 1, borderColor: '#ddd', marginBottom: 10 },
   saveBtn: { backgroundColor: '#34C759', padding: 15, borderRadius: 15 },
   saveBtnText: { color: 'white', textAlign: 'center', fontWeight: 'bold' },
   buttonRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', width: '100%', marginTop: 20 },
