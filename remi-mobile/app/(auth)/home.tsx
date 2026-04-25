@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ActivityIndicator, Image, StyleSheet, Switch, TextInput, ScrollView, Alert } from 'react-native';
+import { Audio } from 'expo-av';
 import * as ImagePicker from 'expo-image-picker';
 import * as Speech from 'expo-speech';
-import { Audio } from 'expo-av';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, Image, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { supabase } from '../../supabase';
 
 export default function HomeScreen() {
