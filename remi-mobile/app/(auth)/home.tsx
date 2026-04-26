@@ -1,5 +1,4 @@
-import { AudioModule, RecordingOptionsPresets, useAudioRecorder } from 'expo-audio'; // The new library
-import * as Speech from 'expo-speech';
+import { AudioModule } from 'expo-audio'; // The new library
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Image, ScrollView, Switch, Text, TouchableOpacity, View } from 'react-native';
 import { supabase } from '../../supabase';
@@ -12,7 +11,9 @@ export default function HomeScreen() {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [description, setDescription] = useState("");
 
-  const recorder = useAudioRecorder(RecordingOptionsPresets.HIGH_QUALITY);
+  const recorder = AudioModule.useAudioRecorder(
+  AudioModule.RecordingOptionsPresets?.HIGH_QUALITY || {} 
+);
   const tunnelUrl = "https://ssk3gx0p-8000.uks1.devtunnels.ms/"; 
 
   useEffect(() => {
