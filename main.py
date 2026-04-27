@@ -135,18 +135,33 @@ async def get_memories(user_id: str):
         return {"error": str(e), "memories": []}
 
 @app.get("/check-routine")
-async def check_routine(user_id: str):
-    """Reminds the user of the next thing in their schedule."""
+async def check_routine(user_id: str = "anonymous"):
+    print(f"🕒 Routine check requested for: {user_id}")
     try:
         now = datetime.now().strftime("%H:%M")
-        context = await get_full_context(user_id)
         
-        prompt = f"Remi here. The current time is {now}. Using this routine: {context}, remind the user what they should be doing or what is coming up next. Be very gentle."
-        res = model.generate_content(prompt)
-        return {"message": res.text}
-    except Exception as e:
-        return {"message": "I'm not quite sure what the time is, but I'm here with you."}
+        # 1. Fetch routines from Supabase
+        response = supabase.table("routines").select("*").eq("user_id", user_id).execute()
+        
+        if not response.data:
+            return {"message": "I don't see anything on your schedule right now, but I'm right here if you need me."}
 
+        # 2. Build the schedule context
+        schedule = ", ".join([f"{item['time']} is {item['activity']}" for item in response.data])
+        
+        prompt = f"""
+        You are Remi, a gentle companion. The time is {now}. 
+        The user's schedule is: {schedule}.
+        Briefly and warmly remind them of what's happening now or next.
+        """
+        
+        res = model.generate_content(prompt)
+        print(f"🤖 Remi schedule response: {res.text}")
+        return {"message": res.text}
+        
+    except Exception as e:
+        print(f"❌ ROUTINE ERROR: {str(e)}")
+        return {"message": "I'm having a little trouble seeing the clock, but it's a lovely day to be with you."}
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
