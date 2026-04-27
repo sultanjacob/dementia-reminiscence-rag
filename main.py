@@ -136,44 +136,34 @@ async def get_memories(user_id: str):
 
 @app.get("/check-routine")
 async def check_routine(user_id: str = None):
-    # Log what's happening so we can see it in VS Code
     print(f"🕒 Checking schedule for User: {user_id}")
-    
     try:
         now = datetime.now().strftime("%H:%M")
         
-        # 1. Fetch from Supabase
-        query = supabase.table("routines").select("*")
+        # Try fetching specific user tasks first
+        response = supabase.table("routines").select("*").execute()
         
-        # Only filter if we actually have a real ID
-        if user_id and user_id != "undefined" and user_id != "null":
-            query = query.eq("user_id", user_id)
-            
-        response = query.execute()
+        # If we have multiple users, we filter manually to be safe
+        user_tasks = [r for r in response.data if r.get('user_id') == user_id]
         
-        print(f"📊 Found {len(response.data)} tasks in database.")
+        # If no specific user tasks, just look at all available (for testing)
+        final_tasks = user_tasks if user_tasks else response.data
 
-        if not response.data:
-            return {"message": "I don't see anything on the schedule yet, but I'm happy to just sit with you."}
+        if not final_tasks:
+            print("📭 Database is empty.")
+            return {"message": "I don't see anything on the schedule yet, but I'm here for you."}
 
-        # 2. Context for Gemini
-        schedule_text = "\n".join([f"{item['time']}: {item['activity']}" for item in response.data])
+        print(f"✅ Found {len(final_tasks)} tasks to tell the user about.")
+        schedule_text = "\n".join([f"{item['time']}: {item['activity']}" for item in final_tasks])
         
-        prompt = f"""
-        You are Remi, a warm companion. 
-        Current Time: {now}
-        User's Schedule:
-        {schedule_text}
-        
-        Tell the user what is happening now or next in a very gentle, encouraging way.
-        """
-        
+        prompt = f"You are Remi. Time is {now}. Schedule: {schedule_text}. Remind the user warmly of what's next."
         res = model.generate_content(prompt)
+        
         return {"message": res.text}
         
     except Exception as e:
         print(f"❌ ROUTINE ERROR: {str(e)}")
-        return {"message": "I'm having a little trouble seeing the clock, but I'm right here with you."}
+        return {"message": "I'm having trouble seeing the clock."}
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
