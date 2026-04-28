@@ -65,9 +65,11 @@ export default function HomeScreen() {
     setLoading(true);
     const formData = new FormData();
     // @ts-ignore
-    formData.append('file', { uri, name: 'voice.m4a', type: 'audio/m4a' });
-    formData.append('user_id', user?.id || "anonymous");
-
+    formData.append('file', { 
+      uri, 
+      name: 'voice.m4a', 
+      type: 'audio/x-m4a' // Change 'audio/m4a' to 'audio/x-m4a'
+    });
     try {
       const res = await fetch(`${tunnelUrl}voice-chat`, { method: 'POST', body: formData });
       const data = await res.json();
