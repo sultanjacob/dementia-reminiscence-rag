@@ -60,31 +60,33 @@ async def get_full_context(user_id: str):
 # --- 5. ENDPOINTS ---
 
 @app.post("/voice-chat")
-async def voice_chat(file: UploadFile = File(...), user_id: str = Form(...)):
-    """Receives audio, transcribes it, and responds as Remi."""
+async def voice_chat(file: UploadFile = File(...), user_id: str = Form("anonymous")):
+    print(f"🎤 Voice received from user: {user_id}")
     try:
         audio_contents = await file.read()
-        context = await get_full_context(user_id)
+        context = await get_full_context(user_id) # Fetches Memories + Routines!
         
         prompt = f"""
         You are Remi, a gentle companion for someone with dementia. 
-        Use this context to help them remember:
+        Context for this specific user:
         {context}
         
-        The user has spoken to you. Listen to the audio and respond warmly.
-        Keep it brief and comforting.
+        The user just sent a voice message. Listen to what they said and respond 
+        very warmly and briefly (1-2 sentences). If they ask what to do, 
+        refer to their ROUTINE.
         """
 
-        # Gemini can process audio bytes directly
+        # Using the same model that worked for the Clock
         res = model.generate_content([
             prompt,
-            {"mime_type": "audio/m4a", "data": audio_contents}
+            {"mime_type": "audio/x-m4a", "data": audio_contents}
         ])
         
+        print(f"🤖 Remi says: {res.text}")
         return {"message": res.text}
     except Exception as e:
-        print(f"Voice Error: {e}")
-        return {"message": "I'm listening, but I'm having trouble thinking clearly."}
+        print(f"❌ VOICE ERROR: {str(e)}")
+        return {"message": "I'm here and I'm listening, but I'm having trouble thinking clearly."}
 
 @app.post("/describe-image")
 async def describe_image(image: UploadFile = File(...), user_id: str = Form("anonymous")):
