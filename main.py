@@ -23,14 +23,23 @@ app.add_middleware(
 )
 
 # --- 3. CLOUD & AI CONFIGURATION ---
-SUPABASE_URL = "https://bphmzxsidlxfawqkvksr.supabase.co"
-SUPABASE_KEY = "sb_publishable_-RYTM7gdaV_1IE3d6F9GNQ_OEoAH3lY"
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+import os
+from dotenv import load_dotenv
+from supabase import create_client, Client
+import google.generativeai as genai
 
+# This looks for the .env file and loads the variables
+load_dotenv()
+
+# We pull them into variables using os.getenv
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+
+# Initialize the services
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 genai.configure(api_key=GEMINI_API_KEY)
-# Using gemini-1.5-flash for speed and multimodal (voice/image) support
-model = genai.GenerativeModel('gemini-1.5-flash')
+model = genai.GenerativeModel('gemini-1.5-flash-latest')
 
 # --- 4. HELPER FUNCTIONS ---
 
@@ -134,36 +143,41 @@ async def get_memories(user_id: str):
     except Exception as e:
         return {"error": str(e), "memories": []}
 
+# 1. Update the model definition (Try 'gemini-1.5-flash-latest')
+model = genai.GenerativeModel('gemini-1.5-flash-latest')
+
+# ... then inside your check_routine function ...
+
 @app.get("/check-routine")
 async def check_routine(user_id: str = None):
     print(f"🕒 Checking schedule for User: {user_id}")
     try:
         now = datetime.now().strftime("%H:%M")
-        
-        # Try fetching specific user tasks first
         response = supabase.table("routines").select("*").execute()
         
-        # If we have multiple users, we filter manually to be safe
+        # Filter for the user
         user_tasks = [r for r in response.data if r.get('user_id') == user_id]
-        
-        # If no specific user tasks, just look at all available (for testing)
         final_tasks = user_tasks if user_tasks else response.data
 
         if not final_tasks:
-            print("📭 Database is empty.")
-            return {"message": "I don't see anything on the schedule yet, but I'm here for you."}
+            return {"message": "I don't see anything on the schedule yet."}
 
-        print(f"✅ Found {len(final_tasks)} tasks to tell the user about.")
+        print(f"✅ Found {len(final_tasks)} tasks. Sending to Gemini...")
+        
         schedule_text = "\n".join([f"{item['time']}: {item['activity']}" for item in final_tasks])
         
-        prompt = f"You are Remi. Time is {now}. Schedule: {schedule_text}. Remind the user warmly of what's next."
+        prompt = f"You are Remi, a warm companion. The time is {now}. Here is the schedule: {schedule_text}. Briefly tell the user what is next."
+
+        # 2. Add a small retry/safety check here
         res = model.generate_content(prompt)
         
+        print(f"🤖 Remi says: {res.text}")
         return {"message": res.text}
         
     except Exception as e:
         print(f"❌ ROUTINE ERROR: {str(e)}")
-        return {"message": "I'm having trouble seeing the clock."}
+        # If the specific model fails, let's see if the base name works as a fallback
+        return {"message": "I'm having a little trouble thinking, but I'm here with you."}
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
