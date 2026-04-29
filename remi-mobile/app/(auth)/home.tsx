@@ -26,13 +26,10 @@ export default function HomeScreen() {
   const [description, setDescription] = useState("");
 
   // --- 2. AUDIO SETUP ---
-  // Modern recorder hook
+  // Using the hook for the recorder, but we will handle permissions manually for stability
   const recorder = AudioModule.useAudioRecorder(
     AudioModule.RecordingOptionsPresets?.HIGH_QUALITY || {}
   );
-
-  // Modern permissions hook
-  const [permissionResponse, requestPermission] = AudioModule.usePermissions();
 
   // ⚠️ Ensure this matches your active VS Code tunnel!
   const tunnelUrl = "https://ssk3gx0p-8000.uks1.devtunnels.ms/"; 
@@ -50,13 +47,12 @@ export default function HomeScreen() {
   // --- 4. VOICE LOGIC ---
   const handleStartRecording = async () => {
     try {
-      // Corrected Permission Logic
-      if (permissionResponse?.status !== 'granted') {
-        const result = await requestPermission();
-        if (result.status !== 'granted') {
-          Alert.alert("Permission", "Mic access needed to talk to Remi.");
-          return;
-        }
+      // Use the stable direct permission request
+      const permission = await AudioModule.requestPermissionsAsync();
+      
+      if (permission.status !== 'granted') {
+        Alert.alert("Permission", "Microphone access is needed to talk to Remi.");
+        return;
       }
       
       setAnswer("Listening... 👂");
@@ -88,7 +84,7 @@ export default function HomeScreen() {
     formData.append('file', { 
       uri, 
       name: 'voice.m4a', 
-      type: 'audio/x-m4a' // Use the x-m4a type for Gemini compatibility
+      type: 'audio/x-m4a' 
     });
     formData.append('user_id', user?.id || "anonymous");
 
