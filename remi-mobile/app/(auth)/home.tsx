@@ -25,15 +25,19 @@ export default function HomeScreen() {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [description, setDescription] = useState("");
 
-  // Setup the modern recorder
+  // --- 2. AUDIO SETUP ---
+  // Modern recorder hook
   const recorder = AudioModule.useAudioRecorder(
     AudioModule.RecordingOptionsPresets?.HIGH_QUALITY || {}
   );
 
+  // Modern permissions hook
+  const [permissionResponse, requestPermission] = AudioModule.usePermissions();
+
   // ⚠️ Ensure this matches your active VS Code tunnel!
   const tunnelUrl = "https://ssk3gx0p-8000.uks1.devtunnels.ms/"; 
 
-  // --- 2. INITIALIZATION ---
+  // --- 3. INITIALIZATION ---
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => setUser(user));
   }, []);
@@ -43,33 +47,51 @@ export default function HomeScreen() {
     Speech.speak(text, { language: 'en-GB', pitch: 0.9, rate: 0.8 });
   };
 
-  // --- 3. VOICE LOGIC ---
+  // --- 4. VOICE LOGIC ---
   const handleStartRecording = async () => {
-    const status = await AudioModule.requestPermissionsAsync();
-    if (!status.granted) return Alert.alert("Permission", "Mic access needed");
-    
-    setAnswer("Listening... 👂");
-    recorder.prepareToRecord();
-    recorder.record();
+    try {
+      // Corrected Permission Logic
+      if (permissionResponse?.status !== 'granted') {
+        const result = await requestPermission();
+        if (result.status !== 'granted') {
+          Alert.alert("Permission", "Mic access needed to talk to Remi.");
+          return;
+        }
+      }
+      
+      setAnswer("Listening... 👂");
+      recorder.prepareToRecord();
+      recorder.record();
+    } catch (err) {
+      console.error(err);
+      setAnswer("I had trouble starting the microphone.");
+    }
   };
 
   const handleStopRecording = async () => {
     if (!recorder.isRecording) return;
-    await recorder.stop();
-    if (recorder.uri) {
-      processVoiceChat(recorder.uri);
+    try {
+      await recorder.stop();
+      if (recorder.uri) {
+        processVoiceChat(recorder.uri);
+      }
+    } catch (error) {
+      console.error(error);
+      setAnswer("I couldn't hear that clearly.");
     }
   };
 
   const processVoiceChat = async (uri: string) => {
     setLoading(true);
     const formData = new FormData();
-   // @ts-ignore
+    // @ts-ignore
     formData.append('file', { 
       uri, 
       name: 'voice.m4a', 
-      type: 'audio/x-m4a' // Change 'audio/m4a' to 'audio/x-m4a'
+      type: 'audio/x-m4a' // Use the x-m4a type for Gemini compatibility
     });
+    formData.append('user_id', user?.id || "anonymous");
+
     try {
       const res = await fetch(`${tunnelUrl}voice-chat`, { method: 'POST', body: formData });
       const data = await res.json();
@@ -80,7 +102,7 @@ export default function HomeScreen() {
     } finally { setLoading(false); }
   };
 
-  // --- 4. CAMERA & TEACHING LOGIC ---
+  // --- 5. CAMERA & TEACHING LOGIC ---
   const handleCameraAction = async () => {
     const result = await ImagePicker.launchCameraAsync({ allowsEditing: false, quality: 0.2 });
     if (!result.canceled) {
@@ -91,12 +113,14 @@ export default function HomeScreen() {
         const formData = new FormData();
         // @ts-ignore
         formData.append('image', { uri, name: 'photo.jpg', type: 'image/jpeg' });
-        formData.append('user_id', user.id);
+        formData.append('user_id', user?.id);
         try {
           const res = await fetch(`${tunnelUrl}describe-image`, { method: 'POST', body: formData });
           const data = await res.json();
           setAnswer(data.message);
           speak(data.message);
+        } catch (e) {
+          setAnswer("I can't see right now.");
         } finally { setLoading(false); }
       } else {
         setAnswer("I see it! Now describe this memory and tap Save.");
@@ -111,7 +135,7 @@ export default function HomeScreen() {
     // @ts-ignore
     formData.append('image', { uri: selectedImage, name: 'photo.jpg', type: 'image/jpeg' });
     formData.append('description', description);
-    formData.append('user_id', user.id);
+    formData.append('user_id', user?.id);
     try {
       const res = await fetch(`${tunnelUrl}teach-remi`, { method: 'POST', body: formData });
       const data = await res.json();
@@ -119,10 +143,12 @@ export default function HomeScreen() {
       speak(data.message);
       setSelectedImage(null);
       setDescription("");
+    } catch (e) {
+      setAnswer("I couldn't save that memory.");
     } finally { setLoading(false); }
   };
 
-  // --- 5. RENDER UI ---
+  // --- 6. RENDER UI ---
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <View style={styles.modeRow}>
@@ -173,10 +199,12 @@ export default function HomeScreen() {
           onPress={async () => {
             setLoading(true);
             try {
-              const res = await fetch(`${tunnelUrl}check-routine?user_id=${user.id}`);
+              const res = await fetch(`${tunnelUrl}check-routine?user_id=${user?.id}`);
               const data = await res.json();
               setAnswer(data.message);
               speak(data.message);
+            } catch (e) {
+              setAnswer("I'm not sure what's next on the schedule.");
             } finally { setLoading(false); }
           }}
         >
