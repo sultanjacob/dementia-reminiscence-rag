@@ -64,7 +64,7 @@ export default function HomeScreen() {
   const processVoiceChat = async (uri: string) => {
     setLoading(true);
     const formData = new FormData();
-    // @ts-ignore
+   // @ts-ignore
     formData.append('file', { 
       uri, 
       name: 'voice.m4a', 
