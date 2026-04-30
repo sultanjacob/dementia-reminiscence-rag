@@ -1,4 +1,4 @@
-import * as AudioModule from 'expo-audio';
+import { Audio } from 'expo-av'; // Switched to the stable expo-av
 import * as ImagePicker from 'expo-image-picker';
 import * as Speech from 'expo-speech';
 import React, { useEffect, useState } from 'react';
@@ -24,21 +24,19 @@ export default function HomeScreen() {
   const [isTeachingMode, setIsTeachingMode] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [description, setDescription] = useState("");
+  const [recording, setRecording] = useState<Audio.Recording | null>(null);
 
-  // --- 2. AUDIO & PERMISSION HOOKS ---
-  const recorder = AudioModule.useAudioRecorder(
-    AudioModule.RecordingOptionsPresets?.HIGH_QUALITY || {}
-  );
-
-  // This is the most stable way to handle permissions in Expo 3
-  const [permissionResponse, requestPermission] = AudioModule.useMicrophonePermissions();
-
-  // ⚠️ Ensure this matches your active VS Code tunnel!
   const tunnelUrl = "https://ssk3gx0p-8000.uks1.devtunnels.ms/"; 
 
-  // --- 3. INITIALIZATION ---
+  // --- 2. INITIALIZATION ---
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => setUser(user));
+    
+    // Configure audio mode for the app
+    Audio.setAudioModeAsync({
+      allowsRecordingIOS: true,
+      playsInSilentModeIOS: true,
+    });
   }, []);
 
   const speak = (text: string) => {
@@ -46,37 +44,37 @@ export default function HomeScreen() {
     Speech.speak(text, { language: 'en-GB', pitch: 0.9, rate: 0.8 });
   };
 
-  // --- 4. VOICE LOGIC ---
+  // --- 3. VOICE LOGIC (Stable expo-av version) ---
   const handleStartRecording = async () => {
     try {
-      // Check and request permissions using the hook status
-      if (permissionResponse?.status !== 'granted') {
-        const result = await requestPermission();
-        if (result.status !== 'granted') {
-          Alert.alert("Permission", "Microphone access is needed to talk to Remi.");
-          return;
-        }
+      const permission = await Audio.requestPermissionsAsync();
+      if (permission.status !== 'granted') {
+        Alert.alert("Permission", "Mic access is needed to talk to Remi.");
+        return;
       }
-      
+
       setAnswer("Listening... 👂");
-      recorder.prepareToRecord();
-      recorder.record();
+      const { recording } = await Audio.Recording.createAsync(
+        Audio.RecordingOptionsPresets.HIGH_QUALITY
+      );
+      setRecording(recording);
     } catch (err) {
-      console.error("Recording Start Error:", err);
+      console.error("Failed to start recording", err);
       setAnswer("I had trouble starting the microphone.");
     }
   };
 
   const handleStopRecording = async () => {
-    if (!recorder.isRecording) return;
+    if (!recording) return;
+    setRecording(null);
     try {
-      await recorder.stop();
-      if (recorder.uri) {
-        processVoiceChat(recorder.uri);
+      await recording.stopAndUnloadAsync();
+      const uri = recording.getURI();
+      if (uri) {
+        processVoiceChat(uri);
       }
     } catch (error) {
-      console.error("Recording Stop Error:", error);
-      setAnswer("I couldn't hear that clearly.");
+      console.error("Failed to stop recording", error);
     }
   };
 
@@ -101,7 +99,7 @@ export default function HomeScreen() {
     } finally { setLoading(false); }
   };
 
-  // --- 5. CAMERA & TEACHING LOGIC ---
+  // --- 4. CAMERA & TEACHING LOGIC ---
   const handleCameraAction = async () => {
     const result = await ImagePicker.launchCameraAsync({ allowsEditing: false, quality: 0.2 });
     if (!result.canceled) {
@@ -147,7 +145,7 @@ export default function HomeScreen() {
     } finally { setLoading(false); }
   };
 
-  // --- 6. RENDER UI ---
+  // --- 5. RENDER UI ---
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <View style={styles.modeRow}>
@@ -185,7 +183,7 @@ export default function HomeScreen() {
         </TouchableOpacity>
 
         <TouchableOpacity 
-          style={[styles.micButton, { backgroundColor: recorder.isRecording ? '#FF3B30' : 'white' }]} 
+          style={[styles.micButton, { backgroundColor: recording ? '#FF3B30' : 'white' }]} 
           onLongPress={handleStartRecording}
           onPressOut={handleStopRecording}
           onPress={() => speak("Hold the brain to talk to me.")}
@@ -196,7 +194,7 @@ export default function HomeScreen() {
         <TouchableOpacity 
           style={styles.sideButton} 
           onPress={async () => {
-            if (!user) return Alert.alert("Wait", "Loading user profile...");
+            if (!user) return Alert.alert("Wait", "Loading profile...");
             setLoading(true);
             try {
               const res = await fetch(`${tunnelUrl}check-routine?user_id=${user.id}`);
