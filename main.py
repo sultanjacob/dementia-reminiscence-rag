@@ -63,31 +63,37 @@ async def get_full_context(user_id: str):
 async def voice_chat(file: UploadFile = File(...), user_id: str = Form("anonymous")):
     print(f"🎤 Voice received from user: {user_id}")
     try:
+        # 1. Read the audio file
         audio_contents = await file.read()
-        context = await get_full_context(user_id) # Fetches Memories + Routines!
         
+        # 2. Get the user's memories and schedule for context
+        context = await get_full_context(user_id) 
+        
+        # 3. Create the prompt for Remi
         prompt = f"""
         You are Remi, a gentle companion for someone with dementia. 
         Context for this specific user:
         {context}
         
-        The user just sent a voice message. Listen to what they said and respond 
-        very warmly and briefly (1-2 sentences). If they ask what to do, 
-        refer to their ROUTINE.
+        The user just sent a voice message. Listen to it and respond 
+        very warmly and briefly (max 2 sentences). 
+        If they ask about their schedule or name, use the context provided.
         """
 
-        # Using the same model that worked for the Clock
+        # 4. Use 'audio/m4a' or 'audio/x-m4a' - expo-av usually sends m4a
+        # We wrap it in a list for the Gemini 1.5 Flash model
         res = model.generate_content([
             prompt,
-            {"mime_type": "audio/x-m4a", "data": audio_contents}
+            {"mime_type": "audio/mp4", "data": audio_contents} 
         ])
         
-        print(f"🤖 Remi says: {res.text}")
+        print(f"🤖 Remi response: {res.text}")
         return {"message": res.text}
-    except Exception as e:
-        print(f"❌ VOICE ERROR: {str(e)}")
-        return {"message": "I'm here and I'm listening, but I'm having trouble thinking clearly."}
 
+    except Exception as e:
+        # This is where your error is being caught!
+        print(f"❌ VOICE ERROR DETAIL: {str(e)}") 
+        return {"message": "I'm here and I'm listening, but I'm having trouble thinking clearly."}
 @app.post("/describe-image")
 async def describe_image(image: UploadFile = File(...), user_id: str = Form("anonymous")):
     try:
