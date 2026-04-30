@@ -25,11 +25,13 @@ export default function HomeScreen() {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [description, setDescription] = useState("");
 
-  // --- 2. AUDIO SETUP ---
-  // Using the hook for the recorder, but we will handle permissions manually for stability
+  // --- 2. AUDIO & PERMISSION HOOKS ---
   const recorder = AudioModule.useAudioRecorder(
     AudioModule.RecordingOptionsPresets?.HIGH_QUALITY || {}
   );
+
+  // This is the most stable way to handle permissions in Expo 3
+  const [permissionResponse, requestPermission] = AudioModule.useMicrophonePermissions();
 
   // ⚠️ Ensure this matches your active VS Code tunnel!
   const tunnelUrl = "https://ssk3gx0p-8000.uks1.devtunnels.ms/"; 
@@ -47,19 +49,20 @@ export default function HomeScreen() {
   // --- 4. VOICE LOGIC ---
   const handleStartRecording = async () => {
     try {
-      // Use the stable direct permission request
-      const permission = await AudioModule.requestPermissionsAsync();
-      
-      if (permission.status !== 'granted') {
-        Alert.alert("Permission", "Microphone access is needed to talk to Remi.");
-        return;
+      // Check and request permissions using the hook status
+      if (permissionResponse?.status !== 'granted') {
+        const result = await requestPermission();
+        if (result.status !== 'granted') {
+          Alert.alert("Permission", "Microphone access is needed to talk to Remi.");
+          return;
+        }
       }
       
       setAnswer("Listening... 👂");
       recorder.prepareToRecord();
       recorder.record();
     } catch (err) {
-      console.error(err);
+      console.error("Recording Start Error:", err);
       setAnswer("I had trouble starting the microphone.");
     }
   };
@@ -72,7 +75,7 @@ export default function HomeScreen() {
         processVoiceChat(recorder.uri);
       }
     } catch (error) {
-      console.error(error);
+      console.error("Recording Stop Error:", error);
       setAnswer("I couldn't hear that clearly.");
     }
   };
@@ -193,9 +196,10 @@ export default function HomeScreen() {
         <TouchableOpacity 
           style={styles.sideButton} 
           onPress={async () => {
+            if (!user) return Alert.alert("Wait", "Loading user profile...");
             setLoading(true);
             try {
-              const res = await fetch(`${tunnelUrl}check-routine?user_id=${user?.id}`);
+              const res = await fetch(`${tunnelUrl}check-routine?user_id=${user.id}`);
               const data = await res.json();
               setAnswer(data.message);
               speak(data.message);
