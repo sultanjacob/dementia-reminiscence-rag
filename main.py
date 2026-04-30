@@ -63,26 +63,20 @@ async def get_full_context(user_id: str):
 async def voice_chat(file: UploadFile = File(...), user_id: str = Form("anonymous")):
     print(f"🎤 Voice received from user: {user_id}")
     try:
-        # 1. Read the audio file
         audio_contents = await file.read()
-        
-        # 2. Get the user's memories and schedule for context
         context = await get_full_context(user_id) 
         
-        # 3. Create the prompt for Remi
+        # Use the most stable model name here
+        voice_model = genai.GenerativeModel('gemini-1.5-flash') 
+
         prompt = f"""
-        You are Remi, a gentle companion for someone with dementia. 
-        Context for this specific user:
-        {context}
-        
-        The user just sent a voice message. Listen to it and respond 
-        very warmly and briefly (max 2 sentences). 
-        If they ask about their schedule or name, use the context provided.
+        You are Remi, a gentle companion. 
+        Context: {context}
+        Respond to this voice message warmly and briefly (max 2 sentences).
         """
 
-        # 4. Use 'audio/m4a' or 'audio/x-m4a' - expo-av usually sends m4a
-        # We wrap it in a list for the Gemini 1.5 Flash model
-        res = model.generate_content([
+        # Using 'audio/mp4' as it's the most compatible for expo-av files
+        res = voice_model.generate_content([
             prompt,
             {"mime_type": "audio/mp4", "data": audio_contents} 
         ])
@@ -91,7 +85,8 @@ async def voice_chat(file: UploadFile = File(...), user_id: str = Form("anonymou
         return {"message": res.text}
 
     except Exception as e:
-        # This is where your error is being caught!
+        print(f"❌ VOICE ERROR DETAIL: {str(e)}") 
+        return {"message": "I'm here and I'm listening, but I'm having trouble thinking clearly."}
         print(f"❌ VOICE ERROR DETAIL: {str(e)}") 
         return {"message": "I'm here and I'm listening, but I'm having trouble thinking clearly."}
 @app.post("/describe-image")
