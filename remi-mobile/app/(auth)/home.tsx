@@ -80,6 +80,8 @@ export default function HomeScreen() {
 
   const processVoiceChat = async (uri: string) => {
     setLoading(true);
+    console.log("📦 Starting upload for URI:", uri); // Debug log
+    
     const formData = new FormData();
     // @ts-ignore
     formData.append('file', { 
@@ -90,13 +92,31 @@ export default function HomeScreen() {
     formData.append('user_id', user?.id || "anonymous");
 
     try {
-      const res = await fetch(`${tunnelUrl}voice-chat`, { method: 'POST', body: formData });
+      const res = await fetch(`${tunnelUrl}voice-chat`, { 
+        method: 'POST', 
+        body: formData,
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.log("❌ Server rejected request:", errorText);
+        setAnswer(`Server Error: ${res.status}`);
+        return;
+      }
+
       const data = await res.json();
       setAnswer(data.message);
       speak(data.message);
-    } catch (e) {
-      setAnswer("I'm having trouble thinking clearly.");
-    } finally { setLoading(false); }
+    } catch (e: any) {
+      console.log("❌ Network/Fetch Error:", e.message);
+      setAnswer(`Connection Error: ${e.message}`);
+    } finally { 
+      setLoading(false); 
+    }
   };
 
   // --- 4. CAMERA & TEACHING LOGIC ---
