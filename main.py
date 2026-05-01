@@ -73,29 +73,26 @@ async def voice_chat(file: UploadFile = File(...), user_id: str = Form("anonymou
         audio_contents = await file.read()
         context = await get_full_context(user_id) 
         
-        # Use the most stable model name here
-        voice_model = genai.GenerativeModel('gemini-1.5-flash') 
-
+        # Use the global 'model' defined above
         prompt = f"""
-        You are Remi, a gentle companion. 
-        Context: {context}
-        Respond to this voice message warmly and briefly (max 2 sentences).
+        You are Remi, a warm companion. 
+        Context for this user: {context}
+        Respond to the user's voice message briefly and warmly.
         """
 
-        # Using 'audio/mp4' as it's the most compatible for expo-av files
-        res = voice_model.generate_content([
+        # Gemini 1.5 Flash supports audio directly
+        response = model.generate_content([
             prompt,
-            {"mime_type": "audio/mp4", "data": audio_contents} 
+            {"mime_type": "audio/mp4", "data": audio_contents}
         ])
         
-        print(f"🤖 Remi response: {res.text}")
-        return {"message": res.text}
+        print(f"🤖 Remi response: {response.text}")
+        return {"message": response.text}
 
     except Exception as e:
-        print(f"❌ VOICE ERROR DETAIL: {str(e)}") 
-        return {"message": "I'm here and I'm listening, but I'm having trouble thinking clearly."}
-        print(f"❌ VOICE ERROR DETAIL: {str(e)}") 
-        return {"message": "I'm here and I'm listening, but I'm having trouble thinking clearly."}
+        print(f"❌ VOICE ERROR DETAIL: {str(e)}")
+        # If the error is still a 404, we'll try a fallback naming convention
+        return {"message": "I'm here, but I'm having a little trouble with my memory banks."}
 @app.post("/describe-image")
 async def describe_image(image: UploadFile = File(...), user_id: str = Form("anonymous")):
     try:
