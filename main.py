@@ -1,3 +1,4 @@
+import google.generativeai as genai
 from fastapi import FastAPI, Request, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 import google.generativeai as genai
@@ -8,6 +9,12 @@ from dotenv import load_dotenv
 from supabase import create_client, Client
 
 # --- 1. SETUP ---
+# Load environment variables
+load_dotenv()
+genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+
+# DEFINE MODEL HERE - Try this naming convention
+model = genai.GenerativeModel('gemini-1.5-flash')
 basedir = os.path.abspath(os.path.dirname(__file__))
 load_dotenv(os.path.join(basedir, 'keys.env'))
 
