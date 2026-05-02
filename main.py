@@ -59,13 +59,19 @@ async def get_full_context(user_id: str):
 
 # --- 4. ENDPOINTS ---
 
-@app.post("/voice-chat")
-async def voice_chat(file: UploadFile = File(...), user_id: str = Form("anonymous")):
-    print(f"🎤 Voice received from user: {user_id}")
+@@app.post("/voice-chat")
+async def voice_chat(file: UploadFile = File(...), user_id: Form(None) = None):
+    # If user_id is coming through as a string "undefined" or null
+    actual_user_id = user_id if user_id and user_id != "undefined" else "anonymous"
+    print(f"🎤 Voice received for User: {actual_user_id}")
+    
     try:
+        # Check if file is empty
+        if not file:
+            return {"message": "I didn't hear anything."}
+            
         audio_contents = await file.read()
-        context = await get_full_context(user_id) 
-        
+        # ... rest of your code ... 
         prompt = f"""
         You are Remi, a warm companion for someone with dementia. 
         Context for this user: {context}
