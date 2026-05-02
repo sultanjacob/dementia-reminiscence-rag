@@ -97,7 +97,7 @@ export default function HomeScreen() {
         body: formData,
         headers: {
           'Accept': 'application/json',
-          'Content-Type': 'multipart/form-data',
+          // REMOVE 'Content-Type': 'multipart/form-data' <-- DELETE THIS LINE
         },
       });
 
