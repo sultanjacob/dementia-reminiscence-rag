@@ -78,32 +78,35 @@ export default function HomeScreen() {
     }
   };
 
-  const processVoiceChat = async (uri: string) => {
+const processVoiceChat = async (uri: string) => {
     setLoading(true);
-    console.log("📦 Starting upload for URI:", uri); // Debug log
+    console.log("📦 Starting upload for URI:", uri);
     
     const formData = new FormData();
+    
+    // We create the file object exactly as React Native expects it
+    const fileToUpload = {
+      uri: uri,
+      name: 'audio.m4a',
+      type: 'audio/m4a',
+    };
+
     // @ts-ignore
-    formData.append('file', { 
-      uri, 
-      name: 'voice.m4a', 
-      type: 'audio/x-m4a' 
-    });
+    formData.append('file', fileToUpload);
     formData.append('user_id', user?.id || "anonymous");
 
     try {
       const res = await fetch(`${tunnelUrl}voice-chat`, { 
         method: 'POST', 
         body: formData,
-        headers: {
-          'Accept': 'application/json',
-          // REMOVE 'Content-Type': 'multipart/form-data' <-- DELETE THIS LINE
-        },
+        // CRITICAL: We removed the headers object entirely to let 
+        // React Native set the correct Multi-part boundary.
       });
 
       if (!res.ok) {
+        // This captures if the tunnel is alive but the Python script crashed
         const errorText = await res.text();
-        console.log("❌ Server rejected request:", errorText);
+        console.log("❌ Server Error Details:", errorText);
         setAnswer(`Server Error: ${res.status}`);
         return;
       }
@@ -112,8 +115,8 @@ export default function HomeScreen() {
       setAnswer(data.message);
       speak(data.message);
     } catch (e: any) {
-      console.log("❌ Network/Fetch Error:", e.message);
-      setAnswer(`Connection Error: ${e.message}`);
+      console.log("❌ Connection Error:", e.message);
+      setAnswer("I can't reach my brain right now. Check your tunnel.");
     } finally { 
       setLoading(false); 
     }
