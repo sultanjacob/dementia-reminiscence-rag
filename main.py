@@ -1,23 +1,28 @@
 import os
 import uuid
 from datetime import datetime
+from path lib import Path # Add this to help find files
 from dotenv import load_dotenv
 
-# FastAPI Imports
-from fastapi import FastAPI, UploadFile, File, Form
-from fastapi.middleware.cors import CORSMiddleware
-
-# Service Imports
-import google.generativeai as genai
-from supabase import create_client, Client
-
 # --- 1. SETUP & CONFIGURATION ---
-load_dotenv()
 
-# Pull variables from .env
+# This forces Python to look in the current folder for a file named '.env'
+# If your file is named 'keys.env', change '.env' to 'keys.env' below
+env_path = Path('.') / '.env'
+load_dotenv(dotenv_path=env_path)
+
+# Pull variables
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+
+# DEBUG PRINT: This helps us see if the keys loaded
+print(f"Checking keys: URL={'✅' if SUPABASE_URL else '❌'}, Key={'✅' if SUPABASE_KEY else '❌'}")
+
+if not SUPABASE_URL:
+    raise ValueError("SUPABASE_URL not found! Check if your .env file is in the same folder as main.py")
+
+# ... rest of your code ...
 
 # Initialize Supabase
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
