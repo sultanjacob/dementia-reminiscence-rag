@@ -4,14 +4,14 @@ from datetime import datetime
 from dotenv import load_dotenv
 
 # FastAPI Imports
-from fastapi import FastAPI, Request, UploadFile, File, Form
+from fastapi import FastAPI, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 
 # Service Imports
 import google.generativeai as genai
 from supabase import create_client, Client
 
-# --- 1. SETUP & COFIGURATION ---
+# --- 1. SETUP & CONFIGURATION ---
 load_dotenv()
 
 # Pull variables from .env
@@ -59,19 +59,21 @@ async def get_full_context(user_id: str):
 
 # --- 4. ENDPOINTS ---
 
-@@app.post("/voice-chat")
+@app.post("/voice-chat")
 async def voice_chat(file: UploadFile = File(...), user_id: Form(None) = None):
-    # If user_id is coming through as a string "undefined" or null
+    # Sanitize user_id
     actual_user_id = user_id if user_id and user_id != "undefined" else "anonymous"
     print(f"🎤 Voice received for User: {actual_user_id}")
     
     try:
-        # Check if file is empty
         if not file:
             return {"message": "I didn't hear anything."}
             
         audio_contents = await file.read()
-        # ... rest of your code ... 
+        
+        # FETCH CONTEXT FIRST (Fixed the previous scope error)
+        context = await get_full_context(actual_user_id) 
+        
         prompt = f"""
         You are Remi, a warm companion for someone with dementia. 
         Context for this user: {context}
@@ -142,14 +144,13 @@ async def teach_remi(image: UploadFile = File(...), description: str = Form(""),
         return {"message": "I have tucked that memory away in my heart."}
     except Exception as e:
         print(f"❌ TEACH ERROR: {e}")
-        return {"message": f"I couldn't save that memory right now."}
+        return {"message": "I couldn't save that memory right now."}
 
 @app.get("/check-routine")
 async def check_routine(user_id: str = None):
     print(f"🕒 Checking schedule for User: {user_id}")
     try:
         now = datetime.now().strftime("%H:%M")
-        # Fetch all routines and filter by user_id
         response = supabase.table("routines").select("*").eq("user_id", user_id).execute()
         
         if not response.data:
@@ -170,5 +171,4 @@ async def check_routine(user_id: str = None):
 
 if __name__ == "__main__":
     import uvicorn
-    # Make sure port 8000 is open in your Dev Tunnel
     uvicorn.run(app, host="0.0.0.0", port=8000)
