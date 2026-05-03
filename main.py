@@ -1,7 +1,7 @@
 import os
 import uuid
 from datetime import datetime
-from path lib import Path # Add this to help find files
+from pathlib import Path # Add this to help find files
 from dotenv import load_dotenv
 
 # --- 1. SETUP & CONFIGURATION ---
