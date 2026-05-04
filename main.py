@@ -59,7 +59,7 @@ async def get_full_context(user_id: str):
 # --- 4. ENDPOINTS ---
 
 @app.post("/voice-chat")
-async def voice_chat(file: UploadFile = File(...), user_id: Form(None) = None):
+async def voice_chat(file: UploadFile = File(...), user_id: str = Form("anonymous")):
     actual_user_id = user_id if user_id and user_id != "undefined" else "anonymous"
     print(f"🎤 Voice received for User: {actual_user_id}")
     try:
