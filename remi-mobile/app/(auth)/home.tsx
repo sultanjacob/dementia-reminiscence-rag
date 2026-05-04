@@ -79,48 +79,42 @@ export default function HomeScreen() {
   };
 
 const processVoiceChat = async (uri: string) => {
-    setLoading(true);
-    console.log("📦 Starting upload for URI:", uri);
-    
-    const formData = new FormData();
-    
-    // We create the file object exactly as React Native expects it
-    const fileToUpload = {
-      uri: uri,
-      name: 'audio.m4a',
-      type: 'audio/m4a',
-    };
+  setLoading(true);
+  
+  const formData = new FormData();
+  // @ts-ignore
+  formData.append('file', { 
+    uri: uri, 
+    name: 'audio.m4a', 
+    type: 'audio/m4a' 
+  });
+  formData.append('user_id', user?.id || "anonymous");
 
-    // @ts-ignore
-    formData.append('file', fileToUpload);
-    formData.append('user_id', user?.id || "anonymous");
+  try {
+    const res = await fetch(`${tunnelUrl}voice-chat`, { 
+      method: 'POST', 
+      body: formData,
+      headers: {
+        'Accept': 'application/json',
+        // DO NOT set Content-Type here
+      },
+    });
 
-    try {
-      const res = await fetch(`${tunnelUrl}voice-chat`, { 
-        method: 'POST', 
-        body: formData,
-        // CRITICAL: We removed the headers object entirely to let 
-        // React Native set the correct Multi-part boundary.
-      });
-
-      if (!res.ok) {
-        // This captures if the tunnel is alive but the Python script crashed
-        const errorText = await res.text();
-        console.log("❌ Server Error Details:", errorText);
-        setAnswer(`Server Error: ${res.status}`);
-        return;
-      }
-
-      const data = await res.json();
-      setAnswer(data.message);
-      speak(data.message);
-    } catch (e: any) {
-      console.log("❌ Connection Error:", e.message);
-      setAnswer("I can't reach my brain right now. Check your tunnel.");
-    } finally { 
-      setLoading(false); 
+    if (!res.ok) {
+      console.log("Status:", res.status);
+      setAnswer(`Error ${res.status}: Brain unreachable.`);
+      return;
     }
-  };
+
+    const data = await res.json();
+    setAnswer(data.message);
+    speak(data.message);
+  } catch (e) {
+    setAnswer("Connection failed.");
+  } finally {
+    setLoading(false);
+  }
+};
 
   // --- 4. CAMERA & TEACHING LOGIC ---
   const handleCameraAction = async () => {
