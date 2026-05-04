@@ -60,20 +60,31 @@ async def get_full_context(user_id: str):
 
 @app.post("/voice-chat")
 async def voice_chat(file: UploadFile = File(...), user_id: str = Form("anonymous")):
-    actual_user_id = user_id if user_id and user_id != "undefined" else "anonymous"
-    print(f"🎤 Voice received for User: {actual_user_id}")
+    print(f"🎤 Voice received for User: {user_id}")
     try:
+        # 1. Read the audio file
         audio_contents = await file.read()
-        context = await get_full_context(actual_user_id) 
-        prompt = f"You are Remi, a warm companion. Context: {context}. Respond to the voice message warmly and briefly."
         
-        response = model.generate_content([prompt, {"mime_type": "audio/mp4", "data": audio_contents}])
+        # 2. FETCH CONTEXT FIRST (Important: do this before the prompt)
+        context = await get_full_context(user_id) 
+        
+        # 3. Use the stable model name (gemini-1.5-flash-latest usually bypasses the 404)
+        voice_model = genai.GenerativeModel('gemini-1.5-flash-latest')
+
+        prompt = f"You are Remi, a warm companion. Context: {context}. Respond warmly and briefly (1-2 sentences)."
+
+        # 4. Generate the response
+        response = voice_model.generate_content([
+            prompt,
+            {"mime_type": "audio/mp4", "data": audio_contents}
+        ])
+        
         print(f"🤖 Remi says: {response.text}")
         return {"message": response.text}
+
     except Exception as e:
         print(f"❌ Error: {e}")
-        return {"message": "I'm having a little trouble thinking."}
-
+        return {"message": "I'm having a little trouble thinking clearly right now."}
 @app.get("/check-routine")
 async def check_routine(user_id: str = None):
     print(f"🕒 Checking schedule for: {user_id}")
