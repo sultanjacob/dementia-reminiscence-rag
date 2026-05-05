@@ -63,19 +63,15 @@ async def voice_chat(file: UploadFile = File(...), user_id: str = Form("anonymou
     print(f"🎤 Voice received for User: {user_id}")
     try:
         audio_contents = await file.read()
-        
-        # 1. Fetch context FIRST
         context = await get_full_context(user_id) 
         
-        # 2. Try the absolute most basic multimodal model name
-        # If gemini-1.5-flash is failing, we'll try this:
-        voice_model = genai.GenerativeModel('gemini-1.5-flash')
+        # USE THE NEW MODEL FROM YOUR LIST
+        voice_model = genai.GenerativeModel('gemini-3-flash-preview')
 
-        prompt = f"You are Remi, a warm companion. Context: {context}. Respond warmly and briefly."
+        prompt = f"You are Remi, a warm companion for someone with dementia. Context: {context}. Respond warmly and briefly (1-2 sentences)."
 
-        # 3. Use the correct data structure
         response = voice_model.generate_content([
-            {"text": prompt},
+            prompt,
             {"mime_type": "audio/mp4", "data": audio_contents}
         ])
         
@@ -84,15 +80,6 @@ async def voice_chat(file: UploadFile = File(...), user_id: str = Form("anonymou
 
     except Exception as e:
         print(f"❌ Error Detail: {e}")
-        # IF IT STILL 404s, let's list what models are actually available to you in the terminal
-        try:
-            print("--- 🔍 Checking Available Models ---")
-            for m in genai.list_models():
-                if 'generateContent' in m.supported_generation_methods:
-                    print(f"Available: {m.name}")
-        except:
-            pass
-            
         return {"message": "I'm having a little trouble thinking clearly right now."}
 @app.get("/check-routine")
 async def check_routine(user_id: str = None):
