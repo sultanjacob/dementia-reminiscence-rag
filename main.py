@@ -102,15 +102,28 @@ async def voice_chat(file: UploadFile = File(...), user_id: str = Form("anonymou
 async def check_routine(user_id: str = None):
     print(f"🕒 Checking schedule for: {user_id}")
     try:
-        now = datetime.now().strftime("%H:%M")
+        now = datetime.now().strftime("%I:%M %p")
+        
+        # Fetch routines from Supabase
         res = supabase.table("routines").select("*").eq("user_id", user_id).execute()
-        schedule_text = "\n".join([f"{i['time']}: {i['activity']}" for i in res.data])
-        prompt = f"Time: {now}. Schedule: {schedule_text}. Tell the user what is next."
-        ai_res = model.generate_content(prompt)
-        return {"message": ai_res.text}
-    except Exception as e:
-        return {"message": "I can't see the clock right now."}
+        
+        if not res.data:
+            # If no routine is found, Remi should still be helpful
+            prompt = f"It is {now}. The user has no scheduled activities. Tell them there is nothing on the calendar and wish them a lovely day."
+        else:
+            schedule_text = "\n".join([f"{i['time']}: {i['activity']}" for i in res.data])
+            prompt = f"Current Time: {now}. User's Schedule:\n{schedule_text}\n\nTell the user what is coming up next based on the time."
 
+        # Use the Gemini 3 model we know works
+        voice_model = genai.GenerativeModel('gemini-3-flash-preview')
+        ai_res = voice_model.generate_content(prompt)
+        
+        print(f"🤖 Remi schedule response: {ai_res.text}")
+        return {"message": ai_res.text}
+        
+    except Exception as e:
+        print(f"❌ Schedule Error: {e}")
+        return {"message": "I'm having a little trouble seeing the calendar, but I'm right here with you."}
 @app.post("/describe-image")
 async def describe_image(image: UploadFile = File(...), user_id: str = Form("anonymous")):
     try:
