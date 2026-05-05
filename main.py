@@ -62,14 +62,31 @@ async def get_full_context(user_id: str):
 async def voice_chat(file: UploadFile = File(...), user_id: str = Form("anonymous")):
     print(f"🎤 Voice received for User: {user_id}")
     try:
+        # 1. Read the audio data sent from the phone
         audio_contents = await file.read()
+        
+        # 2. Get the current local time of the server
+        # This ensures Remi knows if it's morning, afternoon, or night
+        local_time = datetime.now().strftime("%I:%M %p") 
+        
+        # 3. Fetch the user's personal memories and routines from Supabase
         context = await get_full_context(user_id) 
         
-        # USE THE NEW MODEL FROM YOUR LIST
+        # 4. Use the Gemini 3 model that we confirmed is available to you
         voice_model = genai.GenerativeModel('gemini-3-flash-preview')
 
-        prompt = f"You are Remi, a warm companion for someone with dementia. Context: {context}. Respond warmly and briefly (1-2 sentences)."
+        # 5. Create the prompt with the new time variable
+        prompt = f"""
+        You are Remi, a warm and patient companion for someone with dementia. 
+        The current local time is {local_time}. 
+        
+        Use this context to help the user if they sound confused:
+        {context}
+        
+        Respond to the user's voice message warmly and very briefly (max 2 sentences).
+        """
 
+        # 6. Send both the instructions and the audio to the AI
         response = voice_model.generate_content([
             prompt,
             {"mime_type": "audio/mp4", "data": audio_contents}
@@ -80,7 +97,7 @@ async def voice_chat(file: UploadFile = File(...), user_id: str = Form("anonymou
 
     except Exception as e:
         print(f"❌ Error Detail: {e}")
-        return {"message": "I'm having a little trouble thinking clearly right now."}
+        return {"message": "I'm here and I'm listening, but I'm having a little trouble thinking clearly."}
 @app.get("/check-routine")
 async def check_routine(user_id: str = None):
     print(f"🕒 Checking schedule for: {user_id}")
