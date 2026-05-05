@@ -64,18 +64,18 @@ async def voice_chat(file: UploadFile = File(...), user_id: str = Form("anonymou
     try:
         audio_contents = await file.read()
         
-        # 1. FETCH CONTEXT FIRST (Fixed the order issue)
+        # 1. Fetch context FIRST
         context = await get_full_context(user_id) 
         
-        # 2. Use a guaranteed model name locally just for this call
-        # Some library versions prefer 'models/gemini-1.5-flash'
+        # 2. Try the absolute most basic multimodal model name
+        # If gemini-1.5-flash is failing, we'll try this:
         voice_model = genai.GenerativeModel('gemini-1.5-flash')
 
-        prompt = f"You are Remi, a warm companion. Context: {context}. Respond to the voice message warmly and briefly."
+        prompt = f"You are Remi, a warm companion. Context: {context}. Respond warmly and briefly."
 
-        # 3. Use the correct multimodal list format [text, audio]
+        # 3. Use the correct data structure
         response = voice_model.generate_content([
-            prompt,
+            {"text": prompt},
             {"mime_type": "audio/mp4", "data": audio_contents}
         ])
         
@@ -83,7 +83,16 @@ async def voice_chat(file: UploadFile = File(...), user_id: str = Form("anonymou
         return {"message": response.text}
 
     except Exception as e:
-        print(f"❌ Error Detail: {e}") # This helps you see EXACTLY why it failed in the terminal
+        print(f"❌ Error Detail: {e}")
+        # IF IT STILL 404s, let's list what models are actually available to you in the terminal
+        try:
+            print("--- 🔍 Checking Available Models ---")
+            for m in genai.list_models():
+                if 'generateContent' in m.supported_generation_methods:
+                    print(f"Available: {m.name}")
+        except:
+            pass
+            
         return {"message": "I'm having a little trouble thinking clearly right now."}
 @app.get("/check-routine")
 async def check_routine(user_id: str = None):
