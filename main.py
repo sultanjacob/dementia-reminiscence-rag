@@ -44,16 +44,32 @@ app.add_middleware(
 # --- 3. HELPER FUNCTIONS ---
 async def get_full_context(user_id: str):
     try:
+        # 1. Fetch Profile Details
+        profile_res = supabase.table("profiles").select("*").eq("id", user_id).execute()
+        profile = profile_res.data[0] if profile_res.data else {}
+        
+        bio = f"""
+        USER PROFILE:
+        Name: {profile.get('nickname', 'User')}
+        Former Job: {profile.get('former_profession', 'Unknown')}
+        Hobbies: {profile.get('hobbies', 'Unknown')}
+        Family: {profile.get('family_details', 'Unknown')}
+        """
+
+        # 2. Fetch Memories
         mem_res = supabase.table("memories").select("description").eq("user_id", user_id).execute()
         memories = [row['description'] for row in mem_res.data]
+        
+        # 3. Fetch Routines
         rout_res = supabase.table("routines").select("time, activity").eq("user_id", user_id).execute()
         routines = [f"At {r['time']}, {r['activity']}" for r in rout_res.data]
         
-        context = "FAMILY MEMORIES:\n" + ("\n".join(memories) if memories else "None.")
+        context = f"{bio}\n\nMEMORIES:\n" + ("\n".join(memories) if memories else "None.")
         context += "\n\nDAILY ROUTINE:\n" + ("\n".join(routines) if routines else "None.")
         return context
-    except:
-        return "No specific memories found yet."
+    except Exception as e:
+        print(f"Context Error: {e}")
+        return "No specific personal details found."
 
 # --- 4. ENDPOINTS ---
 
