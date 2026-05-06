@@ -40,10 +40,17 @@ export default function HomeScreen() {
   }, []);
 
   const speak = (text: string) => {
-    if (!text) return;
-    Speech.speak(text, { language: 'en-GB', pitch: 0.9, rate: 0.8 });
-  };
+  if (!text) return;
 
+  // This line "scrubs" the text to remove asterisks before speaking
+  const cleanText = text.replace(/\*/g, ''); 
+
+  Speech.speak(cleanText, { 
+    language: 'en-GB', 
+    pitch: 0.9, 
+    rate: 0.8 
+  });
+};
   // --- 3. VOICE LOGIC (Stable expo-av version) ---
   const handleStartRecording = async () => {
     try {
