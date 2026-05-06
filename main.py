@@ -29,7 +29,6 @@ print("--------------------")
 # Initialize Services
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel('gemini-1.5-flash')
 
 # --- 2. INITIALIZE APP ---
 app = FastAPI()
@@ -54,7 +53,7 @@ async def get_full_context(user_id: str):
         context += "\n\nDAILY ROUTINE:\n" + ("\n".join(routines) if routines else "None.")
         return context
     except:
-        return "No context found."
+        return "No specific memories found yet."
 
 # --- 4. ENDPOINTS ---
 
@@ -62,31 +61,24 @@ async def get_full_context(user_id: str):
 async def voice_chat(file: UploadFile = File(...), user_id: str = Form("anonymous")):
     print(f"🎤 Voice received for User: {user_id}")
     try:
-        # 1. Read the audio data sent from the phone
         audio_contents = await file.read()
-        
-        # 2. Get the current local time of the server
-        # This ensures Remi knows if it's morning, afternoon, or night
-        local_time = datetime.now().strftime("%I:%M %p") 
-        
-        # 3. Fetch the user's personal memories and routines from Supabase
+        local_time = datetime.now().strftime("%I:%M %p")
         context = await get_full_context(user_id) 
         
-        # 4. Use the Gemini 3 model that we confirmed is available to you
+        # Using Gemini 3 as confirmed available
         voice_model = genai.GenerativeModel('gemini-3-flash-preview')
 
-        # 5. Create the prompt with the new time variable
         prompt = f"""
-        You are Remi, a warm and patient companion for someone with dementia. 
-        The current local time is {local_time}. 
+        You are Remi, a warm companion for someone with dementia. 
+        Current time: {local_time}.
+        Context: {context}
         
-        Use this context to help the user if they sound confused:
-        {context}
-        
-        Respond to the user's voice message warmly and very briefly (max 2 sentences).
+        INSTRUCTIONS: 
+        1. Respond warmly and briefly (max 2 sentences).
+        2. NEVER use asterisks (**) or symbols. 
+        3. Use plain text only so it can be spoken clearly.
         """
 
-        # 6. Send both the instructions and the audio to the AI
         response = voice_model.generate_content([
             prompt,
             {"mime_type": "audio/mp4", "data": audio_contents}
@@ -94,59 +86,84 @@ async def voice_chat(file: UploadFile = File(...), user_id: str = Form("anonymou
         
         print(f"🤖 Remi says: {response.text}")
         return {"message": response.text}
-
     except Exception as e:
-        print(f"❌ Error Detail: {e}")
-        return {"message": "I'm here and I'm listening, but I'm having a little trouble thinking clearly."}
+        print(f"❌ Voice Error: {e}")
+        return {"message": "I am here and listening, but I am having a little trouble thinking clearly."}
+
 @app.get("/check-routine")
 async def check_routine(user_id: str = None):
     print(f"🕒 Checking schedule for: {user_id}")
     try:
         now = datetime.now().strftime("%I:%M %p")
-        
-        # Fetch routines from Supabase
         res = supabase.table("routines").select("*").eq("user_id", user_id).execute()
         
+        voice_model = genai.GenerativeModel('gemini-3-flash-preview')
+
         if not res.data:
-            # If no routine is found, Remi should still be helpful
-            prompt = f"It is {now}. The user has no scheduled activities. Tell them there is nothing on the calendar and wish them a lovely day."
+            prompt = f"It is {now}. The user has nothing scheduled. Tell them warmly to enjoy their time."
         else:
             schedule_text = "\n".join([f"{i['time']}: {i['activity']}" for i in res.data])
-            prompt = f"Current Time: {now}. User's Schedule:\n{schedule_text}\n\nTell the user what is coming up next based on the time."
+            prompt = f"""
+            Current Time: {now}. 
+            Schedule: {schedule_text}. 
+            Tell the user what is next. 
+            DO NOT use asterisks or markdown. Use plain sentences.
+            """
 
-        # Use the Gemini 3 model we know works
-        voice_model = genai.GenerativeModel('gemini-3-flash-preview')
         ai_res = voice_model.generate_content(prompt)
-        
-        print(f"🤖 Remi schedule response: {ai_res.text}")
+        print(f"🤖 Remi schedule: {ai_res.text}")
         return {"message": ai_res.text}
-        
     except Exception as e:
         print(f"❌ Schedule Error: {e}")
-        return {"message": "I'm having a little trouble seeing the calendar, but I'm right here with you."}
+        return {"message": "I cannot see the schedule right now, but I am right here with you."}
+
 @app.post("/describe-image")
 async def describe_image(image: UploadFile = File(...), user_id: str = Form("anonymous")):
+    print(f"📸 Image received from: {user_id}")
     try:
         contents = await image.read()
         context = await get_full_context(user_id)
-        prompt = f"Context: {context}. Identify the item in this photo warmly as Remi."
-        res = model.generate_content([prompt, {"mime_type": "image/jpeg", "data": contents}])
+        
+        voice_model = genai.GenerativeModel('gemini-3-flash-preview')
+        
+        prompt = f"""
+        Context: {context}. 
+        Identify the item in this photo warmly. 
+        Plain text only. No symbols or asterisks.
+        """
+        
+        res = voice_model.generate_content([
+            prompt, 
+            {"mime_type": "image/jpeg", "data": contents}
+        ])
         return {"message": res.text}
-    except:
-        return {"message": "My eyes are a bit blurry."}
+    except Exception as e:
+        print(f"❌ Image Error: {e}")
+        return {"message": "My eyes are a little blurry right now."}
 
 @app.post("/teach-remi")
 async def teach_remi(image: UploadFile = File(...), description: str = Form(""), user_id: str = Form(...)):
+    print(f"🧠 Saving new memory for: {user_id}")
     try:
         file_ext = image.filename.split(".")[-1] if "." in image.filename else "jpg"
         unique_name = f"{user_id}/{uuid.uuid4()}.{file_ext}"
         contents = await image.read()
+        
+        # Upload photo
         supabase.storage.from_("photos").upload(path=unique_name, file=contents)
         public_url = supabase.storage.from_("photos").get_public_url(unique_name)
-        supabase.table("memories").insert({"description": description, "image_url": public_url, "user_id": user_id}).execute()
-        return {"message": "Memory saved!"}
+        
+        # Save to DB
+        supabase.table("memories").insert({
+            "description": description, 
+            "image_url": public_url, 
+            "user_id": user_id
+        }).execute()
+        
+        return {"message": "I have tucked that memory away for us."}
     except Exception as e:
-        return {"message": f"Error: {str(e)}"}
+        print(f"❌ Teach Error: {e}")
+        return {"message": "I couldn't save that memory."}
 
 if __name__ == "__main__":
     import uvicorn
