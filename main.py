@@ -196,7 +196,46 @@ async def teach_remi(image: UploadFile = File(...), description: str = Form(""),
     except Exception as e:
         print(f"❌ Teach Error: {e}")
         return {"message": "I couldn't save that memory."}
+@app.post("/update-profile")
+async def update_profile(
+    user_id: str = Form(...),
+    nickname: str = Form(""),
+    former_profession: str = Form(""),
+    family_details: str = Form("")
+):
+    print(f"🎛️ CAREGIVER: Updating profile for {user_id}")
+    try:
+        # Upsert means "Update if it exists, Insert if it doesn't"
+        supabase.table("profiles").upsert({
+            "id": user_id,
+            "nickname": nickname,
+            "former_profession": former_profession,
+            "family_details": family_details
+        }).execute()
+        
+        return {"message": "Profile updated successfully!"}
+    except Exception as e:
+        print(f"❌ Profile Update Error: {e}")
+        return {"message": "Failed to update profile."}
 
+@app.post("/add-routine")
+async def add_routine(
+    user_id: str = Form(...),
+    time: str = Form(...),
+    activity: str = Form(...)
+):
+    print(f"🎛️ CAREGIVER: Adding routine at {time} for {user_id}")
+    try:
+        supabase.table("routines").insert({
+            "user_id": user_id,
+            "time": time,
+            "activity": activity
+        }).execute()
+        
+        return {"message": "Routine added successfully!"}
+    except Exception as e:
+        print(f"❌ Routine Add Error: {e}")
+        return {"message": "Failed to add routine."}
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
