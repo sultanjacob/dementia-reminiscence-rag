@@ -135,28 +135,44 @@ async def check_routine(user_id: str = None):
 
 @app.post("/describe-image")
 async def describe_image(image: UploadFile = File(...), user_id: str = Form("anonymous")):
-    print(f"📸 Image received from: {user_id}")
+    print(f"📸 Smart Eyes activated for: {user_id}")
     try:
         contents = await image.read()
+        
+        # 1. Fetch the user's Profile, Memories, and Routines
         context = await get_full_context(user_id)
         
         voice_model = genai.GenerativeModel('gemini-3-flash-preview')
         
+        # 2. The "Visual RAG" Prompt
         prompt = f"""
-        Context: {context}. 
-        Identify the item in this photo warmly. 
-        Plain text only. No symbols or asterisks.
+        You are Remi, helping a user with dementia identify their surroundings.
+        Here is the user's personal context and memory bank:
+        {context}
+        
+        YOUR TASK:
+        1. Look carefully at the photo.
+        2. Cross-reference the photo with the MEMORIES list in the context. 
+        3. IF IT MATCHES A MEMORY: Identify it using the specific details from their life (e.g., "That is the beautiful blue mug your daughter gave you!").
+        4. IF IT DOES NOT MATCH: Warmly and simply describe what the object is in a helpful way.
+        
+        RULES: 
+        - Plain text only. 
+        - NEVER use asterisks (**) or markdown formatting. 
+        - Keep it brief, conversational, and under 2 sentences.
         """
         
         res = voice_model.generate_content([
             prompt, 
             {"mime_type": "image/jpeg", "data": contents}
         ])
+        
+        print(f"🤖 Remi (Eyes) says: {res.text}")
         return {"message": res.text}
+        
     except Exception as e:
         print(f"❌ Image Error: {e}")
-        return {"message": "My eyes are a little blurry right now."}
-
+        return {"message": "My eyes are a little blurry right now, I couldn't quite see that."}
 @app.post("/teach-remi")
 async def teach_remi(image: UploadFile = File(...), description: str = Form(""), user_id: str = Form(...)):
     print(f"🧠 Saving new memory for: {user_id}")
