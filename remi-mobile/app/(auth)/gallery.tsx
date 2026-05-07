@@ -6,23 +6,57 @@ export default function GalleryScreen() {
   const [memories, setMemories] = useState<any[]>([]);
 
   const fetchMemories = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-    const { data } = await supabase.table('memories').select('*').eq('user_id', user.id).order('created_at', { ascending: false });
-    setMemories(data || []);
+    try {
+      // 1. Get the current user safely
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
+        console.log("No user found.");
+        return;
+      }
+
+      // 2. Fetch data using the correct JS syntax (.from instead of .table)
+      const { data, error } = await supabase
+        .from('memories') 
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        throw error;
+      }
+
+      setMemories(data || []);
+    } catch (error) {
+      console.error("❌ FETCH MEMORIES ERROR DETAIL:", error);
+    }
   };
 
-  useEffect(() => { fetchMemories(); }, []);
+  useEffect(() => { 
+    fetchMemories(); 
+  }, []);
 
   const deleteMemory = (id: string, imageUrl: string) => {
     Alert.alert("Delete Memory?", "This will remove it from Remi's brain forever.", [
       { text: "Cancel", style: "cancel" },
-      { text: "Delete", style: "destructive", onPress: async () => {
-          // 1. Delete from DB
-          await supabase.table('memories').delete().eq('id', id);
-          // 2. Refresh list
-          fetchMemories();
-        }}
+      { 
+        text: "Delete", 
+        style: "destructive", 
+        onPress: async () => {
+          try {
+            // Use .from() here as well
+            const { error } = await supabase.from('memories').delete().eq('id', id);
+            
+            if (error) {
+              throw error;
+            }
+            
+            // Refresh list after successful deletion
+            fetchMemories();
+          } catch (error) {
+            console.error("❌ DELETE ERROR DETAIL:", error);
+          }
+        }
+      }
     ]);
   };
 
