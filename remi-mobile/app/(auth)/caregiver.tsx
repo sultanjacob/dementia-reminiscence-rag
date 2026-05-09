@@ -15,31 +15,41 @@ export default function CaregiverScreen() {
   const [time, setTime] = useState('');
   const [activity, setActivity] = useState('');
 
-  const handleUpdateProfile = async () => {
+const handleUpdateProfile = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return Alert.alert("Error", "No user logged in.");
+      console.log("1. Starting profile update...");
+      console.log("Target URL:", `${API_URL}/update-profile`); // Let's check the URL!
 
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
+         console.log("No user found.");
+         return Alert.alert("Error", "No user logged in.");
+      }
+
+      console.log("2. User found, preparing data...");
       const formData = new FormData();
       formData.append('user_id', user.id);
       formData.append('nickname', nickname);
       formData.append('former_profession', profession);
       formData.append('family_details', family);
 
+      console.log("3. Sending fetch request...");
       const response = await fetch(`${API_URL}/update-profile`, {
         method: 'POST',
         body: formData,
       });
 
+      console.log("4. Response received:", response.status);
       if (response.ok) {
         Alert.alert("Success", "Profile updated successfully!");
         setNickname(''); setProfession(''); setFamily(''); // Clear form
       } else {
-        throw new Error("Failed to update profile");
+        throw new Error(`Server returned status: ${response.status}`);
       }
     } catch (error) {
-      console.error(error);
-      Alert.alert("Error", "Could not reach the server.");
+      // THIS WILL TELL US THE REAL PROBLEM
+      console.error("❌ PROFILE UPDATE ERROR DETAIL:", error);
+      Alert.alert("Crash Error", String(error));
     }
   };
 
