@@ -2,9 +2,6 @@ import React, { useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { supabase } from '../../supabase';
 
-// ⚠️ IMPORTANT: Replace this with your actual Dev Tunnel / Python server URL!
-const API_URL = "https://ssk3gx0p-8000.uks1.devtunnels.ms/"; 
-
 export default function CaregiverScreen() {
   // Profile State
   const [nickname, setNickname] = useState('');
@@ -15,69 +12,49 @@ export default function CaregiverScreen() {
   const [time, setTime] = useState('');
   const [activity, setActivity] = useState('');
 
-const handleUpdateProfile = async () => {
+  const handleUpdateProfile = async () => {
     try {
-      console.log("1. Starting profile update...");
-      console.log("Target URL:", `${API_URL}/update-profile`); // Let's check the URL!
-
       const { data: { user }, error: authError } = await supabase.auth.getUser();
-      if (authError || !user) {
-         console.log("No user found.");
-         return Alert.alert("Error", "No user logged in.");
-      }
+      if (authError || !user) return Alert.alert("Error", "No user logged in.");
 
-      console.log("2. User found, preparing data...");
-      const formData = new FormData();
-      formData.append('user_id', user.id);
-      formData.append('nickname', nickname);
-      formData.append('former_profession', profession);
-      formData.append('family_details', family);
-
-      console.log("3. Sending fetch request...");
-      const response = await fetch(`${API_URL}/update-profile`, {
-        method: 'POST',
-        body: formData,
+      // Save directly to Supabase
+      const { error } = await supabase.from('profiles').upsert({
+        id: user.id,
+        nickname: nickname,
+        former_profession: profession,
+        family_details: family
       });
 
-      console.log("4. Response received:", response.status);
-      if (response.ok) {
-        Alert.alert("Success", "Profile updated successfully!");
-        setNickname(''); setProfession(''); setFamily(''); // Clear form
-      } else {
-        throw new Error(`Server returned status: ${response.status}`);
-      }
-    } catch (error) {
-      // THIS WILL TELL US THE REAL PROBLEM
-      console.error("❌ PROFILE UPDATE ERROR DETAIL:", error);
-      Alert.alert("Crash Error", String(error));
+      if (error) throw error;
+
+      Alert.alert("Success", "Profile updated successfully!");
+      setNickname(''); setProfession(''); setFamily(''); // Clear form
+    } catch (error: any) {
+      console.error("Profile Error:", error);
+      Alert.alert("Database Error", error.message);
     }
   };
 
   const handleAddRoutine = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return Alert.alert("Error", "No user logged in.");
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) return Alert.alert("Error", "No user logged in.");
       if (!time || !activity) return Alert.alert("Wait!", "Please enter both a time and an activity.");
 
-      const formData = new FormData();
-      formData.append('user_id', user.id);
-      formData.append('time', time);
-      formData.append('activity', activity);
-
-      const response = await fetch(`${API_URL}/add-routine`, {
-        method: 'POST',
-        body: formData,
+      // Save directly to Supabase
+      const { error } = await supabase.from('routines').insert({
+        user_id: user.id,
+        time: time,
+        activity: activity
       });
 
-      if (response.ok) {
-        Alert.alert("Success", "Routine added to the schedule!");
-        setTime(''); setActivity(''); // Clear form
-      } else {
-        throw new Error("Failed to add routine");
-      }
-    } catch (error) {
-      console.error(error);
-      Alert.alert("Error", "Could not reach the server.");
+      if (error) throw error;
+
+      Alert.alert("Success", "Routine added to the schedule!");
+      setTime(''); setActivity(''); // Clear form
+    } catch (error: any) {
+      console.error("Routine Error:", error);
+      Alert.alert("Database Error", error.message);
     }
   };
 
