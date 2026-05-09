@@ -51,6 +51,56 @@ export default function HomeScreen() {
     rate: 0.8 
   });
 };
+// --- PROACTIVE ALARM (THE WATCHMAN) ---
+  useEffect(() => {
+    // 1. Function to check the time against the schedule
+    const checkSchedule = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        // Get current time in exactly the format we save it (e.g., "08:00 AM")
+        const now = new Date().toLocaleTimeString('en-US', { 
+          hour: '2-digit', 
+          minute: '2-digit' 
+        });
+
+        console.log(`🕒 Watchman checking time... It is ${now}`);
+
+        // Fetch routines from Supabase
+        const { data: routines, error } = await supabase
+          .from('routines')
+          .select('*')
+          .eq('user_id', user.id);
+
+        if (error) throw error;
+
+        // Loop through routines to see if any match the exact current time
+        routines?.forEach(routine => {
+          if (routine.time === now) {
+            console.log("🔔 MATCH FOUND! Triggering Alarm...");
+            
+            // Trigger the voice!
+            const announcement = `Excuse me. It is ${now}, which means it is time to ${routine.activity}.`;
+            speak(announcement);
+            
+            // Optional: Pop up an alert on the screen too
+            Alert.alert("Routine Reminder", announcement);
+          }
+        });
+      } catch (error) {
+        console.error("Watchman Error:", error);
+      }
+    };
+
+    // 2. Start the timer! Check immediately, then check every 60 seconds
+    checkSchedule(); 
+    const intervalId = setInterval(checkSchedule, 60000);
+
+    // Cleanup the timer if the app closes
+    return () => clearInterval(intervalId);
+  }, []);
+  // ---------------------------------------
   // --- 3. VOICE LOGIC (Stable expo-av version) ---
   const handleStartRecording = async () => {
     try {
