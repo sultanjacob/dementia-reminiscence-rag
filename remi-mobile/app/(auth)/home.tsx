@@ -44,9 +44,9 @@ export default function HomeScreen() {
 
       // Loop through routines to find a match
       routines?.forEach(routine => {
-        // Bulletproof match: Convert both to lowercase and remove hidden spaces
-        const dbTime = routine.time.trim().toLowerCase();
-        const phoneTime = now.trim().toLowerCase();
+        // ULTIMATE BULLETPROOF MATCH: Convert to lowercase and remove ALL spaces
+        const dbTime = routine.time.toLowerCase().replace(/\s+/g, '');
+        const phoneTime = now.toLowerCase().replace(/\s+/g, '');
 
         console.log(`Comparing DB: [${dbTime}] with Phone: [${phoneTime}]`);
 
