@@ -1,23 +1,47 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as Speech from 'expo-speech';
-import React, { useEffect, useState } from 'react';
-import { Alert, Modal, Platform, SafeAreaView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { Alert, Animated, Modal, Platform, SafeAreaView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { supabase } from '../../supabase';
 
 export default function HomeScreen() {
   const router = useRouter();
   
   const [remiText, setRemiText] = useState("Hello! I am Remi. How can I help you today?");
-  const [greeting, setGreeting] = useState("Hello");
+  const [greeting, setGreeting] = useState("Good day");
+  const [userName, setUserName] = useState("");
   const [isMenuVisible, setIsMenuVisible] = useState(false);
 
-  // --- DYNAMIC GREETING ---
+  // --- ANIMATION: BREATHING PULSE ---
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+
   useEffect(() => {
-    const hour = new Date().getHours();
-    if (hour < 12) setGreeting("Good morning");
-    else if (hour < 18) setGreeting("Good afternoon");
-    else setGreeting("Good evening");
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 1.15, duration: 1500, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1, duration: 1500, useNativeDriver: true })
+      ])
+    ).start();
+  }, []);
+
+  // --- DYNAMIC GREETING & PROFILE FETCH ---
+  useEffect(() => {
+    const fetchUserData = async () => {
+      // 1. Set Time of Day
+      const hour = new Date().getHours();
+      if (hour < 12) setGreeting("Good morning");
+      else if (hour < 18) setGreeting("Good afternoon");
+      else setGreeting("Good evening");
+
+      // 2. Fetch Name from Supabase Profile
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data } = await supabase.from('profiles').select('nickname').eq('id', user.id).single();
+        if (data && data.nickname) setUserName(data.nickname);
+      }
+    };
+    fetchUserData();
   }, []);
 
   // --- TEXT-TO-SPEECH ---
@@ -34,18 +58,16 @@ export default function HomeScreen() {
       if (!user) return;
 
       const now = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-      const { data: routines, error } = await supabase.from('routines').select('*').eq('user_id', user.id);
-      if (error) throw error;
+      const { data: routines } = await supabase.from('routines').select('*').eq('user_id', user.id);
 
       routines?.forEach(routine => {
         const dbTime = routine.time.toLowerCase().replace(/\s+/g, '');
         const phoneTime = now.toLowerCase().replace(/\s+/g, '');
 
         if (dbTime === phoneTime) {
-          const announcement = `Excuse me. It is ${now}, which means it is time to ${routine.activity}.`;
+          const announcement = `Excuse me ${userName}. It is ${now}, which means it is time to ${routine.activity}.`;
           setRemiText(announcement);
           speak(announcement);
-          Alert.alert("Routine Reminder", announcement);
         }
       });
     } catch (error) {
@@ -66,41 +88,44 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor="#F9FAFB" />
+      <StatusBar barStyle="dark-content" backgroundColor="#FDF8F5" />
       
       <View style={styles.container}>
         
-        {/* --- 1. TOP HEADER --- */}
-        <View style={styles.header}>
+        {/* --- 1. DISTINCT HEADER BOX --- */}
+        <View style={styles.headerCard}>
           <View>
             <Text style={styles.greetingText}>{greeting},</Text>
-            <Text style={styles.subGreetingText}>I'm here to help.</Text>
+            <Text style={styles.nameText}>{userName || "I'm here to help."}</Text>
           </View>
           <TouchableOpacity style={styles.iconButton} onPress={() => setIsMenuVisible(true)}>
-            <Ionicons name="menu-outline" size={32} color="#374151" />
+            <Ionicons name="menu" size={28} color="#5C4D43" />
           </TouchableOpacity>
         </View>
 
-        {/* --- 2. MAIN AI DISPLAY (Fills middle space) --- */}
-        <View style={styles.mainContent}>
+        {/* --- 2. MAIN AI DISPLAY (Middle) --- */}
+        <View style={styles.middleSection}>
           <View style={styles.aiCard}>
-            <View style={styles.avatarContainer}>
-              <Ionicons name="sparkles" size={28} color="#2563EB" />
-            </View>
             <Text style={styles.remiSpeechText}>{remiText}</Text>
           </View>
-        </View>
 
-        {/* --- 3. BOTTOM ACTION BAR (Anchored) --- */}
-        <View style={styles.footer}>
+          {/* --- 3. TAP TO TALK (Moved closer to middle) --- */}
           <TouchableOpacity 
             style={styles.primaryButton} 
             activeOpacity={0.8}
-            onPress={() => Alert.alert("Voice Mode", "Microphone activated.")}
+            onPress={() => Alert.alert("Microphone Offline", "We will wire up the Python voice recording here next!")}
           >
             <Ionicons name="mic" size={26} color="white" />
             <Text style={styles.primaryButtonText}>Tap to Talk</Text>
           </TouchableOpacity>
+        </View>
+
+        {/* --- 4. BREATHING REMI ICON (Bottom) --- */}
+        <View style={styles.bottomSection}>
+          <Animated.View style={[styles.pulseCircle, { transform: [{ scale: pulseAnim }] }]}>
+            <Ionicons name="sparkles" size={32} color="#E07A5F" />
+          </Animated.View>
+          <Text style={styles.remiLabel}>Remi is listening</Text>
         </View>
 
       </View>
@@ -114,13 +139,13 @@ export default function HomeScreen() {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Settings</Text>
               <TouchableOpacity style={styles.closeButton} onPress={() => setIsMenuVisible(false)}>
-                <Ionicons name="close" size={24} color="#6B7280" />
+                <Ionicons name="close" size={24} color="#5C4D43" />
               </TouchableOpacity>
             </View>
 
             <TouchableOpacity style={styles.menuRow} onPress={() => navigateTo('/schedule')}>
               <View style={styles.menuIconContainer}>
-                <Ionicons name="calendar" size={22} color="#4B5563" />
+                <Ionicons name="calendar" size={22} color="#5C4D43" />
               </View>
               <Text style={styles.menuRowText}>Manage Schedule</Text>
               <Ionicons name="chevron-forward" size={20} color="#D1D5DB" />
@@ -128,15 +153,10 @@ export default function HomeScreen() {
 
             <TouchableOpacity style={styles.menuRow} onPress={() => navigateTo('/caregiver')}>
               <View style={styles.menuIconContainer}>
-                <Ionicons name="person" size={22} color="#4B5563" />
+                <Ionicons name="person" size={22} color="#5C4D43" />
               </View>
               <Text style={styles.menuRowText}>User Profile</Text>
               <Ionicons name="chevron-forward" size={20} color="#D1D5DB" />
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.testButton} onPress={checkSchedule}>
-              <Ionicons name="notifications-outline" size={20} color="#D97706" style={{marginRight: 8}}/>
-              <Text style={styles.testButtonText}>Test Background Alarms</Text>
             </TouchableOpacity>
 
           </View>
@@ -148,107 +168,129 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  // Base Layout
   safeArea: {
     flex: 1,
-    backgroundColor: '#F9FAFB', // Very clean off-white
+    backgroundColor: '#FDF8F5', // Warm cream background
     paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
   container: {
     flex: 1,
-    paddingHorizontal: 24,
+    paddingHorizontal: 20,
+    justifyContent: 'space-between',
   },
 
-  // 1. Header
-  header: {
+  // 1. Header Box
+  headerCard: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingTop: 20,
-    paddingBottom: 20,
+    backgroundColor: 'white',
+    padding: 20,
+    borderRadius: 20,
+    marginTop: 20,
+    // Soft shadow
+    shadowColor: '#5C4D43',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    elevation: 3, 
   },
   greetingText: {
-    fontSize: 32,
-    fontWeight: '700',
-    color: '#111827',
-    letterSpacing: -0.5,
+    fontSize: 22,
+    color: '#8A796D', // Softer brown/gray
+    fontWeight: '500',
   },
-  subGreetingText: {
-    fontSize: 18,
-    color: '#6B7280',
+  nameText: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#4A3F35', // Deep warm brown
     marginTop: 4,
   },
   iconButton: {
     width: 48,
     height: 48,
-    borderRadius: 24,
-    backgroundColor: 'white',
+    borderRadius: 15,
+    backgroundColor: '#FDF8F5',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
   },
 
-  // 2. Main Content (The Chat Bubble)
-  mainContent: {
+  // 2. Middle Section
+  middleSection: {
     flex: 1,
-    justifyContent: 'center', // Centers the card vertically in available space
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   aiCard: {
     backgroundColor: 'white',
-    borderRadius: 28,
-    padding: 32,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    // Very subtle, professional shadow
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 12,
-    elevation: 2, 
-  },
-  avatarContainer: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: '#EFF6FF', // Light blue background for the icon
-    alignItems: 'center',
+    width: '100%',
+    borderRadius: 24,
+    padding: 35,
+    minHeight: 200,
     justifyContent: 'center',
-    marginBottom: 24,
+    marginBottom: 25,
+    // Soft shadow
+    shadowColor: '#5C4D43',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.1,
+    shadowRadius: 15,
+    elevation: 4,
   },
   remiSpeechText: {
-    fontSize: 26,
-    color: '#1F2937',
+    fontSize: 24,
+    color: '#4A3F35',
     textAlign: 'center',
-    lineHeight: 38,
+    lineHeight: 36,
     fontWeight: '500',
   },
 
-  // 3. Footer (Anchored to bottom)
-  footer: {
-    paddingBottom: Platform.OS === 'ios' ? 10 : 30, // Extra space for Android navigation bar
-    paddingTop: 20,
-  },
+  // 3. Primary Button
   primaryButton: {
-    backgroundColor: '#2563EB', // Professional deep blue
+    backgroundColor: '#E07A5F', // Warm Terracotta/Peach
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 20,
-    borderRadius: 20,
+    paddingVertical: 18,
+    paddingHorizontal: 40,
+    borderRadius: 30,
+    width: '85%',
+    shadowColor: '#E07A5F',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
   },
   primaryButtonText: {
     color: 'white',
-    fontSize: 22,
-    fontWeight: '600',
+    fontSize: 20,
+    fontWeight: 'bold',
     marginLeft: 12,
   },
 
-  // Modal (Settings Menu)
+  // 4. Bottom Section (Animated)
+  bottomSection: {
+    alignItems: 'center',
+    paddingBottom: 30,
+  },
+  pulseCircle: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    backgroundColor: '#FCEBE5', // Very light peach
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
+  },
+  remiLabel: {
+    color: '#8A796D',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+
+  // Modal
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(17, 24, 39, 0.4)', // Darker, sleeker overlay
+    backgroundColor: 'rgba(74, 63, 53, 0.5)', // Warm dark overlay
     justifyContent: 'flex-end',
   },
   modalContent: {
@@ -275,11 +317,11 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     fontSize: 24,
-    fontWeight: '700',
-    color: '#111827',
+    fontWeight: 'bold',
+    color: '#4A3F35',
   },
   closeButton: {
-    backgroundColor: '#F3F4F6',
+    backgroundColor: '#FDF8F5',
     padding: 8,
     borderRadius: 20,
   },
@@ -288,13 +330,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+    borderBottomColor: '#FDF8F5',
   },
   menuIconContainer: {
     width: 40,
     height: 40,
-    borderRadius: 10,
-    backgroundColor: '#F3F4F6',
+    borderRadius: 12,
+    backgroundColor: '#FDF8F5',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 16,
@@ -303,22 +345,6 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 18,
     fontWeight: '500',
-    color: '#374151',
-  },
-  testButton: {
-    flexDirection: 'row',
-    marginTop: 30,
-    backgroundColor: '#FEF3C7',
-    paddingVertical: 16,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#FDE68A',
-  },
-  testButtonText: {
-    color: '#D97706',
-    fontWeight: '600',
-    fontSize: 16,
+    color: '#4A3F35',
   }
 });
