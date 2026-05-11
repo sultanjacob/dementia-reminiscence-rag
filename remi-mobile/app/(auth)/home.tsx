@@ -1,27 +1,26 @@
-import { Ionicons } from '@expo/vector-icons'; // Standard Expo icons
-import { useRouter } from 'expo-router'; // Allows us to jump to hidden tabs
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import * as Speech from 'expo-speech';
 import React, { useEffect, useState } from 'react';
-import { Alert, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Modal, Platform, SafeAreaView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { supabase } from '../../supabase';
 
 export default function HomeScreen() {
   const router = useRouter();
   
-  // State Variables
   const [remiText, setRemiText] = useState("Hello! I am Remi. How can I help you today?");
   const [greeting, setGreeting] = useState("Hello");
-  const [isMenuVisible, setIsMenuVisible] = useState(false); // Controls the hidden caregiver portal
+  const [isMenuVisible, setIsMenuVisible] = useState(false);
 
   // --- DYNAMIC GREETING ---
   useEffect(() => {
     const hour = new Date().getHours();
-    if (hour < 12) setGreeting("Good Morning");
-    else if (hour < 18) setGreeting("Good Afternoon");
-    else setGreeting("Good Evening");
+    if (hour < 12) setGreeting("Good morning");
+    else if (hour < 18) setGreeting("Good afternoon");
+    else setGreeting("Good evening");
   }, []);
 
-  // --- TEXT-TO-SPEECH (WITH ASTERISK SCRUBBER) ---
+  // --- TEXT-TO-SPEECH ---
   const speak = (text: string) => {
     if (!text) return;
     const cleanText = text.replace(/\*/g, ''); 
@@ -60,70 +59,83 @@ export default function HomeScreen() {
     return () => clearInterval(intervalId); 
   }, []);
 
-  // --- NAVIGATION HELPERS FOR THE HIDDEN MENU ---
   const navigateTo = (path: any) => {
-    setIsMenuVisible(false); // Close the menu
-    router.push(path);       // Jump to the hidden screen
+    setIsMenuVisible(false); 
+    router.push(path);       
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar barStyle="dark-content" backgroundColor="#F9FAFB" />
       
-      {/* --- TOP HEADER NAVIGATION --- */}
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.greetingText}>{greeting},</Text>
-          <Text style={styles.subGreetingText}>I'm here to help.</Text>
-        </View>
+      <View style={styles.container}>
         
-        {/* Hidden Portal Button */}
-        <TouchableOpacity style={styles.gearButton} onPress={() => setIsMenuVisible(true)}>
-          <Ionicons name="settings-outline" size={28} color="#4A5568" />
-        </TouchableOpacity>
-      </View>
-
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        
-        {/* --- BEAUTIFUL AI DISPLAY CARD --- */}
-        <View style={styles.aiCard}>
-          <Ionicons name="sparkles" size={32} color="#4299E1" style={styles.aiIcon} />
-          <Text style={styles.remiSpeechText}>{remiText}</Text>
+        {/* --- 1. TOP HEADER --- */}
+        <View style={styles.header}>
+          <View>
+            <Text style={styles.greetingText}>{greeting},</Text>
+            <Text style={styles.subGreetingText}>I'm here to help.</Text>
+          </View>
+          <TouchableOpacity style={styles.iconButton} onPress={() => setIsMenuVisible(true)}>
+            <Ionicons name="menu-outline" size={32} color="#374151" />
+          </TouchableOpacity>
         </View>
 
-      </ScrollView>
+        {/* --- 2. MAIN AI DISPLAY (Fills middle space) --- */}
+        <View style={styles.mainContent}>
+          <View style={styles.aiCard}>
+            <View style={styles.avatarContainer}>
+              <Ionicons name="sparkles" size={28} color="#2563EB" />
+            </View>
+            <Text style={styles.remiSpeechText}>{remiText}</Text>
+          </View>
+        </View>
 
-      {/* --- TAP TO TALK BUTTON (Bottom Fixed) --- */}
-      <View style={styles.bottomContainer}>
-        <TouchableOpacity style={styles.talkButton} onPress={() => Alert.alert("Voice Mode", "This is where your microphone recording will start!")}>
-          <Ionicons name="mic" size={32} color="white" />
-          <Text style={styles.talkButtonText}>Tap to Talk</Text>
-        </TouchableOpacity>
+        {/* --- 3. BOTTOM ACTION BAR (Anchored) --- */}
+        <View style={styles.footer}>
+          <TouchableOpacity 
+            style={styles.primaryButton} 
+            activeOpacity={0.8}
+            onPress={() => Alert.alert("Voice Mode", "Microphone activated.")}
+          >
+            <Ionicons name="mic" size={26} color="white" />
+            <Text style={styles.primaryButtonText}>Tap to Talk</Text>
+          </TouchableOpacity>
+        </View>
+
       </View>
 
-      {/* --- THE CAREGIVER PORTAL (HIDDEN MODAL) --- */}
-      <Modal visible={isMenuVisible} transparent={true} animationType="fade">
+      {/* --- CAREGIVER PORTAL (HIDDEN MODAL) --- */}
+      <Modal visible={isMenuVisible} transparent={true} animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
+            <View style={styles.modalDragIndicator} />
             
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Caregiver Portal 🎛️</Text>
-              <TouchableOpacity onPress={() => setIsMenuVisible(false)}>
-                <Ionicons name="close-circle" size={32} color="#A0AEC0" />
+              <Text style={styles.modalTitle}>Settings</Text>
+              <TouchableOpacity style={styles.closeButton} onPress={() => setIsMenuVisible(false)}>
+                <Ionicons name="close" size={24} color="#6B7280" />
               </TouchableOpacity>
             </View>
 
-            <TouchableOpacity style={styles.menuItem} onPress={() => navigateTo('/schedule')}>
-              <Ionicons name="calendar-outline" size={24} color="#2D3748" />
-              <Text style={styles.menuItemText}>Manage Schedule</Text>
+            <TouchableOpacity style={styles.menuRow} onPress={() => navigateTo('/schedule')}>
+              <View style={styles.menuIconContainer}>
+                <Ionicons name="calendar" size={22} color="#4B5563" />
+              </View>
+              <Text style={styles.menuRowText}>Manage Schedule</Text>
+              <Ionicons name="chevron-forward" size={20} color="#D1D5DB" />
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.menuItem} onPress={() => navigateTo('/caregiver')}>
-              <Ionicons name="person-outline" size={24} color="#2D3748" />
-              <Text style={styles.menuItemText}>User Profile Settings</Text>
+            <TouchableOpacity style={styles.menuRow} onPress={() => navigateTo('/caregiver')}>
+              <View style={styles.menuIconContainer}>
+                <Ionicons name="person" size={22} color="#4B5563" />
+              </View>
+              <Text style={styles.menuRowText}>User Profile</Text>
+              <Ionicons name="chevron-forward" size={20} color="#D1D5DB" />
             </TouchableOpacity>
 
-            {/* Optional: Put your orange test button inside the hidden menu! */}
             <TouchableOpacity style={styles.testButton} onPress={checkSchedule}>
+              <Ionicons name="notifications-outline" size={20} color="#D97706" style={{marginRight: 8}}/>
               <Text style={styles.testButtonText}>Test Background Alarms</Text>
             </TouchableOpacity>
 
@@ -131,149 +143,182 @@ export default function HomeScreen() {
         </View>
       </Modal>
 
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    backgroundColor: '#F7FAFC', // Much softer, premium off-white background
+  // Base Layout
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#F9FAFB', // Very clean off-white
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
+  container: {
+    flex: 1,
+    paddingHorizontal: 24,
+  },
+
+  // 1. Header
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 25,
-    paddingTop: 60,
+    paddingTop: 20,
     paddingBottom: 20,
   },
   greetingText: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: '#2D3748',
+    fontSize: 32,
+    fontWeight: '700',
+    color: '#111827',
+    letterSpacing: -0.5,
   },
   subGreetingText: {
     fontSize: 18,
-    color: '#718096',
+    color: '#6B7280',
     marginTop: 4,
   },
-  gearButton: {
-    padding: 10,
+  iconButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: 'white',
-    borderRadius: 50,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
-  scrollContent: {
-    paddingHorizontal: 20,
-    paddingBottom: 100, // Space for the bottom button
+
+  // 2. Main Content (The Chat Bubble)
+  mainContent: {
+    flex: 1,
+    justifyContent: 'center', // Centers the card vertically in available space
   },
-  
-  // Premium Card Styling
   aiCard: {
     backgroundColor: 'white',
-    borderRadius: 24,
-    padding: 30,
-    marginTop: 20,
+    borderRadius: 28,
+    padding: 32,
     alignItems: 'center',
-    elevation: 8,
-    shadowColor: '#4299E1', // Slight blue shadow for a modern look
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.15,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    // Very subtle, professional shadow
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
     shadowRadius: 12,
-    minHeight: 250,
-    justifyContent: 'center',
+    elevation: 2, 
   },
-  aiIcon: {
-    marginBottom: 20,
+  avatarContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#EFF6FF', // Light blue background for the icon
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 24,
   },
   remiSpeechText: {
-    fontSize: 24,
-    color: '#1A202C',
+    fontSize: 26,
+    color: '#1F2937',
     textAlign: 'center',
-    lineHeight: 34,
+    lineHeight: 38,
     fontWeight: '500',
   },
 
-  // Action Button Styling
-  bottomContainer: {
-    position: 'absolute',
-    bottom: 30,
-    left: 0,
-    right: 0,
-    alignItems: 'center',
+  // 3. Footer (Anchored to bottom)
+  footer: {
+    paddingBottom: Platform.OS === 'ios' ? 10 : 30, // Extra space for Android navigation bar
+    paddingTop: 20,
   },
-  talkButton: {
+  primaryButton: {
+    backgroundColor: '#2563EB', // Professional deep blue
     flexDirection: 'row',
-    backgroundColor: '#4299E1',
-    paddingVertical: 18,
-    paddingHorizontal: 40,
-    borderRadius: 40,
     alignItems: 'center',
-    elevation: 6,
-    shadowColor: '#4299E1',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
+    justifyContent: 'center',
+    paddingVertical: 20,
+    borderRadius: 20,
   },
-  talkButtonText: {
+  primaryButtonText: {
     color: 'white',
-    fontSize: 20,
-    fontWeight: 'bold',
+    fontSize: 22,
+    fontWeight: '600',
     marginLeft: 12,
   },
 
-  // Hidden Modal Styling
+  // Modal (Settings Menu)
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    justifyContent: 'flex-end', // Menu slides up from the bottom
+    backgroundColor: 'rgba(17, 24, 39, 0.4)', // Darker, sleeker overlay
+    justifyContent: 'flex-end',
   },
   modalContent: {
     backgroundColor: 'white',
-    borderTopLeftRadius: 30,
-    borderTopRightRadius: 30,
-    padding: 30,
-    minHeight: 350,
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    paddingHorizontal: 24,
+    paddingBottom: 50,
+    paddingTop: 12,
+  },
+  modalDragIndicator: {
+    width: 40,
+    height: 5,
+    backgroundColor: '#E5E7EB',
+    borderRadius: 3,
+    alignSelf: 'center',
+    marginBottom: 20,
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 30,
+    marginBottom: 24,
   },
   modalTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#2D3748',
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#111827',
   },
-  menuItem: {
+  closeButton: {
+    backgroundColor: '#F3F4F6',
+    padding: 8,
+    borderRadius: 20,
+  },
+  menuRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 20,
+    paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#EDF2F7',
+    borderBottomColor: '#F3F4F6',
   },
-  menuItemText: {
+  menuIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 16,
+  },
+  menuRowText: {
+    flex: 1,
     fontSize: 18,
-    color: '#2D3748',
-    marginLeft: 15,
     fontWeight: '500',
+    color: '#374151',
   },
   testButton: {
+    flexDirection: 'row',
     marginTop: 30,
-    backgroundColor: '#ED8936',
-    padding: 15,
-    borderRadius: 12,
+    backgroundColor: '#FEF3C7',
+    paddingVertical: 16,
+    borderRadius: 16,
     alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#FDE68A',
   },
   testButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
+    color: '#D97706',
+    fontWeight: '600',
     fontSize: 16,
   }
 });
