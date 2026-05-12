@@ -10,7 +10,7 @@ export default function HomeScreen() {
   const router = useRouter();
   
   // ⚠️ IMPORTANT: Put your active Python Server URL here!
-  const API_URL = "YOUR_PYTHON_TUNNEL_URL_HERE"; 
+  const API_URL = "http://0.0.0.0:8000"; 
   
   const [remiText, setRemiText] = useState("Hello! I am Remi. How can I help you?");
   const [greeting, setGreeting] = useState("Good evening");
