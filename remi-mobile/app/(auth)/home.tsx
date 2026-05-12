@@ -111,23 +111,23 @@ export default function HomeScreen() {
   };
 
   // --- SEND AUDIO TO PYTHON BACKEND ---
-  const sendAudioToBackend = async (fileUri: string) => {
+ const sendAudioToBackend = async (fileUri: string) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       
-      // Package the file for sending
       const formData = new FormData();
-      formData.append('audio', {
+      
+      // FIX 1: Changed 'audio' to 'file' to match Python
+      formData.append('file', {
         uri: fileUri,
         name: 'recording.m4a',
         type: 'audio/m4a',
       } as any);
 
-      // Include user ID so Python knows who is talking
       if (user) formData.append('user_id', user.id);
 
-      // Send to your Python Server (Adjust endpoint if yours is named differently)
-      const response = await fetch(`${API_URL}/chat`, {
+      // FIX 2: Changed /chat to /voice-chat
+      const response = await fetch(`${API_URL}/voice-chat`, {
         method: 'POST',
         body: formData,
         headers: {
@@ -138,20 +138,21 @@ export default function HomeScreen() {
       const responseData = await response.json();
       
       if (response.ok) {
-        setRemiText(responseData.response || "I didn't quite catch that.");
-        speak(responseData.response);
+        // FIX 3: Changed responseData.response to responseData.message
+        const aiText = responseData.message || "I didn't quite catch that.";
+        setRemiText(aiText);
+        speak(aiText);
       } else {
-        throw new Error(responseData.error || "Server error");
+        throw new Error(responseData.message || "Server error");
       }
     } catch (error) {
       console.error("Backend Error:", error);
       Alert.alert("Connection Error", "Could not reach the Python brain.");
       setRemiText("Sorry, I had trouble connecting to my brain.");
     } finally {
-      setIsProcessing(false); // Turn off loading state
+      setIsProcessing(false);
     }
   };
-
   const navigateTo = (path: any) => {
     setIsMenuVisible(false); 
     router.push(path);       
