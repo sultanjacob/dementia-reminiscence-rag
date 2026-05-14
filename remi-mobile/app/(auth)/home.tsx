@@ -6,27 +6,20 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Alert, Animated, Image, Modal, Platform, SafeAreaView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { supabase } from '../../supabase';
 
-// --- TEMPORARY DUMMY DATA ---
 const DUMMY_MEMORIES = [
   {
     id: '1',
     title: 'Sarah\'s Wedding',
-    date: 'June 2018',
-    description: 'This is from Sarah\'s wedding day. You wore your favorite blue suit, and we all danced until midnight. You were so proud walking her down the aisle.',
     imageUrl: 'https://images.unsplash.com/photo-1519741497674-611481863552?q=80&w=600&auto=format&fit=crop',
   },
   {
     id: '2',
     title: 'Trip to the Lake',
-    date: 'Summer 2022',
-    description: 'This is a picture from our family trip to the lake. The weather was beautiful, and we had a picnic on the grass. You loved watching the boats sail by.',
     imageUrl: 'https://images.unsplash.com/photo-1443890484047-5eaa67d1d630?q=80&w=600&auto=format&fit=crop',
   },
   {
     id: '3',
     title: 'Baking Cookies',
-    date: 'December 2023',
-    description: 'Here we are baking chocolate chip cookies in the kitchen. You showed the grandkids your secret recipe for making them extra soft.',
     imageUrl: 'https://images.unsplash.com/photo-1499636136210-6f4ee915583e?q=80&w=600&auto=format&fit=crop',
   }
 ];
@@ -41,8 +34,6 @@ export default function HomeScreen() {
   const [greeting, setGreeting] = useState("Good evening");
   const [userName, setUserName] = useState("John");
   const [isMenuVisible, setIsMenuVisible] = useState(false);
-  
-  // --- NEW: DAILY MEMORY STATE ---
   const [dailyMemory, setDailyMemory] = useState<any>(null);
 
   const [recording, setRecording] = useState<Audio.Recording | null>(null);
@@ -51,7 +42,13 @@ export default function HomeScreen() {
 
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
-  // --- GLOWING ORB ANIMATION ---
+  // 1. Define Speak Function FIRST so it can be used on startup
+  const speak = (text: string) => {
+    if (!text) return;
+    const cleanText = text.replace(/\*/g, ''); 
+    Speech.speak(cleanText, { language: 'en-GB', pitch: 0.9, rate: 0.8 });
+  };
+
   useEffect(() => {
     Animated.loop(
       Animated.sequence([
@@ -61,16 +58,13 @@ export default function HomeScreen() {
     ).start();
   }, []);
 
-  // --- FETCH USER DATA & SET MEMORY DROP ---
   useEffect(() => {
     const initializeHome = async () => {
-      // 1. Set Greeting Time
       const hour = new Date().getHours();
       if (hour < 12) setGreeting("Good morning");
       else if (hour < 18) setGreeting("Good afternoon");
       else setGreeting("Good evening");
 
-      // 2. Fetch User Name
       const { data: { user } } = await supabase.auth.getUser();
       let fetchedName = "John";
       if (user) {
@@ -81,28 +75,41 @@ export default function HomeScreen() {
         }
       }
 
-      // 3. Trigger Memory Drop (50% chance to show a memory on load, or always for testing)
+      // Select a random memory
       const randomMem = DUMMY_MEMORIES[Math.floor(Math.random() * DUMMY_MEMORIES.length)];
       setDailyMemory(randomMem);
       
       const memoryGreeting = `I was just admiring this photo of ${randomMem.title}.`;
       setRemiText(memoryGreeting);
       
-      // Optional: Have Remi speak it immediately on load
-      // speak(memoryGreeting); 
+      // 2. THIS IS THE MAGIC LINE: Remi speaks immediately!
+      speak(memoryGreeting); 
     };
     
     initializeHome();
   }, []);
 
-  const speak = (text: string) => {
-    if (!text) return;
-    const cleanText = text.replace(/\*/g, ''); 
-    Speech.speak(cleanText, { language: 'en-GB', pitch: 0.9, rate: 0.8 });
-  };
-
   const checkSchedule = async () => {
-    // ... (Your existing Watchman logic remains identical)
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const now = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+      const { data: routines } = await supabase.from('routines').select('*').eq('user_id', user.id);
+
+      routines?.forEach(routine => {
+        const dbTime = routine.time.toLowerCase().replace(/\s+/g, '');
+        const phoneTime = now.toLowerCase().replace(/\s+/g, '');
+
+        if (dbTime === phoneTime) {
+          const announcement = `Excuse me ${userName}. It is ${now}, which means it is time to ${routine.activity}.`;
+          setRemiText(announcement);
+          speak(announcement);
+        }
+      });
+    } catch (error) {
+      console.error("Watchman Error:", error);
+    }
   };
 
   useEffect(() => {
@@ -114,9 +121,7 @@ export default function HomeScreen() {
   const startRecording = async () => {
     try {
       const permission = await Audio.requestPermissionsAsync();
-      if (permission.status !== 'granted') {
-        return Alert.alert("Permission Denied", "Remi needs microphone access.");
-      }
+      if (permission.status !== 'granted') return Alert.alert("Permission Denied", "Remi needs microphone access.");
       await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
       const { recording } = await Audio.Recording.createAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
       setRecording(recording);
@@ -183,7 +188,6 @@ export default function HomeScreen() {
       <View style={styles.appCapsule}>
         <View style={styles.internalContent}>
           
-          {/* HEADER */}
           <View style={styles.header}>
             <View>
               <Text style={styles.greetingText}>{greeting},</Text>
@@ -194,19 +198,16 @@ export default function HomeScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* ORB */}
           <View style={styles.orbContainer}>
             <Animated.View style={[styles.orb, { transform: [{ scale: pulseAnim }] }]} />
           </View>
 
-          {/* SPEECH BUBBLE & MEMORY DROP */}
           <View style={styles.speechBubble}>
             <Text style={styles.remiSpeechText}>{remiText}</Text>
             
-            {/* The Image fades in if a memory is active */}
             {dailyMemory && (
               <View style={styles.memoryDropContainer}>
-                <Image source={{ uri: dailyMemory.imageUrl }} style={styles.memoryImage} />
+                <Image source={{ uri: dailyMemory.imageUrl }} style={styles.memoryImage} resizeMode="cover" />
                 <View style={styles.memoryOverlay}>
                   <Ionicons name="image" size={16} color="#FFFFFF" style={{marginRight: 6}} />
                   <Text style={styles.memoryTitleText}>{dailyMemory.title}</Text>
@@ -215,7 +216,6 @@ export default function HomeScreen() {
             )}
           </View>
 
-          {/* RECORD BUTTON */}
           <TouchableOpacity 
             style={[styles.primaryButton, isRecording && styles.recordingButton, isProcessing && styles.processingButton]} 
             activeOpacity={0.8}
@@ -238,7 +238,6 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      {/* MODAL */}
       <Modal visible={isMenuVisible} transparent={true} animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
@@ -276,16 +275,17 @@ const styles = StyleSheet.create({
   nameText: { fontSize: 28, fontWeight: 'bold', color: '#FFFFFF', marginTop: 2 },
   menuIconButton: { padding: 5 },
   
-  // Slightly shrunk orb to make room for the photo
-  orbContainer: { alignItems: 'center', justifyContent: 'center', marginVertical: 15 },
-  orb: { width: 100, height: 100, borderRadius: 50, backgroundColor: '#8B5CF6', shadowColor: '#8B5CF6', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.8, shadowRadius: 30, elevation: 20 },
+  // 3. Shrunk the orb slightly to save vertical space
+  orbContainer: { alignItems: 'center', justifyContent: 'center', marginVertical: 10 },
+  orb: { width: 90, height: 90, borderRadius: 45, backgroundColor: '#8B5CF6', shadowColor: '#8B5CF6', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.8, shadowRadius: 30, elevation: 20 },
   
-  speechBubble: { backgroundColor: '#231A31', padding: 25, borderRadius: 24, alignItems: 'center', marginBottom: 20 },
-  remiSpeechText: { fontSize: 18, color: '#FFFFFF', textAlign: 'center', lineHeight: 28, fontWeight: '500' },
+  // 4. Reduced padding inside the speech bubble
+  speechBubble: { backgroundColor: '#231A31', padding: 20, borderRadius: 24, alignItems: 'center', marginBottom: 20 },
+  remiSpeechText: { fontSize: 18, color: '#FFFFFF', textAlign: 'center', lineHeight: 28, fontWeight: '500', marginBottom: 10 },
   
-  // Memory Drop Styles
-  memoryDropContainer: { marginTop: 20, width: '100%', borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: '#3D2F4F' },
-  memoryImage: { width: '100%', height: 130 },
+  // 5. Shortened the image height so it doesn't take over the screen
+  memoryDropContainer: { width: '100%', borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: '#3D2F4F' },
+  memoryImage: { width: '100%', height: 120 },
   memoryOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(17, 12, 29, 0.7)', flexDirection: 'row', alignItems: 'center', paddingVertical: 8, paddingHorizontal: 12 },
   memoryTitleText: { color: '#FFFFFF', fontSize: 14, fontWeight: '600' },
 
