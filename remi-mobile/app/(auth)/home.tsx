@@ -11,17 +11,23 @@ const DUMMY_MEMORIES = [
   {
     id: '1',
     title: 'Sarah\'s Wedding',
-    imageUrl: 'https://images.unsplash.com/photo-1511285560929-80b456fea0bc?q=80&w=600&auto=format&fit=crop',
+    date: 'June 2018',
+    description: 'This is from Sarah\'s wedding day. You wore your favorite blue suit, and we all danced until midnight. You were so proud walking her down the aisle.',
+    imageUrl: 'https://images.unsplash.com/photo-1519741497674-611481863552?q=80&w=600&auto=format&fit=crop',
   },
   {
     id: '2',
     title: 'Trip to the Lake',
-    imageUrl: 'https://images.unsplash.com/photo-1506744626753-eba7bc336e9a?q=80&w=600&auto=format&fit=crop',
+    date: 'Summer 2022',
+    description: 'This is a picture from our family trip to the lake. The weather was beautiful, and we had a picnic on the grass. You loved watching the boats sail by.',
+    imageUrl: 'https://images.unsplash.com/photo-1443890484047-5eaa67d1d630?q=80&w=600&auto=format&fit=crop',
   },
   {
     id: '3',
     title: 'Baking Cookies',
-    imageUrl: 'https://images.unsplash.com/photo-1556910103-1c02745a872f?q=80&w=600&auto=format&fit=crop',
+    date: 'December 2023',
+    description: 'Here we are baking chocolate chip cookies in the kitchen. You showed the grandkids your secret recipe for making them extra soft.',
+    imageUrl: 'https://images.unsplash.com/photo-1499636136210-6f4ee915583e?q=80&w=600&auto=format&fit=crop',
   }
 ];
 
