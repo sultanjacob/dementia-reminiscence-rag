@@ -47,13 +47,13 @@ export default function AuthScreen() {
     return () => clearTimeout(timer);
   }, []);
 
-  async function signInWithEmail() {
-    setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) Alert.alert("Sign In Failed", error.message);
-    else router.replace('/home'); // Send to our beautiful home screen!
-    setLoading(false);
-  }
+ async function signInWithEmail() {
+  setLoading(true);
+  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) Alert.alert("Sign In Failed", error.message);
+  else router.replace('/home'); // <--- LOOK AT THIS LINE
+  setLoading(false);
+}
 
   async function signUpWithEmail() {
     setLoading(true);
