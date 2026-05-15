@@ -1,43 +1,46 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Speech from 'expo-speech';
-import React, { useState } from 'react';
-import { Dimensions, FlatList, Image, Modal, Platform, SafeAreaView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-
-// --- TEMPORARY DUMMY DATA ---
-// We will replace this with real images from your Supabase database later!
-const DUMMY_MEMORIES = [
-  {
-    id: '1',
-    title: 'Sarah\'s Wedding',
-    date: 'June 2018',
-    description: 'This is from Sarah\'s wedding day. You wore your favorite blue suit, and we all danced until midnight. You were so proud walking her down the aisle.',
-    imageUrl: 'https://images.unsplash.com/photo-1511285560929-80b456fea0bc?q=80&w=600&auto=format&fit=crop',
-  },
-  {
-    id: '2',
-    title: 'Trip to the Lake',
-    date: 'Summer 2022',
-    description: 'This is a picture from our family trip to the lake. The weather was beautiful, and we had a picnic on the grass. You loved watching the boats sail by.',
-    imageUrl: 'https://images.unsplash.com/photo-1506744626753-eba7bc336e9a?q=80&w=600&auto=format&fit=crop',
-  },
-  {
-    id: '3',
-    title: 'Baking Cookies',
-    date: 'December 2023',
-    description: 'Here we are baking chocolate chip cookies in the kitchen. You showed the grandkids your secret recipe for making them extra soft.',
-    imageUrl: 'https://images.unsplash.com/photo-1556910103-1c02745a872f?q=80&w=600&auto=format&fit=crop',
-  }
-];
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, Dimensions, FlatList, Image, Modal, Platform, SafeAreaView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { supabase } from '../../supabase'; // Ensure this path is correct!
 
 const screenWidth = Dimensions.get('window').width;
 
 export default function GalleryScreen() {
+  const [memories, setMemories] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [selectedMemory, setSelectedMemory] = useState<any>(null);
   const [isPlaying, setIsPlaying] = useState(false);
 
+  // --- FETCH REAL MEMORIES FROM SUPABASE ---
+  useEffect(() => {
+    const fetchMemories = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const { data, error } = await supabase
+          .from('memories')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        if (data) setMemories(data);
+      } catch (error) {
+        console.error("Error fetching memories:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchMemories();
+  }, []);
+
   // --- NARRATION LOGIC ---
   const playNarration = (text: string) => {
-    Speech.stop(); // Stop any current speech
+    if (!text) return;
+    Speech.stop(); 
     setIsPlaying(true);
     Speech.speak(text, { 
       language: 'en-GB', 
@@ -65,7 +68,7 @@ export default function GalleryScreen() {
       activeOpacity={0.8}
       onPress={() => setSelectedMemory(item)}
     >
-      <Image source={{ uri: item.imageUrl }} style={styles.gridImage} />
+      <Image source={{ uri: item.image_url }} style={styles.gridImage} />
       <View style={styles.gridTextContainer}>
         <Text style={styles.gridTitle} numberOfLines={1}>{item.title}</Text>
         <Text style={styles.gridDate}>{item.date}</Text>
@@ -80,21 +83,33 @@ export default function GalleryScreen() {
       <View style={styles.appCapsule}>
         <View style={styles.internalContent}>
           
-          {/* HEADER */}
           <View style={styles.header}>
             <Text style={styles.headerTitle}>Memories</Text>
             <Ionicons name="images" size={28} color="#A78BFA" />
           </View>
 
-          {/* PHOTO GRID */}
-          <FlatList
-            data={DUMMY_MEMORIES}
-            keyExtractor={(item) => item.id}
-            numColumns={2}
-            renderItem={renderMemoryItem}
-            contentContainerStyle={styles.listContainer}
-            showsVerticalScrollIndicator={false}
-          />
+          {/* LOADING SPINNER OR PHOTO GRID */}
+          {isLoading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#8B5CF6" />
+              <Text style={styles.loadingText}>Fetching memories...</Text>
+            </View>
+          ) : memories.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <Ionicons name="images-outline" size={48} color="#3D2F4F" />
+              <Text style={styles.emptyText}>No memories found.</Text>
+              <Text style={styles.emptySubtext}>Add photos from the caregiver portal.</Text>
+            </View>
+          ) : (
+            <FlatList
+              data={memories}
+              keyExtractor={(item) => item.id}
+              numColumns={2}
+              renderItem={renderMemoryItem}
+              contentContainerStyle={styles.listContainer}
+              showsVerticalScrollIndicator={false}
+            />
+          )}
 
         </View>
       </View>
@@ -102,9 +117,8 @@ export default function GalleryScreen() {
       {/* --- THE INTERACTIVE MEMORY VIEWER (MODAL) --- */}
       <Modal visible={!!selectedMemory} transparent={true} animationType="fade">
         <View style={styles.modalOverlay}>
-          
           <View style={styles.detailCapsule}>
-            {/* Top Bar inside Modal */}
+            
             <View style={styles.modalHeader}>
               <View>
                 <Text style={styles.modalTitle}>{selectedMemory?.title}</Text>
@@ -115,10 +129,8 @@ export default function GalleryScreen() {
               </TouchableOpacity>
             </View>
 
-            {/* The Large Photo */}
-            <Image source={{ uri: selectedMemory?.imageUrl }} style={styles.largeImage} />
+            <Image source={{ uri: selectedMemory?.image_url }} style={styles.largeImage} />
 
-            {/* The Narration Box */}
             <View style={styles.narrationContainer}>
               <Text style={styles.narrationInstructions}>
                 Ask about this photo. If they need a hint, tap below.
@@ -135,160 +147,46 @@ export default function GalleryScreen() {
                 </Text>
               </TouchableOpacity>
             </View>
+            
           </View>
-
         </View>
       </Modal>
-
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#000000', 
-    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
-  },
-  appCapsule: {
-    flex: 1,
-    backgroundColor: '#110C1D', 
-    borderRadius: 45,
-    overflow: 'hidden',
-    marginHorizontal: 10,
-    marginBottom: 10,
-    marginTop: 10,
-    borderWidth: 1,
-    borderColor: '#231A31',
-  },
-  internalContent: {
-    flex: 1,
-    paddingHorizontal: 20,
-    paddingTop: 20,
-  },
+  safeArea: { flex: 1, backgroundColor: '#000000', paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0 },
+  appCapsule: { flex: 1, backgroundColor: '#110C1D', borderRadius: 45, overflow: 'hidden', marginHorizontal: 10, marginBottom: 10, marginTop: 10, borderWidth: 1, borderColor: '#231A31' },
+  internalContent: { flex: 1, paddingHorizontal: 20, paddingTop: 20 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+  headerTitle: { fontSize: 32, fontWeight: 'bold', color: '#FFFFFF' },
   
-  // Header
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  headerTitle: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-  },
+  // Loading and Empty States
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  loadingText: { color: '#A396B5', marginTop: 12, fontSize: 16 },
+  emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingBottom: 50 },
+  emptyText: { color: '#FFFFFF', fontSize: 20, fontWeight: 'bold', marginTop: 16 },
+  emptySubtext: { color: '#A396B5', fontSize: 14, marginTop: 8, textAlign: 'center' },
 
-  // Grid Styles
-  listContainer: {
-    paddingBottom: 30,
-  },
-  gridItem: {
-    flex: 1,
-    backgroundColor: '#1A1325',
-    margin: 6,
-    borderRadius: 20,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: '#231A31',
-  },
-  gridImage: {
-    width: '100%',
-    height: 140,
-  },
-  gridTextContainer: {
-    padding: 12,
-  },
-  gridTitle: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  gridDate: {
-    color: '#A396B5',
-    fontSize: 12,
-  },
+  listContainer: { paddingBottom: 30 },
+  gridItem: { flex: 1, backgroundColor: '#1A1325', margin: 6, borderRadius: 20, overflow: 'hidden', borderWidth: 1, borderColor: '#231A31' },
+  gridImage: { width: '100%', height: 140 },
+  gridTextContainer: { padding: 12 },
+  gridTitle: { color: '#FFFFFF', fontSize: 16, fontWeight: '600', marginBottom: 4 },
+  gridDate: { color: '#A396B5', fontSize: 12 },
 
-  // Modal Styles
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.85)', // Darker overlay for focus
-    justifyContent: 'center',
-    padding: 10,
-  },
-  detailCapsule: {
-    backgroundColor: '#110C1D',
-    borderRadius: 35,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: '#3D2F4F',
-    elevation: 10,
-    shadowColor: '#8B5CF6',
-    shadowOpacity: 0.2,
-    shadowRadius: 20,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  modalTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-  },
-  modalDate: {
-    fontSize: 16,
-    color: '#A78BFA',
-    marginTop: 4,
-  },
-  closeButton: {
-    backgroundColor: '#231A31',
-    padding: 8,
-    borderRadius: 20,
-  },
-  largeImage: {
-    width: '100%',
-    height: 300,
-    borderRadius: 20,
-    marginBottom: 20,
-  },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.85)', justifyContent: 'center', padding: 10 },
+  detailCapsule: { backgroundColor: '#110C1D', borderRadius: 35, padding: 20, borderWidth: 1, borderColor: '#3D2F4F', elevation: 10, shadowColor: '#8B5CF6', shadowOpacity: 0.2, shadowRadius: 20 },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+  modalTitle: { fontSize: 24, fontWeight: 'bold', color: '#FFFFFF' },
+  modalDate: { fontSize: 16, color: '#A78BFA', marginTop: 4 },
+  closeButton: { backgroundColor: '#231A31', padding: 8, borderRadius: 20 },
+  largeImage: { width: '100%', height: 300, borderRadius: 20, marginBottom: 20 },
   
-  // Narration Box
-  narrationContainer: {
-    backgroundColor: '#1A1325',
-    padding: 20,
-    borderRadius: 24,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#231A31',
-  },
-  narrationInstructions: {
-    color: '#A396B5',
-    fontSize: 14,
-    textAlign: 'center',
-    marginBottom: 16,
-  },
-  playButton: {
-    backgroundColor: '#8B5CF6',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-    borderRadius: 30,
-    width: '100%',
-  },
-  playingButton: {
-    backgroundColor: '#EF4444', // Turns red when playing so they know how to stop it
-  },
-  playButtonText: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginLeft: 10,
-  },
+  narrationContainer: { backgroundColor: '#1A1325', padding: 20, borderRadius: 24, alignItems: 'center', borderWidth: 1, borderColor: '#231A31' },
+  narrationInstructions: { color: '#A396B5', fontSize: 14, textAlign: 'center', marginBottom: 16 },
+  playButton: { backgroundColor: '#8B5CF6', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 16, paddingHorizontal: 24, borderRadius: 30, width: '100%' },
+  playingButton: { backgroundColor: '#EF4444' },
+  playButtonText: { color: '#FFFFFF', fontSize: 18, fontWeight: 'bold', marginLeft: 10 },
 });
