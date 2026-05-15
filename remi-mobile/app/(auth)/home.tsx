@@ -1,263 +1,153 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Audio } from 'expo-av';
-import { useRouter } from 'expo-router';
 import * as Speech from 'expo-speech';
-import React, { useEffect, useRef, useState } from 'react';
-import { Alert, Animated, Image, Modal, Platform, SafeAreaView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { supabase } from '../../supabase';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, Dimensions, FlatList, Image, Modal, Platform, SafeAreaView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { supabase } from '../../supabase'; // Ensure this path is correct!
 
-const DUMMY_MEMORIES = [
-  {
-    id: '1',
-    title: 'Sarah\'s Wedding',
-    imageUrl: 'https://images.unsplash.com/photo-1519741497674-611481863552?q=80&w=600&auto=format&fit=crop',
-  },
-  {
-    id: '2',
-    title: 'Trip to the Lake',
-    imageUrl: 'https://images.unsplash.com/photo-1443890484047-5eaa67d1d630?q=80&w=600&auto=format&fit=crop',
-  },
-  {
-    id: '3',
-    title: 'Baking Cookies',
-    imageUrl: 'https://images.unsplash.com/photo-1499636136210-6f4ee915583e?q=80&w=600&auto=format&fit=crop',
-  }
-];
+const screenWidth = Dimensions.get('window').width;
 
-export default function HomeScreen() {
-  const router = useRouter();
-  
-  // 🛑 PASTE YOUR ACTIVE PYTHON URL HERE 🛑
-  const API_URL = "http://192.168.1.235:8000"; 
-  
-  const [remiText, setRemiText] = useState("Hello! I am Remi. How can I help you?");
-  const [greeting, setGreeting] = useState("Good evening");
-  const [userName, setUserName] = useState("John");
-  const [isMenuVisible, setIsMenuVisible] = useState(false);
-  const [dailyMemory, setDailyMemory] = useState<any>(null);
+export default function GalleryScreen() {
+  const [memories, setMemories] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [selectedMemory, setSelectedMemory] = useState<any>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
 
-  const [recording, setRecording] = useState<Audio.Recording | null>(null);
-  const [isRecording, setIsRecording] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false); 
-
-  const pulseAnim = useRef(new Animated.Value(1)).current;
-
-  // 1. Define Speak Function FIRST so it can be used on startup
-  const speak = (text: string) => {
-    if (!text) return;
-    const cleanText = text.replace(/\*/g, ''); 
-    Speech.speak(cleanText, { language: 'en-GB', pitch: 0.9, rate: 0.8 });
-  };
-
+  // --- FETCH REAL MEMORIES FROM SUPABASE ---
   useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, { toValue: 1.1, duration: 2000, useNativeDriver: true }),
-        Animated.timing(pulseAnim, { toValue: 1, duration: 2000, useNativeDriver: true })
-      ])
-    ).start();
-  }, []);
+    const fetchMemories = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
 
-  useEffect(() => {
-    const initializeHome = async () => {
-      const hour = new Date().getHours();
-      if (hour < 12) setGreeting("Good morning");
-      else if (hour < 18) setGreeting("Good afternoon");
-      else setGreeting("Good evening");
+        const { data, error } = await supabase
+          .from('memories')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false });
 
-      const { data: { user } } = await supabase.auth.getUser();
-      let fetchedName = "John";
-      if (user) {
-        const { data } = await supabase.from('profiles').select('nickname').eq('id', user.id).single();
-        if (data && data.nickname) {
-          fetchedName = data.nickname;
-          setUserName(fetchedName);
-        }
+        if (error) throw error;
+        if (data) setMemories(data);
+      } catch (error) {
+        console.error("Error fetching memories:", error);
+      } finally {
+        setIsLoading(false);
       }
-
-      // Select a random memory
-      const randomMem = DUMMY_MEMORIES[Math.floor(Math.random() * DUMMY_MEMORIES.length)];
-      setDailyMemory(randomMem);
-      
-      const memoryGreeting = `I was just admiring this photo of ${randomMem.title}.`;
-      setRemiText(memoryGreeting);
-      
-      // 2. THIS IS THE MAGIC LINE: Remi speaks immediately!
-      speak(memoryGreeting); 
     };
-    
-    initializeHome();
+
+    fetchMemories();
   }, []);
 
-  const checkSchedule = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const now = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-      const { data: routines } = await supabase.from('routines').select('*').eq('user_id', user.id);
-
-      routines?.forEach(routine => {
-        const dbTime = routine.time.toLowerCase().replace(/\s+/g, '');
-        const phoneTime = now.toLowerCase().replace(/\s+/g, '');
-
-        if (dbTime === phoneTime) {
-          const announcement = `Excuse me ${userName}. It is ${now}, which means it is time to ${routine.activity}.`;
-          setRemiText(announcement);
-          speak(announcement);
-        }
-      });
-    } catch (error) {
-      console.error("Watchman Error:", error);
-    }
+  // --- NARRATION LOGIC ---
+  const playNarration = (text: string) => {
+    if (!text) return;
+    Speech.stop(); 
+    setIsPlaying(true);
+    Speech.speak(text, { 
+      language: 'en-GB', 
+      pitch: 0.9, 
+      rate: 0.85,
+      onDone: () => setIsPlaying(false),
+      onStopped: () => setIsPlaying(false),
+    });
   };
 
-  useEffect(() => {
-    checkSchedule(); 
-    const intervalId = setInterval(checkSchedule, 60000); 
-    return () => clearInterval(intervalId); 
-  }, []);
-
-  const startRecording = async () => {
-    try {
-      const permission = await Audio.requestPermissionsAsync();
-      if (permission.status !== 'granted') return Alert.alert("Permission Denied", "Remi needs microphone access.");
-      await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
-      const { recording } = await Audio.Recording.createAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
-      setRecording(recording);
-      setIsRecording(true);
-      setRemiText("I'm listening...");
-    } catch (err) {
-      console.error("Failed to start recording", err);
-    }
+  const stopNarration = () => {
+    Speech.stop();
+    setIsPlaying(false);
   };
 
-  const stopRecording = async () => {
-    setRecording(null);
-    setIsRecording(false);
-    setIsProcessing(true);
-    setRemiText("Thinking...");
-    try {
-      await recording?.stopAndUnloadAsync();
-      const uri = recording?.getURI();
-      if (!uri) throw new Error("No audio file found.");
-      await sendAudioToBackend(uri);
-    } catch (err) {
-      console.error("Failed to stop", err);
-      setIsProcessing(false);
-    }
+  const closeModal = () => {
+    stopNarration();
+    setSelectedMemory(null);
   };
 
-  const sendAudioToBackend = async (fileUri: string) => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      const formData = new FormData();
-      formData.append('file', { uri: fileUri, name: 'recording.m4a', type: 'audio/m4a' } as any);
-      if (user) formData.append('user_id', user.id);
-
-      const response = await fetch(`${API_URL}/voice-chat`, {
-        method: 'POST',
-        body: formData,
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-
-      const responseData = await response.json();
-      if (response.ok) {
-        const aiText = responseData.message || "I didn't quite catch that.";
-        setRemiText(aiText);
-        speak(aiText);
-      } else {
-        throw new Error(responseData.message || "Server error");
-      }
-    } catch (error) {
-      console.error("Backend Error:", error);
-      setRemiText("Sorry, I had trouble connecting to my brain.");
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const navigateTo = (path: any) => {
-    setIsMenuVisible(false); 
-    router.push(path);       
-  };
+  // --- RENDER SINGLE PHOTO GRID ITEM ---
+  const renderMemoryItem = ({ item }: { item: any }) => (
+    <TouchableOpacity 
+      style={styles.gridItem} 
+      activeOpacity={0.8}
+      onPress={() => setSelectedMemory(item)}
+    >
+      <Image source={{ uri: item.image_url }} style={styles.gridImage} />
+      <View style={styles.gridTextContainer}>
+        <Text style={styles.gridTitle} numberOfLines={1}>{item.title}</Text>
+        <Text style={styles.gridDate}>{item.date}</Text>
+      </View>
+    </TouchableOpacity>
+  );
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="light-content" backgroundColor="#000000" />
+      
       <View style={styles.appCapsule}>
         <View style={styles.internalContent}>
           
           <View style={styles.header}>
-            <View>
-              <Text style={styles.greetingText}>{greeting},</Text>
-              <Text style={styles.nameText}>{userName}</Text>
+            <Text style={styles.headerTitle}>Memories</Text>
+            <Ionicons name="images" size={28} color="#A78BFA" />
+          </View>
+
+          {/* LOADING SPINNER OR PHOTO GRID */}
+          {isLoading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#8B5CF6" />
+              <Text style={styles.loadingText}>Fetching memories...</Text>
             </View>
-            <TouchableOpacity onPress={() => setIsMenuVisible(true)} style={styles.menuIconButton}>
-              <Ionicons name="menu" size={28} color="#FFFFFF" />
-            </TouchableOpacity>
-          </View>
+          ) : memories.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <Ionicons name="images-outline" size={48} color="#3D2F4F" />
+              <Text style={styles.emptyText}>No memories found.</Text>
+              <Text style={styles.emptySubtext}>Add photos from the caregiver portal.</Text>
+            </View>
+          ) : (
+            <FlatList
+              data={memories}
+              keyExtractor={(item) => item.id}
+              numColumns={2}
+              renderItem={renderMemoryItem}
+              contentContainerStyle={styles.listContainer}
+              showsVerticalScrollIndicator={false}
+            />
+          )}
 
-          <View style={styles.orbContainer}>
-            <Animated.View style={[styles.orb, { transform: [{ scale: pulseAnim }] }]} />
-          </View>
-
-          <View style={styles.speechBubble}>
-            <Text style={styles.remiSpeechText}>{remiText}</Text>
-            
-            {dailyMemory && (
-              <View style={styles.memoryDropContainer}>
-                <Image source={{ uri: dailyMemory.imageUrl }} style={styles.memoryImage} resizeMode="cover" />
-                <View style={styles.memoryOverlay}>
-                  <Ionicons name="image" size={16} color="#FFFFFF" style={{marginRight: 6}} />
-                  <Text style={styles.memoryTitleText}>{dailyMemory.title}</Text>
-                </View>
-              </View>
-            )}
-          </View>
-
-          <TouchableOpacity 
-            style={[styles.primaryButton, isRecording && styles.recordingButton, isProcessing && styles.processingButton]} 
-            activeOpacity={0.8}
-            onPress={isRecording ? stopRecording : startRecording}
-            disabled={isProcessing} 
-          >
-            <Ionicons name={isRecording ? "stop-circle" : (isProcessing ? "hourglass" : "mic")} size={22} color="#FFFFFF" />
-            <Text style={styles.primaryButtonText}>
-              {isRecording ? "Tap to Stop" : (isProcessing ? "Remi is thinking..." : "Tap to Talk")}
-            </Text>
-          </TouchableOpacity>
-
-          <View style={styles.bottomStatus}>
-            <View style={[styles.statusDot, isRecording && { backgroundColor: '#EF4444' }]} />
-            <Text style={styles.statusText}>
-              {isRecording ? "Recording your voice..." : "Remi is listening"}
-            </Text>
-          </View>
-          <View style={styles.dividerLine} />
         </View>
       </View>
 
-      <Modal visible={isMenuVisible} transparent={true} animationType="slide">
+      {/* --- THE INTERACTIVE MEMORY VIEWER (MODAL) --- */}
+      <Modal visible={!!selectedMemory} transparent={true} animationType="fade">
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalDragIndicator} />
+          <View style={styles.detailCapsule}>
+            
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Settings</Text>
-              <TouchableOpacity onPress={() => setIsMenuVisible(false)}>
+              <View>
+                <Text style={styles.modalTitle}>{selectedMemory?.title}</Text>
+                <Text style={styles.modalDate}>{selectedMemory?.date}</Text>
+              </View>
+              <TouchableOpacity onPress={closeModal} style={styles.closeButton}>
                 <Ionicons name="close" size={28} color="#FFFFFF" />
               </TouchableOpacity>
             </View>
-            <TouchableOpacity style={styles.menuRow} onPress={() => navigateTo('/schedule')}>
-              <Ionicons name="calendar" size={22} color="#A78BFA" style={styles.menuIcon} />
-              <Text style={styles.menuRowText}>Manage Schedule</Text>
-              <Ionicons name="chevron-forward" size={20} color="#6B7280" />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.menuRow} onPress={() => navigateTo('/caregiver')}>
-              <Ionicons name="person" size={22} color="#A78BFA" style={styles.menuIcon} />
-              <Text style={styles.menuRowText}>User Profile</Text>
-              <Ionicons name="chevron-forward" size={20} color="#6B7280" />
-            </TouchableOpacity>
+
+            <Image source={{ uri: selectedMemory?.image_url }} style={styles.largeImage} />
+
+            <View style={styles.narrationContainer}>
+              <Text style={styles.narrationInstructions}>
+                Ask about this photo. If they need a hint, tap below.
+              </Text>
+
+              <TouchableOpacity 
+                style={[styles.playButton, isPlaying && styles.playingButton]} 
+                activeOpacity={0.8}
+                onPress={() => isPlaying ? stopNarration() : playNarration(selectedMemory?.description)}
+              >
+                <Ionicons name={isPlaying ? "stop-circle" : "play-circle"} size={28} color="#FFFFFF" />
+                <Text style={styles.playButtonText}>
+                  {isPlaying ? "Stop Story" : "Remi, tell the story"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+            
           </View>
         </View>
       </Modal>
@@ -268,43 +158,35 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#000000', paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0 },
   appCapsule: { flex: 1, backgroundColor: '#110C1D', borderRadius: 45, overflow: 'hidden', marginHorizontal: 10, marginBottom: 10, marginTop: 10, borderWidth: 1, borderColor: '#231A31' },
-  internalContent: { flex: 1, paddingHorizontal: 20, justifyContent: 'space-between', paddingTop: 10 },
+  internalContent: { flex: 1, paddingHorizontal: 20, paddingTop: 20 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+  headerTitle: { fontSize: 32, fontWeight: 'bold', color: '#FFFFFF' },
   
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 10, marginBottom: 5 },
-  greetingText: { fontSize: 16, color: '#A396B5', fontWeight: '500' },
-  nameText: { fontSize: 28, fontWeight: 'bold', color: '#FFFFFF', marginTop: 2 },
-  menuIconButton: { padding: 5 },
-  
-  // 3. Shrunk the orb slightly to save vertical space
-  orbContainer: { alignItems: 'center', justifyContent: 'center', marginVertical: 10 },
-  orb: { width: 90, height: 90, borderRadius: 45, backgroundColor: '#8B5CF6', shadowColor: '#8B5CF6', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.8, shadowRadius: 30, elevation: 20 },
-  
-  // 4. Reduced padding inside the speech bubble
-  speechBubble: { backgroundColor: '#231A31', padding: 20, borderRadius: 24, alignItems: 'center', marginBottom: 20 },
-  remiSpeechText: { fontSize: 18, color: '#FFFFFF', textAlign: 'center', lineHeight: 28, fontWeight: '500', marginBottom: 10 },
-  
-  // 5. Shortened the image height so it doesn't take over the screen
-  memoryDropContainer: { width: '100%', borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: '#3D2F4F' },
-  memoryImage: { width: '100%', height: 120 },
-  memoryOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(17, 12, 29, 0.7)', flexDirection: 'row', alignItems: 'center', paddingVertical: 8, paddingHorizontal: 12 },
-  memoryTitleText: { color: '#FFFFFF', fontSize: 14, fontWeight: '600' },
+  // Loading and Empty States
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  loadingText: { color: '#A396B5', marginTop: 12, fontSize: 16 },
+  emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingBottom: 50 },
+  emptyText: { color: '#FFFFFF', fontSize: 20, fontWeight: 'bold', marginTop: 16 },
+  emptySubtext: { color: '#A396B5', fontSize: 14, marginTop: 8, textAlign: 'center' },
 
-  primaryButton: { backgroundColor: '#8B5CF6', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 16, borderRadius: 30, marginBottom: 20, marginHorizontal: 15 },
-  recordingButton: { backgroundColor: '#EF4444' }, 
-  processingButton: { backgroundColor: '#4B5563' }, 
-  primaryButtonText: { color: '#FFFFFF', fontSize: 18, fontWeight: 'bold', marginLeft: 10 },
-  
-  bottomStatus: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 15 },
-  statusDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#A78BFA', marginRight: 6 },
-  statusText: { color: '#A396B5', fontSize: 14, fontWeight: '500' },
-  dividerLine: { height: 1, backgroundColor: '#231A31', width: '100%', marginBottom: 10 },
-  
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.7)', justifyContent: 'flex-end' },
-  modalContent: { backgroundColor: '#1A1325', borderTopLeftRadius: 32, borderTopRightRadius: 32, paddingHorizontal: 24, paddingBottom: 50, paddingTop: 12 },
-  modalDragIndicator: { width: 40, height: 5, backgroundColor: '#3D2F4F', borderRadius: 3, alignSelf: 'center', marginBottom: 20 },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
+  listContainer: { paddingBottom: 30 },
+  gridItem: { flex: 1, backgroundColor: '#1A1325', margin: 6, borderRadius: 20, overflow: 'hidden', borderWidth: 1, borderColor: '#231A31' },
+  gridImage: { width: '100%', height: 140 },
+  gridTextContainer: { padding: 12 },
+  gridTitle: { color: '#FFFFFF', fontSize: 16, fontWeight: '600', marginBottom: 4 },
+  gridDate: { color: '#A396B5', fontSize: 12 },
+
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.85)', justifyContent: 'center', padding: 10 },
+  detailCapsule: { backgroundColor: '#110C1D', borderRadius: 35, padding: 20, borderWidth: 1, borderColor: '#3D2F4F', elevation: 10, shadowColor: '#8B5CF6', shadowOpacity: 0.2, shadowRadius: 20 },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
   modalTitle: { fontSize: 24, fontWeight: 'bold', color: '#FFFFFF' },
-  menuRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 20, borderBottomWidth: 1, borderBottomColor: '#231A31' },
-  menuIcon: { marginRight: 16 },
-  menuRowText: { flex: 1, fontSize: 18, fontWeight: '500', color: '#E2D8F0' }
+  modalDate: { fontSize: 16, color: '#A78BFA', marginTop: 4 },
+  closeButton: { backgroundColor: '#231A31', padding: 8, borderRadius: 20 },
+  largeImage: { width: '100%', height: 300, borderRadius: 20, marginBottom: 20 },
+  
+  narrationContainer: { backgroundColor: '#1A1325', padding: 20, borderRadius: 24, alignItems: 'center', borderWidth: 1, borderColor: '#231A31' },
+  narrationInstructions: { color: '#A396B5', fontSize: 14, textAlign: 'center', marginBottom: 16 },
+  playButton: { backgroundColor: '#8B5CF6', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 16, paddingHorizontal: 24, borderRadius: 30, width: '100%' },
+  playingButton: { backgroundColor: '#EF4444' },
+  playButtonText: { color: '#FFFFFF', fontSize: 18, fontWeight: 'bold', marginLeft: 10 },
 });
