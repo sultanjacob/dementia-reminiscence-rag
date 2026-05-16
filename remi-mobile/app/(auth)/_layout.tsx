@@ -1,5 +1,4 @@
 import { Tabs } from 'expo-router';
-import { Text } from 'react-native';
 
 export default function TabLayout() {
   return (
@@ -9,20 +8,19 @@ export default function TabLayout() {
     }}>
       
       {/* --- VISIBLE TABS (The User Zone) --- */}
-      <Tabs.Screen 
-        name="home" 
-        options={{ 
-          title: 'Remi', 
-          tabBarIcon: () => <Text>🧠</Text> 
-        }} 
-      />
-      <Tabs.Screen 
-        name="gallery" 
-        options={{ 
-          title: 'Memories', 
-          tabBarIcon: () => <Text>🖼️</Text> 
-        }} 
-      />
+      <Tabs>
+  {/* HOME TAB MUST BE FIRST so it opens by default */}
+  <Tabs.Screen 
+    name="home" 
+    options={{ title: 'Remi' }} 
+  />
+  
+  {/* MEMORIES TAB IS SECOND */}
+  <Tabs.Screen 
+    name="gallery" 
+    options={{ title: 'Memories' }} 
+  />
+</Tabs>
 
       {/* --- HIDDEN TABS (The Caregiver Zone) --- */}
       {/* href: null makes the page exist, but hides the button on the bottom bar */}
