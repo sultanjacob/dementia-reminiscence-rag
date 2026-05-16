@@ -2,10 +2,7 @@ import { Tabs } from 'expo-router';
 
 export default function TabLayout() {
   return (
-    <Tabs screenOptions={{ 
-      tabBarActiveTintColor: '#003366',
-      headerShown: false, // You can change this to false later if you want a custom top header!
-    }}>
+    <Tabs screenOptions={{ headerShown: false }} initialRouteName="home">
       
       {/* --- VISIBLE TABS (The User Zone) --- */}
       <Tabs>
