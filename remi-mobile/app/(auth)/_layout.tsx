@@ -5,19 +5,15 @@ export default function TabLayout() {
     <Tabs screenOptions={{ headerShown: false }} initialRouteName="home">
       
       {/* --- VISIBLE TABS (The User Zone) --- */}
-      <Tabs>
-  {/* HOME TAB MUST BE FIRST so it opens by default */}
-  <Tabs.Screen 
-    name="home" 
-    options={{ title: 'Remi' }} 
-  />
-  
-  {/* MEMORIES TAB IS SECOND */}
-  <Tabs.Screen 
-    name="gallery" 
-    options={{ title: 'Memories' }} 
-  />
-</Tabs>
+      <Tabs.Screen 
+        name="home" 
+        options={{ title: 'Remi' }} 
+      />
+      
+      <Tabs.Screen 
+        name="gallery" 
+        options={{ title: 'Memories' }} 
+      />
 
       {/* --- HIDDEN TABS (The Caregiver Zone) --- */}
       {/* href: null makes the page exist, but hides the button on the bottom bar */}
