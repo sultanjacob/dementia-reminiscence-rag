@@ -35,8 +35,9 @@ export default function RootLayout() {
       // Not logged in -> Go to Login
       router.replace('/');
     } else if (user && !inAuthGroup) {
-      // Logged in -> Go to the Tab Home
-      router.replace('/(auth)/home');
+      // Logged in -> Go to the (auth) folder's index!
+      // *** THIS IS THE LINE WE CHANGED ***
+      router.replace('/(auth)');
     }
   }, [user, initializing, segments]);
 
