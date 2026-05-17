@@ -51,7 +51,7 @@ export default function AuthScreen() {
   setLoading(true);
   const { error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) Alert.alert("Sign In Failed", error.message);
-  else router.replace('/home'); // <--- LOOK AT THIS LINE
+  else router.replace('/(auth)/home'); // <--- LOOK AT THIS LINE
   setLoading(false);
 }
 
