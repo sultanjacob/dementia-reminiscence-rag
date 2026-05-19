@@ -1,8 +1,8 @@
+import React, { useState } from 'react';
+import { Alert, KeyboardAvoidingView, Platform, SafeAreaView, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
 import * as ImagePicker from 'expo-image-picker';
-import React, { useState } from 'react';
-import { Alert, Image, KeyboardAvoidingView, Platform, SafeAreaView, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { supabase } from '../../supabase';
 
 export default function CaregiverScreen() {
@@ -24,12 +24,6 @@ export default function CaregiverScreen() {
       allowsEditing: false, 
       quality: 0.8,
     });
-
-    if (!result.canceled) {
-      setImageUri(result.assets[0].uri);
-    }
-  };
-    // ...
 
     if (!result.canceled) {
       setImageUri(result.assets[0].uri);
@@ -81,15 +75,12 @@ export default function CaregiverScreen() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("No user found");
 
-      // NOTE: For now, we are just saving the text and local URIs. 
-      // Next, we will connect Supabase Storage buckets to hold the actual files!
       const newMemory = {
         user_id: user.id,
         title,
         date,
         description,
-        image_url: imageUri, // Temporary local URI
-        // audio_url: audioUri, // We will add this column to Supabase next!
+        image_url: imageUri, 
       };
 
       const { error } = await supabase.from('memories').insert([newMemory]);
