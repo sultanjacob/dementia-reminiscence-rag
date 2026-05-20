@@ -20,9 +20,9 @@ export default function CaregiverScreen() {
 
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['image'], // <--- New Expo 54 syntax
       allowsEditing: false, 
-      quality: 0.5, // Reduced slightly for faster uploads
+      quality: 0.5, 
     });
 
     if (!result.canceled) {
