@@ -20,7 +20,7 @@ export default function CaregiverScreen() {
 
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['image'], // <--- New Expo 54 syntax
+      mediaTypes: ['images'], // <--- New Expo 54 syntax
       allowsEditing: false, 
       quality: 0.5, 
     });
