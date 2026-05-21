@@ -31,7 +31,7 @@ app.add_middleware(
 
 @app.get("/")
 def read_root():
-    return {"status": "Remi's Cloud Brain is online."}
+    return {"status": "Remi's Cloud Brain is online and listening."}
 
 @app.post("/voice-chat")
 async def voice_chat(user_id: str = Form(...), file: UploadFile = File(...)):
@@ -43,7 +43,7 @@ async def voice_chat(user_id: str = Form(...), file: UploadFile = File(...)):
         response = supabase.table('memories').select('title, date, description').eq('user_id', user_id).execute()
         memories_data = response.data
         
-        # 2. Format the memories into a readable context string
+        # Format the memories into a readable context string
         memory_context = ""
         if memories_data:
             memory_context = "Here are the patient's recent memories uploaded by their family:\n"
@@ -52,10 +52,7 @@ async def voice_chat(user_id: str = Form(...), file: UploadFile = File(...)):
         else:
             memory_context = "The patient has no uploaded memories yet."
 
-        print("Memories retrieved successfully.")
-
-        # 3. Create the System Prompt for Gemini
-        # This tells Gemini exactly who she is and gives her the patient's life story
+        # 2. Create the System Prompt for Gemini
         system_prompt = f"""
         You are Remi, an empathetic, gentle, and highly conversational AI companion designed for a patient with early-stage dementia.
         Keep your responses brief (1-3 sentences max), warm, and spoken directly to the patient.
@@ -63,16 +60,29 @@ async def voice_chat(user_id: str = Form(...), file: UploadFile = File(...)):
         
         {memory_context}
         
-        The user has just spoken to you. Respond to them kindly. If they ask about a memory, use the context above to gently remind them of the story.
+        The user is speaking to you in the attached audio file. Listen to their voice and respond kindly. Use the context above to gently remind them of a story if they ask.
         """
 
-        # 4. For right now, we will simulate reading the audio file's text 
-        # (We will add the actual Whisper audio-to-text transcription in the next step!)
-        user_spoken_text = "Who is in the photo of Sarah's Wedding?" 
+        # 3. Save the incoming audio temporarily to hand to Gemini
+        print("Processing your voice...")
+        temp_file_path = f"temp_audio_{user_id}.m4a"
+        with open(temp_file_path, "wb") as buffer:
+            buffer.write(await file.read())
+
+        # 4. Upload the audio file directly into Gemini's brain
+        print("Uploading audio to AI...")
+        gemini_audio_file = genai.upload_file(path=temp_file_path)
         
         # 5. Generate the AI Response
-        print("Thinking...")
-        ai_response = model.generate_content([system_prompt, user_spoken_text])
+        print("Listening and Thinking...")
+        ai_response = model.generate_content([system_prompt, gemini_audio_file])
+        
+        # 6. Clean up (Security & Privacy!)
+        # Delete from local computer
+        if os.path.exists(temp_file_path):
+            os.remove(temp_file_path)
+        # Delete from Gemini's servers immediately
+        gemini_audio_file.delete()
         
         print(f"Remi says: {ai_response.text.strip()}")
         print("--------------------------------------------------\n")
@@ -81,6 +91,9 @@ async def voice_chat(user_id: str = Form(...), file: UploadFile = File(...)):
 
     except Exception as e:
         print(f"Error: {str(e)}")
+        # If something fails, still clean up the file just in case
+        if 'temp_file_path' in locals() and os.path.exists(temp_file_path):
+            os.remove(temp_file_path)
         return {"message": "I am having a little trouble thinking right now, but I am still here with you."}
 
 if __name__ == "__main__":
