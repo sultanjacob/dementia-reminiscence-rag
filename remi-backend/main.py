@@ -6,8 +6,14 @@ import google.generativeai as genai
 from dotenv import load_dotenv
 import uvicorn
 
-# Load your secret keys from the .env file
-load_dotenv()
+# 1. Force Python to read the file
+load_dotenv(override=True)
+
+# 2. 🔍 THE TRUTH SERUM
+print("\n--- 🔍 DIAGNOSTICS ---")
+print("Does the .env file exist here?:", os.path.exists(".env"))
+print("What is the Supabase URL?:", os.getenv("SUPABASE_URL"))
+print("----------------------\n")
 
 # Set up Supabase
 SUPABASE_URL = os.getenv("SUPABASE_URL")
