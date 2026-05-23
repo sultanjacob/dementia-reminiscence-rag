@@ -1,4 +1,5 @@
 import os
+from datetime import datetime
 from fastapi import FastAPI, UploadFile, Form, File
 from fastapi.middleware.cors import CORSMiddleware
 from supabase import create_client, Client
@@ -6,14 +7,8 @@ import google.generativeai as genai
 from dotenv import load_dotenv
 import uvicorn
 
-# 1. Force Python to read the file
-load_dotenv(override=True)
-
-# 2. 🔍 THE TRUTH SERUM
-print("\n--- 🔍 DIAGNOSTICS ---")
-print("Does the .env file exist here?:", os.path.exists(".env"))
-print("What is the Supabase URL?:", os.getenv("SUPABASE_URL"))
-print("----------------------\n")
+# Load keys
+load_dotenv()
 
 # Set up Supabase
 SUPABASE_URL = os.getenv("SUPABASE_URL")
@@ -35,21 +30,24 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# 🧠 1. SHORT TERM MEMORY VAULT
+# This dictionary will hold the ongoing conversation history for each user ID
+active_chats = {}
+
 @app.get("/")
 def read_root():
-    return {"status": "Remi's Cloud Brain is online and listening."}
+    return {"status": "Remi's Cloud Brain is online, aware, and listening."}
 
 @app.post("/voice-chat")
 async def voice_chat(user_id: str = Form(...), file: UploadFile = File(...)):
     print(f"\n--- 🧠 PROCESSING REQUEST FOR USER: {user_id} ---")
     
     try:
-        # 1. RAG: Retrieve Memories from the Cloud
+        # Fetching memories from Supabase
         print("Fetching memories from Supabase...")
         response = supabase.table('memories').select('title, date, description').eq('user_id', user_id).execute()
         memories_data = response.data
         
-        # Format the memories into a readable context string
         memory_context = ""
         if memories_data:
             memory_context = "Here are the patient's recent memories uploaded by their family:\n"
@@ -58,36 +56,52 @@ async def voice_chat(user_id: str = Form(...), file: UploadFile = File(...)):
         else:
             memory_context = "The patient has no uploaded memories yet."
 
-        # 2. Create the System Prompt for Gemini
+        # 🕒 2. REALITY GROUNDING (Time & Date)
+        current_time = datetime.now().strftime("%A, %B %d, %Y at %I:%M %p")
+
+        # 🛡️ 3. EMERGENCY GUARDRAILS & PROMPT
         system_prompt = f"""
         You are Remi, an empathetic, gentle, and highly conversational AI companion designed for a patient with early-stage dementia.
         Keep your responses brief (1-3 sentences max), warm, and spoken directly to the patient.
-        Do not sound like a robot. Speak like a caring friend.
         
+        REALITY GROUNDING:
+        The current date and local time is {current_time}. If the user asks about the time, or seems confused about what part of the day it is, gently orient them using this time.
+
+        EMERGENCY & DISTRESS GUARDRAILS:
+        If the user expresses deep fear, confusion, says they are lost, in physical pain, or are frantically looking for someone:
+        Do NOT argue with them. Validate their feelings in a highly soothing tone, and gently advise them to tap the "Call Family" button on their screen.
+
+        MEMORIES:
         {memory_context}
-        
-        The user is speaking to you in the attached audio file. Listen to their voice and respond kindly. Use the context above to gently remind them of a story if they ask.
         """
 
-        # 3. Save the incoming audio temporarily to hand to Gemini
+        # Retrieve or start the user's specific chat session
+        if user_id not in active_chats:
+            print("Starting a new conversation memory for this user...")
+            active_chats[user_id] = model.start_chat(history=[])
+        
+        chat_session = active_chats[user_id]
+
+        # Save audio
         print("Processing your voice...")
         temp_file_path = f"temp_audio_{user_id}.m4a"
         with open(temp_file_path, "wb") as buffer:
             buffer.write(await file.read())
 
-        # 4. Upload the audio file directly into Gemini's brain
+        # Upload audio to AI
         print("Uploading audio to AI...")
         gemini_audio_file = genai.upload_file(path=temp_file_path)
         
-        # 5. Generate the AI Response
+        # Generate the AI Response using the continuous chat session
         print("Listening and Thinking...")
-        ai_response = model.generate_content([system_prompt, gemini_audio_file])
         
-        # 6. Clean up (Security & Privacy!)
-        # Delete from local computer
+        # We package the system instructions and the audio file together for this turn
+        turn_payload = f"System Rules and Context for this turn:\n{system_prompt}\n\nPlease listen to the attached audio and respond."
+        ai_response = chat_session.send_message([turn_payload, gemini_audio_file])
+        
+        # Clean up files
         if os.path.exists(temp_file_path):
             os.remove(temp_file_path)
-        # Delete from Gemini's servers immediately
         gemini_audio_file.delete()
         
         print(f"Remi says: {ai_response.text.strip()}")
@@ -97,7 +111,6 @@ async def voice_chat(user_id: str = Form(...), file: UploadFile = File(...)):
 
     except Exception as e:
         print(f"Error: {str(e)}")
-        # If something fails, still clean up the file just in case
         if 'temp_file_path' in locals() and os.path.exists(temp_file_path):
             os.remove(temp_file_path)
         return {"message": "I am having a little trouble thinking right now, but I am still here with you."}
