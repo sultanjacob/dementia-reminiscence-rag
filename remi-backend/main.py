@@ -23,7 +23,7 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 # Set up Gemini
 GEMINI_KEY = os.getenv("GEMINI_KEY")
 genai.configure(api_key=GEMINI_KEY)
-model = genai.GenerativeModel('gemini-1.5-pro-lates')
+model = genai.GenerativeModel('gemini-1.5-flash')
 
 app = FastAPI()
 
