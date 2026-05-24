@@ -27,7 +27,7 @@ export default function AuthScreen() {
       ])
     ).start();
 
-    // 2. Wait 2.5 seconds, then transition to the Login Form
+    // 2. Wait 2.5 seconds, then transitions to the Login Form
     const timer = setTimeout(() => {
       Animated.timing(fadeAnim, {
         toValue: 0,
