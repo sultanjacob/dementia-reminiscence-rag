@@ -30,8 +30,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 🧠 1. SHORT TERM MEMORY VAULT
-# This dictionary will hold the ongoing conversation history for each user ID
+# 🧠 THE TEXT MEMORY VAULT
+# We will store the history of the conversation as a simple text script
 active_chats = {}
 
 @app.get("/")
@@ -43,7 +43,7 @@ async def voice_chat(user_id: str = Form(...), file: UploadFile = File(...)):
     print(f"\n--- 🧠 PROCESSING REQUEST FOR USER: {user_id} ---")
     
     try:
-        # Fetching memories from Supabase
+        # 1. Fetching memories from Supabase
         print("Fetching memories from Supabase...")
         response = supabase.table('memories').select('title, date, description').eq('user_id', user_id).execute()
         memories_data = response.data
@@ -56,31 +56,38 @@ async def voice_chat(user_id: str = Form(...), file: UploadFile = File(...)):
         else:
             memory_context = "The patient has no uploaded memories yet."
 
-        # 🕒 2. REALITY GROUNDING (Time & Date)
+        # 2. Reality Grounding (Time & Date)
         current_time = datetime.now().strftime("%A, %B %d, %Y at %I:%M %p")
 
-        # 🛡️ 3. EMERGENCY GUARDRAILS & PROMPT
+        # 3. Fetch custom Text History
+        if user_id not in active_chats:
+            print("Starting a new conversation memory for this user...")
+            active_chats[user_id] = ""
+        
+        # Keep only the last 1000 characters to prevent the prompt from getting too massive
+        chat_history = active_chats[user_id][-1000:] 
+
+        # 4. System Prompt
         system_prompt = f"""
         You are Remi, an empathetic, gentle, and highly conversational AI companion designed for a patient with early-stage dementia.
         Keep your responses brief (1-3 sentences max), warm, and spoken directly to the patient.
         
         REALITY GROUNDING:
-        The current date and local time is {current_time}. If the user asks about the time, or seems confused about what part of the day it is, gently orient them using this time.
+        The current date and local time is {current_time}. Gently orient the patient if they seem confused about the time.
 
         EMERGENCY & DISTRESS GUARDRAILS:
         If the user expresses deep fear, confusion, says they are lost, in physical pain, or are frantically looking for someone:
-        Do NOT argue with them. Validate their feelings in a highly soothing tone, and gently advise them to tap the "Call Family" button on their screen.
+        Validate their feelings in a highly soothing tone, and gently advise them to tap the "Call Family" button on their screen. Do not argue.
 
-        MEMORIES:
+        DATABASE MEMORIES:
         {memory_context}
-        """
-
-        # Retrieve or start the user's specific chat session
-        if user_id not in active_chats:
-            print("Starting a new conversation memory for this user...")
-            active_chats[user_id] = model.start_chat(history=[])
         
-        chat_session = active_chats[user_id]
+        RECENT CONVERSATION HISTORY (What you recently said to the user):
+        {chat_history}
+        
+        INSTRUCTIONS:
+        Listen to the new attached audio from the user. Use the Recent Conversation History to understand what they are replying to, and respond naturally.
+        """
 
         # Save audio
         print("Processing your voice...")
@@ -92,22 +99,23 @@ async def voice_chat(user_id: str = Form(...), file: UploadFile = File(...)):
         print("Uploading audio to AI...")
         gemini_audio_file = genai.upload_file(path=temp_file_path)
         
-        # Generate the AI Response using the continuous chat session
+        # Generate Response (Standard generate_content instead of chat_session!)
         print("Listening and Thinking...")
+        ai_response = model.generate_content([system_prompt, gemini_audio_file])
+        response_text = ai_response.text.strip()
         
-        # We package the system instructions and the audio file together for this turn
-        turn_payload = f"System Rules and Context for this turn:\n{system_prompt}\n\nPlease listen to the attached audio and respond."
-        ai_response = chat_session.send_message([turn_payload, gemini_audio_file])
+        # Save Remi's response to the Text Memory Vault so she remembers what she just asked!
+        active_chats[user_id] += f"\nRemi said: {response_text}"
         
-        # Clean up files
+        # Clean up files - MAXIMUM PRIVACY RESTORED
         if os.path.exists(temp_file_path):
             os.remove(temp_file_path)
-        gemini_audio_file.delete()
+        gemini_audio_file.delete() 
         
-        print(f"Remi says: {ai_response.text.strip()}")
+        print(f"Remi says: {response_text}")
         print("--------------------------------------------------\n")
         
-        return {"message": ai_response.text.strip()}
+        return {"message": response_text}
 
     except Exception as e:
         print(f"Error: {str(e)}")
