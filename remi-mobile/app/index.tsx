@@ -1,8 +1,21 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
-import { Alert, Animated, KeyboardAvoidingView, Platform, SafeAreaView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { supabase } from '../supabase'; // Adjust this path if needed!
+import { 
+  Alert, 
+  Animated, 
+  KeyboardAvoidingView, 
+  Platform, 
+  SafeAreaView, 
+  StatusBar, 
+  StyleSheet, 
+  Text, 
+  TextInput, 
+  TouchableOpacity, 
+  View, 
+  Linking // <-- 1. Linking properly imported here
+} from 'react-native';
+import { supabase } from '../supabase';
 
 export default function AuthScreen() {
   const router = useRouter();
@@ -10,16 +23,19 @@ export default function AuthScreen() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   
-  // Controls whether we show the Welcome screen or the Login screen
   const [showWelcome, setShowWelcome] = useState(true);
 
-  // Animations
-  const fadeAnim = useRef(new Animated.Value(1)).current; // For Welcome fading out
-  const formFadeAnim = useRef(new Animated.Value(0)).current; // For Form fading in
-  const pulseAnim = useRef(new Animated.Value(1)).current; // For glowing icon
+  const fadeAnim = useRef(new Animated.Value(1)).current;
+  const formFadeAnim = useRef(new Animated.Value(0)).current;
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  // 2. The Call logic is now safely outside the animation timer
+  const handleEmergencyCall = () => {
+    // Replace with the actual caregiver's number
+    Linking.openURL('tel:+15551234567'); 
+  };
 
   useEffect(() => {
-    // 1. Start the glowing pulse animation immediately
     Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, { toValue: 1.1, duration: 1500, useNativeDriver: true }),
@@ -27,7 +43,6 @@ export default function AuthScreen() {
       ])
     ).start();
 
-    // 2. Wait 2.5 seconds, then transitions to the Login Form
     const timer = setTimeout(() => {
       Animated.timing(fadeAnim, {
         toValue: 0,
@@ -35,7 +50,6 @@ export default function AuthScreen() {
         useNativeDriver: true,
       }).start(() => {
         setShowWelcome(false);
-        // Fade the form in smoothly
         Animated.timing(formFadeAnim, {
           toValue: 1,
           duration: 800,
@@ -43,24 +57,18 @@ export default function AuthScreen() {
         }).start();
       });
     }, 2500);
-const handleEmergencyCall = () => {
-    // Replace with the actual caregiver's number
-    Linking.openURL('tel:+15551234567'); 
-  };
+    
     return () => clearTimeout(timer);
   }, []);
 
  async function signInWithEmail() {
   setLoading(true);
-
   const { error } = await supabase.auth.signInWithPassword({ email, password });
-
   if (error) {
     Alert.alert("Sign In Failed", error.message);
   } else {
     router.replace('/(auth)'); 
   }
-
   setLoading(false);
 }
 
@@ -78,7 +86,6 @@ const handleEmergencyCall = () => {
       
       <View style={styles.appCapsule}>
         
-        {/* --- STATE 1: THE WELCOME SPLASH SCREEN --- */}
         {showWelcome && (
           <Animated.View style={[styles.welcomeContainer, { opacity: fadeAnim }]}>
             <Animated.View style={[styles.orb, { transform: [{ scale: pulseAnim }] }]}>
@@ -89,7 +96,6 @@ const handleEmergencyCall = () => {
           </Animated.View>
         )}
 
-        {/* --- STATE 2: THE AUTHENTICATION FORM --- */}
         {!showWelcome && (
           <KeyboardAvoidingView 
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -146,6 +152,11 @@ const handleEmergencyCall = () => {
                 >
                   <Text style={styles.secondaryButtonText}>Create an Account</Text>
                 </TouchableOpacity>
+
+                {/* 3. The Emergency Button is safely rendered here */}
+                <TouchableOpacity style={styles.emergencyButton} onPress={handleEmergencyCall}>
+                  <Text style={styles.emergencyText}>📞 Call Family</Text>
+                </TouchableOpacity>
               </View>
 
             </Animated.View>
@@ -160,12 +171,12 @@ const handleEmergencyCall = () => {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#000000', // Black phone frame
+    backgroundColor: '#000000',
     paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
   appCapsule: {
     flex: 1,
-    backgroundColor: '#110C1D', // Deep purple-black app background
+    backgroundColor: '#110C1D',
     borderRadius: 45,
     overflow: 'hidden',
     marginHorizontal: 10,
@@ -174,8 +185,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#231A31',
   },
-  
-  // --- Welcome Screen Styles ---
   welcomeContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -206,8 +215,6 @@ const styles = StyleSheet.create({
     color: '#A396B5',
     marginTop: 10,
   },
-
-  // --- Auth Form Styles ---
   formContainer: {
     flex: 1,
     paddingHorizontal: 30,
@@ -232,7 +239,7 @@ const styles = StyleSheet.create({
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1A1325', // Slightly lighter than background
+    backgroundColor: '#1A1325',
     borderRadius: 16,
     marginBottom: 16,
     borderWidth: 1,
@@ -252,28 +259,4 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   primaryButton: {
-    backgroundColor: '#8B5CF6',
-    paddingVertical: 18,
-    borderRadius: 30,
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  primaryButtonText: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  secondaryButton: {
-    backgroundColor: 'transparent',
-    paddingVertical: 18,
-    borderRadius: 30,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#3D2F4F',
-  },
-  secondaryButtonText: {
-    color: '#E2D8F0',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-});
+    backgroundColor: '#8B5CF
