@@ -3,7 +3,21 @@ import { Audio } from 'expo-av';
 import { useRouter } from 'expo-router';
 import * as Speech from 'expo-speech';
 import React, { useEffect, useRef, useState } from 'react';
-import { Alert, Animated, Image, Modal, Platform, SafeAreaView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import {
+  Alert,
+  Animated,
+  Image,
+  Linking // <-- Linking imported here
+  ,
+  Modal,
+  Platform,
+  SafeAreaView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
+} from 'react-native';
 import { supabase } from '../../supabase';
 
 export default function HomeScreen() {
@@ -25,6 +39,12 @@ export default function HomeScreen() {
   const [isProcessing, setIsProcessing] = useState(false); 
 
   const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  // --- Emergency Call Logic ---
+  const handleEmergencyCall = () => {
+    // Replace with the actual caregiver's number
+    Linking.openURL('tel:+15551234567'); 
+  };
 
   const speak = (text: string) => {
     if (!text) return;
@@ -209,6 +229,11 @@ export default function HomeScreen() {
             )}
           </View>
 
+          {/* --- The New Emergency Button --- */}
+          <TouchableOpacity style={styles.emergencyButton} onPress={handleEmergencyCall}>
+            <Text style={styles.emergencyText}>📞 Call Family</Text>
+          </TouchableOpacity>
+
           <TouchableOpacity 
             style={[styles.primaryButton, isRecording && styles.recordingButton, isProcessing && styles.processingButton]} 
             activeOpacity={0.8}
@@ -313,4 +338,24 @@ const styles = StyleSheet.create({
   imageModalDate: { fontSize: 16, color: '#A78BFA', marginTop: 4 },
   closeImageButton: { backgroundColor: '#231A31', padding: 8, borderRadius: 20 },
   largeExpandedImage: { width: '100%', height: 300, borderRadius: 20 },
+  // --- Emergency Button Styles ---
+  emergencyButton: {
+    backgroundColor: '#FF3B30', 
+    paddingVertical: 15,
+    paddingHorizontal: 30,
+    borderRadius: 30,
+    marginVertical: 10,
+    marginHorizontal: 15,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5, 
+  },
+  emergencyText: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
 });
