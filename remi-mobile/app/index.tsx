@@ -43,7 +43,10 @@ export default function AuthScreen() {
         }).start();
       });
     }, 2500);
-
+const handleEmergencyCall = () => {
+    // Replace with the actual caregiver's number
+    Linking.openURL('tel:+15551234567'); 
+  };
     return () => clearTimeout(timer);
   }, []);
 
