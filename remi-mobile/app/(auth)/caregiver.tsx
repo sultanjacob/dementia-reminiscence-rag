@@ -3,7 +3,7 @@ import { decode } from 'base64-arraybuffer';
 import { Audio } from 'expo-av';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as ImagePicker from 'expo-image-picker';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, SafeAreaView, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { supabase } from '../../supabase';
 
@@ -18,9 +18,58 @@ export default function CaregiverScreen() {
   const [isRecording, setIsRecording] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
+  // --- NEW: Emergency Contact States ---
+  const [primaryContact, setPrimaryContact] = useState('');
+  const [secondaryContact, setSecondaryContact] = useState('');
+  const [isSavingContacts, setIsSavingContacts] = useState(false);
+
+  // --- NEW: Fetch Existing Contacts on Load ---
+  useEffect(() => {
+    const fetchContacts = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('primary_contact, secondary_contact')
+          .eq('id', user.id)
+          .single();
+          
+        if (data) {
+          if (data.primary_contact) setPrimaryContact(data.primary_contact);
+          if (data.secondary_contact) setSecondaryContact(data.secondary_contact);
+        }
+      }
+    };
+    fetchContacts();
+  }, []);
+
+  // --- NEW: Save Contacts to Supabase ---
+  const saveEmergencyContacts = async () => {
+    setIsSavingContacts(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("No user logged in.");
+
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          primary_contact: primaryContact,
+          secondary_contact: secondaryContact
+        })
+        .eq('id', user.id);
+
+      if (error) throw error;
+      Alert.alert("Success", "Emergency contacts have been updated.");
+    } catch (error: any) {
+      Alert.alert("Error", error.message);
+    } finally {
+      setIsSavingContacts(false);
+    }
+  };
+
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'], // <--- New Expo 54 syntax
+      mediaTypes: ['images'], 
       allowsEditing: false, 
       quality: 0.5, 
     });
@@ -62,7 +111,6 @@ export default function CaregiverScreen() {
     await sound.playAsync();
   };
 
-  // --- THE NEW CLOUD UPLOAD FUNCTION ---
   const saveMemory = async () => {
     if (!title || !imageUri) {
       return Alert.alert("Missing Info", "Please provide at least a title and an image.");
@@ -76,7 +124,6 @@ export default function CaregiverScreen() {
       let publicImageUrl = '';
       let publicAudioUrl = null;
 
-      // 1. Upload Image to Supabase Storage
       const imageBase64 = await FileSystem.readAsStringAsync(imageUri, { encoding: 'base64' });
       const imagePath = `${user.id}/${Date.now()}_image.jpg`;
       const { error: imgError } = await supabase.storage
@@ -86,7 +133,6 @@ export default function CaregiverScreen() {
       if (imgError) throw new Error("Image Upload Failed: " + imgError.message);
       publicImageUrl = supabase.storage.from('memories').getPublicUrl(imagePath).data.publicUrl;
 
-      // 2. Upload Audio to Supabase Storage (If recorded)
       if (audioUri) {
         const audioBase64 = await FileSystem.readAsStringAsync(audioUri, { encoding: 'base64' });
         const audioPath = `${user.id}/${Date.now()}_audio.m4a`;
@@ -98,7 +144,6 @@ export default function CaregiverScreen() {
         publicAudioUrl = supabase.storage.from('memories').getPublicUrl(audioPath).data.publicUrl;
       }
 
-      // 3. Save everything to the database
       const newMemory = {
         user_id: user.id,
         title,
@@ -113,7 +158,6 @@ export default function CaregiverScreen() {
 
       Alert.alert("Success!", "Memory safely uploaded to the cloud.");
       
-      // Clear the form for the next memory
       setTitle(''); setDate(''); setDescription(''); setImageUri(null); setAudioUri(null);
     } catch (error: any) {
       Alert.alert("Upload Error", error.message);
@@ -134,6 +178,51 @@ export default function CaregiverScreen() {
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
             
+            {/* --- NEW: Emergency Contacts Section --- */}
+            <View style={styles.emergencyCard}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Emergency Contacts</Text>
+                <Text style={styles.sectionSubtitle}>Numbers for Remi to dial during distress.</Text>
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Primary Contact (e.g., Daughter)</Text>
+                <TextInput 
+                  style={styles.input} 
+                  placeholder="+44 7700 900000" 
+                  placeholderTextColor="#6B7280" 
+                  value={primaryContact} 
+                  onChangeText={setPrimaryContact}
+                  keyboardType="phone-pad"
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Secondary Contact (e.g., Son)</Text>
+                <TextInput 
+                  style={styles.input} 
+                  placeholder="+44 7700 900001" 
+                  placeholderTextColor="#6B7280" 
+                  value={secondaryContact} 
+                  onChangeText={setSecondaryContact}
+                  keyboardType="phone-pad"
+                />
+              </View>
+
+              <TouchableOpacity 
+                style={styles.secondarySaveButton} 
+                onPress={saveEmergencyContacts}
+                disabled={isSavingContacts}
+              >
+                <Text style={styles.secondarySaveText}>
+                  {isSavingContacts ? "Saving..." : "Update Contacts"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+            
+            <View style={styles.dividerLine} />
+
+            {/* --- Existing Memory Upload Section --- */}
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Add a New Memory</Text>
               <Text style={styles.sectionSubtitle}>Upload a photo and record the story behind it.</Text>
@@ -229,5 +318,32 @@ const styles = StyleSheet.create({
   deleteAudioButton: { backgroundColor: '#3D2F4F', padding: 14, borderRadius: 30 },
   saveButton: { backgroundColor: '#A78BFA', paddingVertical: 18, borderRadius: 30, alignItems: 'center', marginBottom: 20 },
   savingState: { backgroundColor: '#8B5CF6', opacity: 0.7 },
-  saveButtonText: { color: '#110C1D', fontSize: 18, fontWeight: 'bold' }
+  saveButtonText: { color: '#110C1D', fontSize: 18, fontWeight: 'bold' },
+  
+  // NEW STYLES
+  emergencyCard: {
+    backgroundColor: 'rgba(239, 68, 68, 0.1)', // Light red tint for importance
+    padding: 20,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.3)',
+    marginBottom: 20,
+  },
+  secondarySaveButton: {
+    backgroundColor: '#3D2F4F',
+    paddingVertical: 14,
+    borderRadius: 20,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  secondarySaveText: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  dividerLine: {
+    height: 1,
+    backgroundColor: '#3D2F4F',
+    marginBottom: 30,
+  }
 });
