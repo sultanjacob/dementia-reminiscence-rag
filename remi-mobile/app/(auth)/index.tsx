@@ -37,11 +37,11 @@ export default function HomeScreen() {
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false); 
 
-  // --- NEW: Distress & Emergency States ---
+  // Distress & Emergency States
   const [isDistressed, setIsDistressed] = useState(false);
   const [showEmergencyMenu, setShowEmergencyMenu] = useState(false);
+  
   const flashAnim = useRef(new Animated.Value(1)).current;
-
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
   const speak = (text: string) => {
@@ -50,7 +50,7 @@ export default function HomeScreen() {
     Speech.speak(cleanText, { language: 'en-GB', pitch: 0.9, rate: 0.8 });
   };
 
-  // --- NEW: Flashing Animation Logic ---
+  // Flashing Animation Logic
   useEffect(() => {
     if (isDistressed) {
       Animated.loop(
@@ -60,7 +60,7 @@ export default function HomeScreen() {
         ])
       ).start();
     } else {
-      flashAnim.setValue(1); // Reset if they are calm
+      flashAnim.setValue(1); 
     }
   }, [isDistressed]);
 
@@ -188,12 +188,11 @@ export default function HomeScreen() {
         setRemiText(aiText);
         speak(aiText);
 
-        // --- 🚨 THE DISTRESS TRIGGER 🚨 ---
-        // If the AI's response contains our specific guardrail phrase, show the flashing button!
+        // 🚨 THE DISTRESS TRIGGER 🚨
         if (aiText.toLowerCase().includes("call family")) {
           setIsDistressed(true);
         } else {
-          setIsDistressed(false); // Hide the button if they are having a normal conversation
+          setIsDistressed(false); 
         }
 
       } else {
@@ -250,7 +249,7 @@ export default function HomeScreen() {
             )}
           </View>
 
-          {/* --- NEW: Conditional Flashing Emergency Button --- */}
+          {/* Only the conditional flashing button exists here now! */}
           {isDistressed && (
             <Animated.View style={{ opacity: flashAnim }}>
               <TouchableOpacity 
@@ -285,7 +284,7 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      {/* --- NEW: The Emergency Contacts Menu --- */}
+      {/* The Emergency Contacts Menu */}
       <Modal visible={showEmergencyMenu} transparent={true} animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={styles.emergencyModalContent}>
@@ -397,7 +396,6 @@ const styles = StyleSheet.create({
   closeImageButton: { backgroundColor: '#231A31', padding: 8, borderRadius: 20 },
   largeExpandedImage: { width: '100%', height: 300, borderRadius: 20 },
   
-  // --- NEW: Dynamic Emergency Styles ---
   flashingEmergencyButton: {
     backgroundColor: '#FF3B30',
     flexDirection: 'row',
