@@ -1,19 +1,19 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
-import { 
-  Alert, 
-  Animated, 
-  KeyboardAvoidingView, 
-  Platform, 
-  SafeAreaView, 
-  StatusBar, 
-  StyleSheet, 
-  Text, 
-  TextInput, 
-  TouchableOpacity, 
-  View, 
-  Linking // <-- 1. Linking properly imported here
+import {
+  Alert,
+  Animated,
+  KeyboardAvoidingView,
+  Linking,
+  Platform,
+  SafeAreaView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { supabase } from '../supabase';
 
@@ -29,9 +29,7 @@ export default function AuthScreen() {
   const formFadeAnim = useRef(new Animated.Value(0)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
-  // 2. The Call logic is now safely outside the animation timer
   const handleEmergencyCall = () => {
-    // Replace with the actual caregiver's number
     Linking.openURL('tel:+15551234567'); 
   };
 
@@ -153,7 +151,6 @@ export default function AuthScreen() {
                   <Text style={styles.secondaryButtonText}>Create an Account</Text>
                 </TouchableOpacity>
 
-                {/* 3. The Emergency Button is safely rendered here */}
                 <TouchableOpacity style={styles.emergencyButton} onPress={handleEmergencyCall}>
                   <Text style={styles.emergencyText}>📞 Call Family</Text>
                 </TouchableOpacity>
@@ -259,4 +256,47 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   primaryButton: {
-    backgroundColor: '#8B5CF
+    backgroundColor: '#8B5CF6',
+    paddingVertical: 18,
+    borderRadius: 30,
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  primaryButtonText: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  secondaryButton: {
+    backgroundColor: 'transparent',
+    paddingVertical: 18,
+    borderRadius: 30,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#3D2F4F',
+    marginBottom: 20,
+  },
+  secondaryButtonText: {
+    color: '#E2D8F0',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  emergencyButton: {
+    backgroundColor: '#FF3B30', 
+    paddingVertical: 15,
+    paddingHorizontal: 30,
+    borderRadius: 30,
+    marginVertical: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5, 
+  },
+  emergencyText: {
+    color: '#FFFFFF',
+    fontSize: 20,
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+});
