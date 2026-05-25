@@ -1,19 +1,18 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
-import {
-  Alert,
-  Animated,
-  KeyboardAvoidingView,
-  Linking,
-  Platform,
-  SafeAreaView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
+import { 
+  Alert, 
+  Animated, 
+  KeyboardAvoidingView, 
+  Platform, 
+  SafeAreaView, 
+  StatusBar, 
+  StyleSheet, 
+  Text, 
+  TextInput, 
+  TouchableOpacity, 
+  View 
 } from 'react-native';
 import { supabase } from '../supabase';
 
@@ -28,10 +27,6 @@ export default function AuthScreen() {
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const formFadeAnim = useRef(new Animated.Value(0)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
-
-  const handleEmergencyCall = () => {
-    Linking.openURL('tel:+15551234567'); 
-  };
 
   useEffect(() => {
     Animated.loop(
@@ -151,9 +146,6 @@ export default function AuthScreen() {
                   <Text style={styles.secondaryButtonText}>Create an Account</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity style={styles.emergencyButton} onPress={handleEmergencyCall}>
-                  <Text style={styles.emergencyText}>📞 Call Family</Text>
-                </TouchableOpacity>
               </View>
 
             </Animated.View>
@@ -280,23 +272,5 @@ const styles = StyleSheet.create({
     color: '#E2D8F0',
     fontSize: 16,
     fontWeight: '600',
-  },
-  emergencyButton: {
-    backgroundColor: '#FF3B30', 
-    paddingVertical: 15,
-    paddingHorizontal: 30,
-    borderRadius: 30,
-    marginVertical: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 5, 
-  },
-  emergencyText: {
-    color: '#FFFFFF',
-    fontSize: 20,
-    fontWeight: 'bold',
-    textAlign: 'center',
   },
 });
