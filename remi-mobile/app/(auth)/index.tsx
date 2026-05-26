@@ -29,6 +29,10 @@ export default function HomeScreen() {
   const [greeting, setGreeting] = useState("Good evening");
   const [userName, setUserName] = useState("John");
   
+  // --- NEW: Dynamic Contact States ---
+  const [primaryContact, setPrimaryContact] = useState<string | null>(null);
+  const [secondaryContact, setSecondaryContact] = useState<string | null>(null);
+
   const [isMenuVisible, setIsMenuVisible] = useState(false);
   const [isMemoryExpanded, setIsMemoryExpanded] = useState(false);
   const [dailyMemory, setDailyMemory] = useState<any>(null);
@@ -37,7 +41,6 @@ export default function HomeScreen() {
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false); 
 
-  // Distress & Emergency States
   const [isDistressed, setIsDistressed] = useState(false);
   const [showEmergencyMenu, setShowEmergencyMenu] = useState(false);
   
@@ -50,7 +53,6 @@ export default function HomeScreen() {
     Speech.speak(cleanText, { language: 'en-GB', pitch: 0.9, rate: 0.8 });
   };
 
-  // Flashing Animation Logic
   useEffect(() => {
     if (isDistressed) {
       Animated.loop(
@@ -84,10 +86,16 @@ export default function HomeScreen() {
       let fetchedName = "John";
       
       if (user) {
-        const { data: profileData } = await supabase.from('profiles').select('nickname').eq('id', user.id).single();
-        if (profileData && profileData.nickname) {
-          fetchedName = profileData.nickname;
-          setUserName(fetchedName);
+        // --- UPDATED: Fetching the contacts alongside the nickname ---
+        const { data: profileData } = await supabase.from('profiles').select('nickname, primary_contact, secondary_contact').eq('id', user.id).single();
+        
+        if (profileData) {
+          if (profileData.nickname) {
+            fetchedName = profileData.nickname;
+            setUserName(fetchedName);
+          }
+          if (profileData.primary_contact) setPrimaryContact(profileData.primary_contact);
+          if (profileData.secondary_contact) setSecondaryContact(profileData.secondary_contact);
         }
 
         const { data: memories } = await supabase.from('memories').select('*').eq('user_id', user.id);
@@ -188,7 +196,6 @@ export default function HomeScreen() {
         setRemiText(aiText);
         speak(aiText);
 
-        // 🚨 THE DISTRESS TRIGGER 🚨
         if (aiText.toLowerCase().includes("call family")) {
           setIsDistressed(true);
         } else {
@@ -209,6 +216,17 @@ export default function HomeScreen() {
   const navigateTo = (path: any) => {
     setIsMenuVisible(false); 
     router.push(path);       
+  };
+
+  // --- NEW: Safe Dialing Handlers ---
+  const handlePrimaryCall = () => {
+    if (primaryContact) Linking.openURL(`tel:${primaryContact}`);
+    else Alert.alert("Not Setup", "Please ask your family to add a Primary Contact in settings.");
+  };
+
+  const handleSecondaryCall = () => {
+    if (secondaryContact) Linking.openURL(`tel:${secondaryContact}`);
+    else Alert.alert("Not Setup", "Please ask your family to add a Secondary Contact in settings.");
   };
 
   return (
@@ -249,7 +267,6 @@ export default function HomeScreen() {
             )}
           </View>
 
-          {/* Only the conditional flashing button exists here now! */}
           {isDistressed && (
             <Animated.View style={{ opacity: flashAnim }}>
               <TouchableOpacity 
@@ -284,20 +301,26 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      {/* The Emergency Contacts Menu */}
+      {/* --- UPDATED: Dynamic Emergency Contacts Menu --- */}
       <Modal visible={showEmergencyMenu} transparent={true} animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={styles.emergencyModalContent}>
             <Text style={styles.emergencyModalTitle}>Who do you want to call?</Text>
             
-            <TouchableOpacity style={styles.contactRow} onPress={() => Linking.openURL('tel:+447700900077')}>
+            <TouchableOpacity style={styles.contactRow} onPress={handlePrimaryCall}>
               <Ionicons name="person" size={24} color="#8B5CF6" />
-              <Text style={styles.contactText}>Call Daughter (Primary)</Text>
+              <View style={{ marginLeft: 15 }}>
+                <Text style={styles.contactText}>Primary Contact</Text>
+                <Text style={styles.numberText}>{primaryContact || "Not Setup"}</Text>
+              </View>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.contactRow} onPress={() => Linking.openURL('tel:+447700900088')}>
+            <TouchableOpacity style={styles.contactRow} onPress={handleSecondaryCall}>
               <Ionicons name="person" size={24} color="#8B5CF6" />
-              <Text style={styles.contactText}>Call Son (Secondary)</Text>
+              <View style={{ marginLeft: 15 }}>
+                <Text style={styles.contactText}>Secondary Contact</Text>
+                <Text style={styles.numberText}>{secondaryContact || "Not Setup"}</Text>
+              </View>
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.policeRow} onPress={() => Linking.openURL('tel:999')}>
@@ -347,7 +370,7 @@ export default function HomeScreen() {
             </TouchableOpacity>
             <TouchableOpacity style={styles.menuRow} onPress={() => navigateTo('/caregiver')}>
               <Ionicons name="person" size={22} color="#A78BFA" style={styles.menuIcon} />
-              <Text style={styles.menuRowText}>User Profile</Text>
+              <Text style={styles.menuRowText}>Caregiver Portal</Text>
               <Ionicons name="chevron-forward" size={20} color="#6B7280" />
             </TouchableOpacity>
           </View>
@@ -437,7 +460,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#231A31',
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 20,
+    padding: 15,
     borderRadius: 16,
     marginBottom: 15,
     borderWidth: 1,
@@ -447,7 +470,11 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 18,
     fontWeight: '600',
-    marginLeft: 15,
+  },
+  numberText: {
+    color: '#A396B5',
+    fontSize: 14,
+    marginTop: 2,
   },
   policeRow: {
     backgroundColor: '#EF4444',
