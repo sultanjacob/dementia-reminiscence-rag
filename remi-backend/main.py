@@ -7,15 +7,12 @@ import google.generativeai as genai
 from dotenv import load_dotenv
 import uvicorn
 
-# Load keys
 load_dotenv()
 
-# Set up Supabase
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# Set up Gemini
 GEMINI_KEY = os.getenv("GEMINI_KEY")
 genai.configure(api_key=GEMINI_KEY)
 model = genai.GenerativeModel('gemini-2.5-flash')
@@ -30,87 +27,63 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 🧠 THE TEXT MEMORY VAULT
-# We will store the history of the conversation as a simple text script
 active_chats = {}
+# 🧠 NEW: Cache the database so we don't query it on every single sentence!
+memory_cache = {}
 
 @app.get("/")
 def read_root():
-    return {"status": "Remi's Cloud Brain is online, aware, and listening."}
+    return {"status": "Remi's Fast Cloud Brain is online."}
 
 @app.post("/voice-chat")
 async def voice_chat(user_id: str = Form(...), file: UploadFile = File(...)):
-    print(f"\n--- 🧠 PROCESSING REQUEST FOR USER: {user_id} ---")
+    print(f"\n--- ⚡ FAST PROCESSING FOR: {user_id} ---")
     
     try:
-        # 1. Fetching memories from Supabase
-        print("Fetching memories from Supabase...")
-        response = supabase.table('memories').select('title, date, description').eq('user_id', user_id).execute()
-        memories_data = response.data
+        # 1. Check cache instead of hitting the database every time
+        if user_id not in memory_cache:
+            print("Fetching memories from Supabase (First time only)...")
+            response = supabase.table('memories').select('title, date, description').eq('user_id', user_id).execute()
+            memories_data = response.data
+            
+            if memories_data:
+                mem_context = "Here are the patient's recent memories:\n"
+                for mem in memories_data:
+                    mem_context += f"- {mem.get('title')} ({mem.get('date', 'Unknown')}): {mem.get('description', '')}\n"
+            else:
+                mem_context = "No uploaded memories yet."
+            memory_cache[user_id] = mem_context
         
-        memory_context = ""
-        if memories_data:
-            memory_context = "Here are the patient's recent memories uploaded by their family:\n"
-            for mem in memories_data:
-                memory_context += f"- Title: {mem.get('title')}, Date: {mem.get('date', 'Unknown')}. Story: {mem.get('description', 'No description.')}\n"
-        else:
-            memory_context = "The patient has no uploaded memories yet."
-
-        # 2. Reality Grounding (Time & Date)
+        memory_context = memory_cache[user_id]
         current_time = datetime.now().strftime("%A, %B %d, %Y at %I:%M %p")
 
-        # 3. Fetch custom Text History
         if user_id not in active_chats:
-            print("Starting a new conversation memory for this user...")
             active_chats[user_id] = ""
         
-        # Keep only the last 1000 characters to prevent the prompt from getting too massive
         chat_history = active_chats[user_id][-1000:] 
 
-        # 4. System Prompt
         system_prompt = f"""
-        You are Remi, an empathetic, gentle, and highly conversational AI companion designed for a patient with early-stage dementia.
-        Keep your responses brief (1-3 sentences max), warm, and spoken directly to the patient.
+        You are Remi, an empathetic, gentle AI companion for a patient with early-stage dementia.
+        Keep responses brief (1-3 sentences), warm, and spoken directly to the patient.
         
-        REALITY GROUNDING:
-        The current date and local time is {current_time}. Gently orient the patient if they seem confused about the time.
-
-        EMERGENCY & DISTRESS GUARDRAILS:
-        If the user expresses deep fear, confusion, says they are lost, in physical pain, or are frantically looking for someone:
-        Validate their feelings in a highly soothing tone, and gently advise them to tap the "Call Family" button on their screen. Do not argue.
-
-        DATABASE MEMORIES:
-        {memory_context}
-        
-        RECENT CONVERSATION HISTORY (What you recently said to the user):
-        {chat_history}
-        
-        INSTRUCTIONS:
-        Listen to the new attached audio from the user. Use the Recent Conversation History to understand what they are replying to, and respond naturally.
+        TIME: {current_time}. Orient the patient if confused.
+        GUARDRAIL: If user expresses fear, pain, or being lost, validate feelings and advise them to tap "Call Family".
+        MEMORIES: {memory_context}
+        HISTORY: {chat_history}
         """
 
-        # Save audio
-        print("Processing your voice...")
-        temp_file_path = f"temp_audio_{user_id}.m4a"
-        with open(temp_file_path, "wb") as buffer:
-            buffer.write(await file.read())
-
-        # Upload audio to AI
-        print("Uploading audio to AI...")
-        gemini_audio_file = genai.upload_file(path=temp_file_path)
+        # 🚀 2. INLINE AUDIO: Skip disk saving and skip Google File API entirely!
+        audio_bytes = await file.read()
+        audio_part = {
+            "mime_type": file.content_type or "audio/m4a",
+            "data": audio_bytes
+        }
         
-        # Generate Response (Standard generate_content instead of chat_session!)
-        print("Listening and Thinking...")
-        ai_response = model.generate_content([system_prompt, gemini_audio_file])
+        print("Listening and Thinking instantly...")
+        ai_response = model.generate_content([system_prompt, audio_part])
         response_text = ai_response.text.strip()
         
-        # Save Remi's response to the Text Memory Vault so she remembers what she just asked!
         active_chats[user_id] += f"\nRemi said: {response_text}"
-        
-        # Clean up files - MAXIMUM PRIVACY RESTORED
-        if os.path.exists(temp_file_path):
-            os.remove(temp_file_path)
-        gemini_audio_file.delete() 
         
         print(f"Remi says: {response_text}")
         print("--------------------------------------------------\n")
@@ -119,9 +92,7 @@ async def voice_chat(user_id: str = Form(...), file: UploadFile = File(...)):
 
     except Exception as e:
         print(f"Error: {str(e)}")
-        if 'temp_file_path' in locals() and os.path.exists(temp_file_path):
-            os.remove(temp_file_path)
-        return {"message": "I am having a little trouble thinking right now, but I am still here with you."}
+        return {"message": "I am having a little trouble thinking right now, but I am still here."}
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
