@@ -152,7 +152,7 @@ export default function HomeScreen() {
       const permission = await Audio.requestPermissionsAsync();
       if (permission.status !== 'granted') return Alert.alert("Permission Denied", "Remi needs microphone access.");
       await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
-      const { recording } = await Audio.Recording.createAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
+      const { recording } = await Audio.Recording.createAsync(Audio.RecordingOptionsPresets.LOW_QUALITY);
       setRecording(recording);
       setIsRecording(true);
       setRemiText("I'm listening...");
