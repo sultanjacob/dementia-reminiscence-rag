@@ -348,7 +348,7 @@ export default function HomeScreen() {
             <View style={styles.imageModalHeader}>
               <View>
                 <Text style={styles.imageModalTitle}>{dailyMemory?.title}</Text>
-                <Text style={styles.imageModalDate}>{dailyMemory?.date || "A beautiful memory"}</Text>
+                <Text style={styles.imageModalDate}>{dailyMemory?.date || "A very beautiful memory"}</Text>
               </View>
               <TouchableOpacity onPress={() => setIsMemoryExpanded(false)} style={styles.closeImageButton}>
                 <Ionicons name="close" size={28} color="#FFFFFF" />
