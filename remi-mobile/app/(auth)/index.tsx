@@ -29,7 +29,6 @@ export default function HomeScreen() {
   const [greeting, setGreeting] = useState("Good evening");
   const [userName, setUserName] = useState("John");
   
-  // --- NEW: Dynamic Contact States ---
   const [primaryContact, setPrimaryContact] = useState<string | null>(null);
   const [secondaryContact, setSecondaryContact] = useState<string | null>(null);
 
@@ -86,7 +85,6 @@ export default function HomeScreen() {
       let fetchedName = "John";
       
       if (user) {
-        // --- UPDATED: Fetching the contacts alongside the nickname ---
         const { data: profileData } = await supabase.from('profiles').select('nickname, primary_contact, secondary_contact').eq('id', user.id).single();
         
         if (profileData) {
@@ -151,7 +149,15 @@ export default function HomeScreen() {
     try {
       const permission = await Audio.requestPermissionsAsync();
       if (permission.status !== 'granted') return Alert.alert("Permission Denied", "Remi needs microphone access.");
-      await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
+      
+      // --- UPDATED: Forcing the audio engine to stay awake and fast ---
+      await Audio.setAudioModeAsync({ 
+        allowsRecordingIOS: true, 
+        playsInSilentModeIOS: true,
+        staysActiveInBackground: true, 
+        playThroughEarpieceAndroid: false
+      });
+
       const { recording } = await Audio.Recording.createAsync(Audio.RecordingOptionsPresets.LOW_QUALITY);
       setRecording(recording);
       setIsRecording(true);
@@ -187,7 +193,10 @@ export default function HomeScreen() {
       const response = await fetch(`${API_URL}/voice-chat`, {
         method: 'POST',
         body: formData,
-        headers: { 'Content-Type': 'multipart/form-data' },
+        headers: { 
+          'Content-Type': 'multipart/form-data',
+          'Connection': 'keep-alive' // Forces Android not to stall
+        },
       });
 
       const responseData = await response.json();
@@ -218,7 +227,6 @@ export default function HomeScreen() {
     router.push(path);       
   };
 
-  // --- NEW: Safe Dialing Handlers ---
   const handlePrimaryCall = () => {
     if (primaryContact) Linking.openURL(`tel:${primaryContact}`);
     else Alert.alert("Not Setup", "Please ask your family to add a Primary Contact in settings.");
@@ -301,7 +309,6 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      {/* --- UPDATED: Dynamic Emergency Contacts Menu --- */}
       <Modal visible={showEmergencyMenu} transparent={true} animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={styles.emergencyModalContent}>
@@ -335,7 +342,6 @@ export default function HomeScreen() {
         </View>
       </Modal>
 
-      {/* Existing Modals */}
       <Modal visible={isMemoryExpanded} transparent={true} animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.imageCapsule}>
