@@ -1,4 +1,5 @@
 import os
+import time
 from datetime import datetime
 from fastapi import FastAPI, UploadFile, Form, File
 from fastapi.middleware.cors import CORSMiddleware
@@ -28,21 +29,25 @@ app.add_middleware(
 )
 
 active_chats = {}
-# 🧠 NEW: Cache the database so we don't query it on every single sentence!
 memory_cache = {}
 
 @app.get("/")
 def read_root():
-    return {"status": "Remi's Fast Cloud Brain is online."}
+    return {"status": "Remi's Stopwatch Brain is online."}
 
 @app.post("/voice-chat")
 async def voice_chat(user_id: str = Form(...), file: UploadFile = File(...)):
-    print(f"\n--- ⚡ FAST PROCESSING FOR: {user_id} ---")
+    start_time = time.time()
+    print(f"\n--- ⏱️ DIAGNOSTIC SPEED TEST FOR: {user_id} ---")
     
     try:
-        # 1. Check cache instead of hitting the database every time
+        # 1. Measure Phone Upload Speed
+        audio_bytes = await file.read()
+        received_time = time.time()
+        print(f"✅ Audio received from phone in: {received_time - start_time:.2f} seconds")
+
+        # 2. Measure Database Speed
         if user_id not in memory_cache:
-            print("Fetching memories from Supabase (First time only)...")
             response = supabase.table('memories').select('title, date, description').eq('user_id', user_id).execute()
             memories_data = response.data
             
@@ -54,6 +59,9 @@ async def voice_chat(user_id: str = Form(...), file: UploadFile = File(...)):
                 mem_context = "No uploaded memories yet."
             memory_cache[user_id] = mem_context
         
+        cache_time = time.time()
+        print(f"✅ Database cache checked in: {cache_time - received_time:.2f} seconds")
+
         memory_context = memory_cache[user_id]
         current_time = datetime.now().strftime("%A, %B %d, %Y at %I:%M %p")
 
@@ -63,28 +71,28 @@ async def voice_chat(user_id: str = Form(...), file: UploadFile = File(...)):
         chat_history = active_chats[user_id][-1000:] 
 
         system_prompt = f"""
-        You are Remi, an empathetic, gentle AI companion for a patient with early-stage dementia.
-        Keep responses brief (1-3 sentences), warm, and spoken directly to the patient.
-        
-        TIME: {current_time}. Orient the patient if confused.
-        GUARDRAIL: If user expresses fear, pain, or being lost, validate feelings and advise them to tap "Call Family".
+        You are Remi, an empathetic AI companion for a patient with early-stage dementia.
+        Keep responses brief (1-3 sentences).
+        TIME: {current_time}. 
         MEMORIES: {memory_context}
         HISTORY: {chat_history}
         """
 
-        # 🚀 2. INLINE AUDIO: Skip disk saving and skip Google File API entirely!
-        audio_bytes = await file.read()
         audio_part = {
             "mime_type": file.content_type or "audio/m4a",
             "data": audio_bytes
         }
         
-        print("Listening and Thinking instantly...")
+        # 3. Measure Gemini Speed
+        print("🤔 Gemini is thinking...")
         ai_response = model.generate_content([system_prompt, audio_part])
+        ai_time = time.time()
         response_text = ai_response.text.strip()
+        print(f"✅ Gemini finished thinking in: {ai_time - cache_time:.2f} seconds")
         
         active_chats[user_id] += f"\nRemi said: {response_text}"
         
+        print(f"🚀 TOTAL BACKEND TIME: {ai_time - start_time:.2f} seconds")
         print(f"Remi says: {response_text}")
         print("--------------------------------------------------\n")
         
@@ -92,7 +100,7 @@ async def voice_chat(user_id: str = Form(...), file: UploadFile = File(...)):
 
     except Exception as e:
         print(f"Error: {str(e)}")
-        return {"message": "I am having a little trouble thinking right now, but I am still here."}
+        return {"message": "I am having a little trouble thinking right now."}
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
