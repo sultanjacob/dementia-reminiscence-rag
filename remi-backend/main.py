@@ -1,5 +1,4 @@
 import os
-import time
 from datetime import datetime
 from fastapi import FastAPI, UploadFile, Form, File
 from fastapi.middleware.cors import CORSMiddleware
@@ -8,15 +7,20 @@ import google.generativeai as genai
 from dotenv import load_dotenv
 import uvicorn
 
+# Load keys
 load_dotenv()
 
+# Set up Supabase
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
+# Set up Gemini
 GEMINI_KEY = os.getenv("GEMINI_KEY")
 genai.configure(api_key=GEMINI_KEY)
-model = genai.GenerativeModel('gemini-2.5-flash')
+
+# 💡 OPTION 2 APPLIED: Switched to 1.5-flash to completely bypass the strict 5-request limit!
+model = genai.GenerativeModel('gemini-1.5-flash')
 
 app = FastAPI()
 
@@ -28,71 +32,86 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# 🧠 THE TEXT MEMORY VAULT
 active_chats = {}
-memory_cache = {}
 
 @app.get("/")
 def read_root():
-    return {"status": "Remi's Stopwatch Brain is online."}
+    return {"status": "Remi's Cloud Brain is online, aware, and listening."}
 
 @app.post("/voice-chat")
 async def voice_chat(user_id: str = Form(...), file: UploadFile = File(...)):
-    start_time = time.time()
-    print(f"\n--- ⏱️ DIAGNOSTIC SPEED TEST FOR: {user_id} ---")
+    print(f"\n--- 🧠 PROCESSING REQUEST FOR USER: {user_id} ---")
     
     try:
-        # 1. Measure Phone Upload Speed
-        audio_bytes = await file.read()
-        received_time = time.time()
-        print(f"✅ Audio received from phone in: {received_time - start_time:.2f} seconds")
-
-        # 2. Measure Database Speed
-        if user_id not in memory_cache:
-            response = supabase.table('memories').select('title, date, description').eq('user_id', user_id).execute()
-            memories_data = response.data
-            
-            if memories_data:
-                mem_context = "Here are the patient's recent memories:\n"
-                for mem in memories_data:
-                    mem_context += f"- {mem.get('title')} ({mem.get('date', 'Unknown')}): {mem.get('description', '')}\n"
-            else:
-                mem_context = "No uploaded memories yet."
-            memory_cache[user_id] = mem_context
+        # 1. Fetching memories from Supabase
+        print("Fetching memories from Supabase...")
+        response = supabase.table('memories').select('title, date, description').eq('user_id', user_id).execute()
+        memories_data = response.data
         
-        cache_time = time.time()
-        print(f"✅ Database cache checked in: {cache_time - received_time:.2f} seconds")
+        memory_context = ""
+        if memories_data:
+            memory_context = "Here are the patient's recent memories uploaded by their family:\n"
+            for mem in memories_data:
+                memory_context += f"- Title: {mem.get('title')}, Date: {mem.get('date', 'Unknown')}. Story: {mem.get('description', 'No description.')}\n"
+        else:
+            memory_context = "The patient has no uploaded memories yet."
 
-        memory_context = memory_cache[user_id]
+        # 2. Reality Grounding (Time & Date)
         current_time = datetime.now().strftime("%A, %B %d, %Y at %I:%M %p")
 
+        # 3. Fetch custom Text History
         if user_id not in active_chats:
+            print("Starting a new conversation memory for this user...")
             active_chats[user_id] = ""
         
         chat_history = active_chats[user_id][-1000:] 
 
+        # 4. System Prompt
         system_prompt = f"""
-        You are Remi, an empathetic AI companion for a patient with early-stage dementia.
-        Keep responses brief (1-3 sentences).
-        TIME: {current_time}. 
-        MEMORIES: {memory_context}
-        HISTORY: {chat_history}
+        You are Remi, an empathetic, gentle, and highly conversational AI companion designed for a patient with early-stage dementia.
+        Keep your responses brief (1-3 sentences max), warm, and spoken directly to the patient.
+        
+        REALITY GROUNDING:
+        The current date and local time is {current_time}. Gently orient the patient if they seem confused about the time.
+
+        EMERGENCY & DISTRESS GUARDRAILS:
+        If the user expresses deep fear, confusion, says they are lost, in physical pain, or are frantically looking for someone:
+        Validate their feelings in a highly soothing tone, and gently advise them to tap the "Call Family" button on their screen. Do not argue.
+
+        DATABASE MEMORIES:
+        {memory_context}
+        
+        RECENT CONVERSATION HISTORY (What you recently said to the user):
+        {chat_history}
+        
+        INSTRUCTIONS:
+        Listen to the new attached audio from the user. Use the Recent Conversation History to understand what they are replying to, and respond naturally.
         """
 
-        audio_part = {
-            "mime_type": file.content_type or "audio/m4a",
-            "data": audio_bytes
-        }
+        # Save audio locally
+        print("Processing your voice...")
+        temp_file_path = f"temp_audio_{user_id}.m4a"
+        with open(temp_file_path, "wb") as buffer:
+            buffer.write(await file.read())
+
+        # Upload audio to AI
+        print("Uploading audio to AI...")
+        gemini_audio_file = genai.upload_file(path=temp_file_path)
         
-        # 3. Measure Gemini Speed
-        print("🤔 Gemini is thinking...")
-        ai_response = model.generate_content([system_prompt, audio_part])
-        ai_time = time.time()
+        # Generate Response 
+        print("Listening and Thinking...")
+        ai_response = model.generate_content([system_prompt, gemini_audio_file])
         response_text = ai_response.text.strip()
-        print(f"✅ Gemini finished thinking in: {ai_time - cache_time:.2f} seconds")
         
+        # Save Remi's response to the vault
         active_chats[user_id] += f"\nRemi said: {response_text}"
         
-        print(f"🚀 TOTAL BACKEND TIME: {ai_time - start_time:.2f} seconds")
+        # Clean up files - MAXIMUM PRIVACY RESTORED
+        if os.path.exists(temp_file_path):
+            os.remove(temp_file_path)
+        gemini_audio_file.delete() 
+        
         print(f"Remi says: {response_text}")
         print("--------------------------------------------------\n")
         
@@ -100,7 +119,9 @@ async def voice_chat(user_id: str = Form(...), file: UploadFile = File(...)):
 
     except Exception as e:
         print(f"Error: {str(e)}")
-        return {"message": "I am having a little trouble thinking right now."}
+        if 'temp_file_path' in locals() and os.path.exists(temp_file_path):
+            os.remove(temp_file_path)
+        return {"message": "I am having a little trouble thinking right now, but I am still here with you."}
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
