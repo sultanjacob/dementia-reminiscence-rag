@@ -150,15 +150,11 @@ export default function HomeScreen() {
       const permission = await Audio.requestPermissionsAsync();
       if (permission.status !== 'granted') return Alert.alert("Permission Denied", "Remi needs microphone access.");
       
-      // --- UPDATED: Forcing the audio engine to stay awake and fast ---
-      await Audio.setAudioModeAsync({ 
-        allowsRecordingIOS: true, 
-        playsInSilentModeIOS: true,
-        staysActiveInBackground: true, 
-        playThroughEarpieceAndroid: false
-      });
+      // RESTORED: Standard audio configuration
+      await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
 
-      const { recording } = await Audio.Recording.createAsync(Audio.RecordingOptionsPresets.LOW_QUALITY);
+      // RESTORED: High quality recording for better voice recognition
+      const { recording } = await Audio.Recording.createAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
       setRecording(recording);
       setIsRecording(true);
       setRemiText("I'm listening...");
@@ -190,12 +186,12 @@ export default function HomeScreen() {
       formData.append('file', { uri: fileUri, name: 'recording.m4a', type: 'audio/m4a' } as any);
       if (user) formData.append('user_id', user.id);
 
+      // RESTORED: Standard fetch request
       const response = await fetch(`${API_URL}/voice-chat`, {
         method: 'POST',
         body: formData,
         headers: { 
-          'Content-Type': 'multipart/form-data',
-          'Connection': 'keep-alive' // Forces Android not to stall
+          'Content-Type': 'multipart/form-data'
         },
       });
 
@@ -348,7 +344,7 @@ export default function HomeScreen() {
             <View style={styles.imageModalHeader}>
               <View>
                 <Text style={styles.imageModalTitle}>{dailyMemory?.title}</Text>
-                <Text style={styles.imageModalDate}>{dailyMemory?.date || "A very beautiful memory"}</Text>
+                <Text style={styles.imageModalDate}>{dailyMemory?.date || "A beautiful memory"}</Text>
               </View>
               <TouchableOpacity onPress={() => setIsMemoryExpanded(false)} style={styles.closeImageButton}>
                 <Ionicons name="close" size={28} color="#FFFFFF" />
