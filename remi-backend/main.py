@@ -20,7 +20,7 @@ GEMINI_KEY = os.getenv("GEMINI_KEY")
 genai.configure(api_key=GEMINI_KEY)
 
 # 💡 OPTION 2 APPLIED: Switched to 1.5-flash to completely bypass the strict 5-request limit!
-model = genai.GenerativeModel('gemini-1.5-flash')
+model = genai.GenerativeModel('gemini-1.5-flash-latest')
 
 app = FastAPI()
 
