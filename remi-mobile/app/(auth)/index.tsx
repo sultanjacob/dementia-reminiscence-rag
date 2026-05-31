@@ -22,11 +22,11 @@ import { supabase } from '../../supabase';
 export default function HomeScreen() {
   const router = useRouter();
   
-  // 🛑 PASTE YOUR ACTIVE PYTHON URL HERE 🛑
-  const API_URL = "http://192.168.1.235:8000"; 
+  // 🛑 KEEP YOUR RENDER URL HERE 🛑
+  const API_URL = "https://remi-backend-xxxxx.onrender.com"; 
   
   const [remiText, setRemiText] = useState("Hello! I am Remi. How can I help you?");
-  const [greeting, setGreeting] = useState("Good evening");
+  const [greeting, setGreeting] = useState("Good morning");
   const [userName, setUserName] = useState("John");
   
   const [primaryContact, setPrimaryContact] = useState<string | null>(null);
@@ -93,7 +93,7 @@ export default function HomeScreen() {
             setUserName(fetchedName);
           }
           if (profileData.primary_contact) setPrimaryContact(profileData.primary_contact);
-          if (profileData.secondary_contact) setSecondaryContact(profileData.secondary_contact);
+          if (profileData.secondaryContact) setSecondaryContact(profileData.secondary_contact);
         }
 
         const { data: memories } = await supabase.from('memories').select('*').eq('user_id', user.id);
@@ -150,10 +150,7 @@ export default function HomeScreen() {
       const permission = await Audio.requestPermissionsAsync();
       if (permission.status !== 'granted') return Alert.alert("Permission Denied", "Remi needs microphone access.");
       
-      // RESTORED: Standard audio configuration
       await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
-
-      // RESTORED: High quality recording for better voice recognition
       const { recording } = await Audio.Recording.createAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
       setRecording(recording);
       setIsRecording(true);
@@ -186,7 +183,6 @@ export default function HomeScreen() {
       formData.append('file', { uri: fileUri, name: 'recording.m4a', type: 'audio/m4a' } as any);
       if (user) formData.append('user_id', user.id);
 
-      // RESTORED: Standard fetch request
       const response = await fetch(`${API_URL}/voice-chat`, {
         method: 'POST',
         body: formData,
@@ -235,7 +231,8 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor="#000000" />
+      {/* 💡 UPDATED: Dark status bar icons for the light background */}
+      <StatusBar barStyle="dark-content" backgroundColor="#F9FAFB" />
       <View style={styles.appCapsule}>
         <View style={styles.internalContent}>
           
@@ -245,7 +242,8 @@ export default function HomeScreen() {
               <Text style={styles.nameText}>{userName}</Text>
             </View>
             <TouchableOpacity onPress={() => setIsMenuVisible(true)} style={styles.menuIconButton}>
-              <Ionicons name="menu" size={28} color="#FFFFFF" />
+              {/* 💡 UPDATED: Dark menu icon */}
+              <Ionicons name="menu" size={32} color="#111827" />
             </TouchableOpacity>
           </View>
 
@@ -289,7 +287,7 @@ export default function HomeScreen() {
             onPress={isRecording ? stopRecording : startRecording}
             disabled={isProcessing} 
           >
-            <Ionicons name={isRecording ? "stop-circle" : (isProcessing ? "hourglass" : "mic")} size={22} color="#FFFFFF" />
+            <Ionicons name={isRecording ? "stop-circle" : (isProcessing ? "hourglass" : "mic")} size={28} color="#FFFFFF" />
             <Text style={styles.primaryButtonText}>
               {isRecording ? "Tap to Stop" : (isProcessing ? "Remi is thinking..." : "Tap to Talk")}
             </Text>
@@ -305,6 +303,7 @@ export default function HomeScreen() {
         </View>
       </View>
 
+      {/* Emergency Modal - Kept dark/high alert for contrast */}
       <Modal visible={showEmergencyMenu} transparent={true} animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={styles.emergencyModalContent}>
@@ -338,6 +337,7 @@ export default function HomeScreen() {
         </View>
       </Modal>
 
+      {/* Memory Modal - Light Theme */}
       <Modal visible={isMemoryExpanded} transparent={true} animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.imageCapsule}>
@@ -347,7 +347,7 @@ export default function HomeScreen() {
                 <Text style={styles.imageModalDate}>{dailyMemory?.date || "A beautiful memory"}</Text>
               </View>
               <TouchableOpacity onPress={() => setIsMemoryExpanded(false)} style={styles.closeImageButton}>
-                <Ionicons name="close" size={28} color="#FFFFFF" />
+                <Ionicons name="close" size={28} color="#111827" />
               </TouchableOpacity>
             </View>
             <Image source={{ uri: dailyMemory?.image_url }} style={styles.largeExpandedImage} />
@@ -355,6 +355,7 @@ export default function HomeScreen() {
         </View>
       </Modal>
 
+      {/* Settings Menu Modal - Light Theme */}
       <Modal visible={isMenuVisible} transparent={true} animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
@@ -362,18 +363,22 @@ export default function HomeScreen() {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Settings</Text>
               <TouchableOpacity onPress={() => setIsMenuVisible(false)}>
-                <Ionicons name="close" size={28} color="#FFFFFF" />
+                <Ionicons name="close" size={32} color="#111827" />
               </TouchableOpacity>
             </View>
             <TouchableOpacity style={styles.menuRow} onPress={() => navigateTo('/schedule')}>
-              <Ionicons name="calendar" size={22} color="#A78BFA" style={styles.menuIcon} />
+              <View style={styles.menuIconContainer}>
+                <Ionicons name="calendar" size={24} color="#8B5CF6" />
+              </View>
               <Text style={styles.menuRowText}>Manage Schedule</Text>
-              <Ionicons name="chevron-forward" size={20} color="#6B7280" />
+              <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
             </TouchableOpacity>
             <TouchableOpacity style={styles.menuRow} onPress={() => navigateTo('/caregiver')}>
-              <Ionicons name="person" size={22} color="#A78BFA" style={styles.menuIcon} />
+              <View style={styles.menuIconContainer}>
+                <Ionicons name="person" size={24} color="#8B5CF6" />
+              </View>
               <Text style={styles.menuRowText}>Caregiver Portal</Text>
-              <Ionicons name="chevron-forward" size={20} color="#6B7280" />
+              <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
             </TouchableOpacity>
           </View>
         </View>
@@ -382,123 +387,58 @@ export default function HomeScreen() {
   );
 }
 
+// 💡 THE COMPLETELY REWRITTEN HIGH-CONTRAST STYLES
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#000000', paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0 },
-  appCapsule: { flex: 1, backgroundColor: '#110C1D', borderRadius: 45, overflow: 'hidden', marginHorizontal: 10, marginBottom: 10, marginTop: 10, borderWidth: 1, borderColor: '#231A31' },
-  internalContent: { flex: 1, paddingHorizontal: 20, justifyContent: 'space-between', paddingTop: 10 },
+  safeArea: { flex: 1, backgroundColor: '#F3F4F6', paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0 },
+  appCapsule: { flex: 1, backgroundColor: '#FFFFFF', borderRadius: 45, overflow: 'hidden', marginHorizontal: 10, marginBottom: 10, marginTop: 10, borderWidth: 1, borderColor: '#E5E7EB', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 5 },
+  internalContent: { flex: 1, paddingHorizontal: 24, justifyContent: 'space-between', paddingTop: 20 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 10, marginBottom: 5 },
-  greetingText: { fontSize: 16, color: '#A396B5', fontWeight: '500' },
-  nameText: { fontSize: 28, fontWeight: 'bold', color: '#FFFFFF', marginTop: 2 },
-  menuIconButton: { padding: 5 },
-  orbContainer: { alignItems: 'center', justifyContent: 'center', marginVertical: 10 },
-  orb: { width: 90, height: 90, borderRadius: 45, backgroundColor: '#8B5CF6', shadowColor: '#8B5CF6', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.8, shadowRadius: 30, elevation: 20 },
-  speechBubble: { backgroundColor: '#231A31', padding: 20, borderRadius: 24, alignItems: 'center', marginBottom: 20 },
-  remiSpeechText: { fontSize: 18, color: '#FFFFFF', textAlign: 'center', lineHeight: 28, fontWeight: '500', marginBottom: 10 },
-  memoryDropContainer: { width: '100%', borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: '#3D2F4F' },
-  memoryImage: { width: '100%', height: 120 },
-  memoryOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(17, 12, 29, 0.7)', flexDirection: 'row', alignItems: 'center', paddingVertical: 8, paddingHorizontal: 12 },
-  memoryTitleText: { color: '#FFFFFF', fontSize: 14, fontWeight: '600' },
-  primaryButton: { backgroundColor: '#8B5CF6', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 16, borderRadius: 30, marginBottom: 20, marginHorizontal: 15 },
-  recordingButton: { backgroundColor: '#EF4444' }, 
-  processingButton: { backgroundColor: '#4B5563' }, 
-  primaryButtonText: { color: '#FFFFFF', fontSize: 18, fontWeight: 'bold', marginLeft: 10 },
-  bottomStatus: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 15 },
-  statusDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#A78BFA', marginRight: 6 },
-  statusText: { color: '#A396B5', fontSize: 14, fontWeight: '500' },
-  dividerLine: { height: 1, backgroundColor: '#231A31', width: '100%', marginBottom: 10 },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.85)', justifyContent: 'flex-end' },
-  modalContent: { backgroundColor: '#1A1325', borderTopLeftRadius: 32, borderTopRightRadius: 32, paddingHorizontal: 24, paddingBottom: 50, paddingTop: 12 },
-  modalDragIndicator: { width: 40, height: 5, backgroundColor: '#3D2F4F', borderRadius: 3, alignSelf: 'center', marginBottom: 20 },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
-  modalTitle: { fontSize: 24, fontWeight: 'bold', color: '#FFFFFF' },
-  menuRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 20, borderBottomWidth: 1, borderBottomColor: '#231A31' },
-  menuIcon: { marginRight: 16 },
-  menuRowText: { flex: 1, fontSize: 18, fontWeight: '500', color: '#E2D8F0' },
-  imageCapsule: { backgroundColor: '#110C1D', borderRadius: 35, padding: 20, borderWidth: 1, borderColor: '#3D2F4F', elevation: 10, shadowColor: '#8B5CF6', shadowOpacity: 0.2, shadowRadius: 20, alignSelf: 'center', width: '95%', marginBottom: '50%' },
-  imageModalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-  imageModalTitle: { fontSize: 24, fontWeight: 'bold', color: '#FFFFFF' },
-  imageModalDate: { fontSize: 16, color: '#A78BFA', marginTop: 4 },
-  closeImageButton: { backgroundColor: '#231A31', padding: 8, borderRadius: 20 },
-  largeExpandedImage: { width: '100%', height: 300, borderRadius: 20 },
+  greetingText: { fontSize: 18, color: '#6B7280', fontWeight: '500' },
+  nameText: { fontSize: 32, fontWeight: '800', color: '#111827', marginTop: 4, letterSpacing: -0.5 },
+  menuIconButton: { padding: 8, backgroundColor: '#F3F4F6', borderRadius: 20 },
+  orbContainer: { alignItems: 'center', justifyContent: 'center', marginVertical: 20 },
+  orb: { width: 110, height: 110, borderRadius: 55, backgroundColor: '#8B5CF6', shadowColor: '#8B5CF6', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.6, shadowRadius: 25, elevation: 15 },
+  speechBubble: { backgroundColor: '#F9FAFB', padding: 24, borderRadius: 28, alignItems: 'center', marginBottom: 20, borderWidth: 1, borderColor: '#F3F4F6' },
+  remiSpeechText: { fontSize: 20, color: '#1F2937', textAlign: 'center', lineHeight: 30, fontWeight: '600', marginBottom: 15 },
+  memoryDropContainer: { width: '100%', borderRadius: 20, overflow: 'hidden', borderWidth: 1, borderColor: '#E5E7EB', backgroundColor: '#FFF' },
+  memoryImage: { width: '100%', height: 140 },
+  memoryOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(17, 24, 39, 0.75)', flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 16 },
+  memoryTitleText: { color: '#FFFFFF', fontSize: 15, fontWeight: '600' },
+  primaryButton: { backgroundColor: '#8B5CF6', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 20, borderRadius: 35, marginBottom: 20, shadowColor: '#8B5CF6', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.4, shadowRadius: 15, elevation: 10 },
+  recordingButton: { backgroundColor: '#EF4444', shadowColor: '#EF4444' }, 
+  processingButton: { backgroundColor: '#9CA3AF', shadowColor: 'transparent', elevation: 0 }, 
+  primaryButtonText: { color: '#FFFFFF', fontSize: 22, fontWeight: 'bold', marginLeft: 12 },
+  bottomStatus: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 20 },
+  statusDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#8B5CF6', marginRight: 8 },
+  statusText: { color: '#6B7280', fontSize: 16, fontWeight: '600' },
+  dividerLine: { height: 4, backgroundColor: '#E5E7EB', width: 40, borderRadius: 2, alignSelf: 'center', marginBottom: 10 },
   
-  flashingEmergencyButton: {
-    backgroundColor: '#FF3B30',
-    flexDirection: 'row',
-    paddingVertical: 18,
-    paddingHorizontal: 20,
-    borderRadius: 30,
-    marginVertical: 10,
-    marginHorizontal: 15,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#FF3B30',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: 10,
-    elevation: 10,
-  },
-  flashingEmergencyText: {
-    color: '#FFFFFF',
-    fontSize: 20,
-    fontWeight: 'bold',
-    letterSpacing: 1,
-  },
-  emergencyModalContent: {
-    backgroundColor: '#1A1325',
-    borderTopLeftRadius: 32,
-    borderTopRightRadius: 32,
-    paddingHorizontal: 24,
-    paddingBottom: 40,
-    paddingTop: 30,
-  },
-  emergencyModalTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    textAlign: 'center',
-    marginBottom: 30,
-  },
-  contactRow: {
-    backgroundColor: '#231A31',
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 15,
-    borderRadius: 16,
-    marginBottom: 15,
-    borderWidth: 1,
-    borderColor: '#3D2F4F',
-  },
-  contactText: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  numberText: {
-    color: '#A396B5',
-    fontSize: 14,
-    marginTop: 2,
-  },
-  policeRow: {
-    backgroundColor: '#EF4444',
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 20,
-    borderRadius: 16,
-    marginBottom: 25,
-  },
-  policeText: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginLeft: 15,
-  },
-  cancelEmergencyButton: {
-    paddingVertical: 15,
-    alignItems: 'center',
-  },
-  cancelEmergencyText: {
-    color: '#A396B5',
-    fontSize: 18,
-    fontWeight: '600',
-  },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(17, 24, 39, 0.6)', justifyContent: 'flex-end' },
+  modalContent: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 36, borderTopRightRadius: 36, paddingHorizontal: 28, paddingBottom: 50, paddingTop: 16, shadowColor: '#000', shadowOffset: { width: 0, height: -10 }, shadowOpacity: 0.1, shadowRadius: 20, elevation: 20 },
+  modalDragIndicator: { width: 50, height: 6, backgroundColor: '#E5E7EB', borderRadius: 3, alignSelf: 'center', marginBottom: 24 },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 30 },
+  modalTitle: { fontSize: 28, fontWeight: '800', color: '#111827' },
+  menuRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 20, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
+  menuIconContainer: { backgroundColor: '#F5F3FF', padding: 12, borderRadius: 16, marginRight: 16 },
+  menuRowText: { flex: 1, fontSize: 18, fontWeight: '600', color: '#374151' },
+  
+  imageCapsule: { backgroundColor: '#FFFFFF', borderRadius: 35, padding: 24, alignSelf: 'center', width: '90%', marginBottom: '40%', shadowColor: '#000', shadowOffset: { width: 0, height: 20 }, shadowOpacity: 0.15, shadowRadius: 30, elevation: 20 },
+  imageModalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 },
+  imageModalTitle: { fontSize: 24, fontWeight: '800', color: '#111827' },
+  imageModalDate: { fontSize: 16, color: '#8B5CF6', marginTop: 4, fontWeight: '600' },
+  closeImageButton: { backgroundColor: '#F3F4F6', padding: 10, borderRadius: 20 },
+  largeExpandedImage: { width: '100%', height: 350, borderRadius: 24 },
+  
+  // Emergency menu remains dark for high urgency
+  flashingEmergencyButton: { backgroundColor: '#EF4444', flexDirection: 'row', paddingVertical: 20, paddingHorizontal: 20, borderRadius: 35, marginVertical: 15, alignItems: 'center', justifyContent: 'center', shadowColor: '#EF4444', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.5, shadowRadius: 15, elevation: 12 },
+  flashingEmergencyText: { color: '#FFFFFF', fontSize: 20, fontWeight: '800', letterSpacing: 1 },
+  emergencyModalContent: { backgroundColor: '#1F2937', borderTopLeftRadius: 36, borderTopRightRadius: 36, paddingHorizontal: 28, paddingBottom: 50, paddingTop: 30 },
+  emergencyModalTitle: { fontSize: 24, fontWeight: '800', color: '#FFFFFF', textAlign: 'center', marginBottom: 30 },
+  contactRow: { backgroundColor: '#374151', flexDirection: 'row', alignItems: 'center', padding: 18, borderRadius: 20, marginBottom: 16 },
+  contactText: { color: '#FFFFFF', fontSize: 18, fontWeight: '700' },
+  numberText: { color: '#9CA3AF', fontSize: 15, marginTop: 4 },
+  policeRow: { backgroundColor: '#EF4444', flexDirection: 'row', alignItems: 'center', padding: 20, borderRadius: 20, marginBottom: 30 },
+  policeText: { color: '#FFFFFF', fontSize: 20, fontWeight: '800', marginLeft: 15 },
+  cancelEmergencyButton: { paddingVertical: 15, alignItems: 'center' },
+  cancelEmergencyText: { color: '#9CA3AF', fontSize: 18, fontWeight: '700' },
 });
