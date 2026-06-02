@@ -23,7 +23,7 @@ export default function HomeScreen() {
   const router = useRouter();
   
   // 🛑 KEEP YOUR RENDER URL HERE 🛑
-  const API_URL = https://dementia-reminiscence-rag.onrender.com; 
+  const API_URL = "https://dementia-reminiscence-rag.onrender.com"; 
   
   const [remiText, setRemiText] = useState("Hello! I am Remi. How can I help you?");
   const [greeting, setGreeting] = useState("Good morning");
