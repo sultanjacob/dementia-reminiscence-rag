@@ -295,7 +295,52 @@ export default function HomeScreen() {
     </SafeAreaView>
   );
 }
+{/* Memory Modal - Light Theme */}
+      <Modal visible={isMemoryExpanded} transparent={true} animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.imageCapsule}>
+            <View style={styles.imageModalHeader}>
+              <View>
+                <Text style={styles.imageModalTitle}>{dailyMemory?.title}</Text>
+                <Text style={styles.imageModalDate}>{dailyMemory?.date || "A beautiful memory"}</Text>
+              </View>
+              <TouchableOpacity onPress={() => setIsMemoryExpanded(false)} style={styles.closeImageButton}>
+                <Ionicons name="close" size={28} color="#111827" />
+              </TouchableOpacity>
+            </View>
+            <Image source={{ uri: dailyMemory?.image_url }} style={styles.largeExpandedImage} />
+          </View>
+        </View>
+      </Modal>
 
+      {/* Settings Menu Modal - Light Theme */}
+      <Modal visible={isMenuVisible} transparent={true} animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalDragIndicator} />
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Settings</Text>
+              <TouchableOpacity onPress={() => setIsMenuVisible(false)}>
+                <Ionicons name="close" size={32} color="#111827" />
+              </TouchableOpacity>
+            </View>
+            <TouchableOpacity style={styles.menuRow} onPress={() => navigateTo('/routine')}>
+              <View style={styles.menuIconContainer}>
+                <Ionicons name="calendar" size={24} color="#8B5CF6" />
+              </View>
+              <Text style={styles.menuRowText}>Manage Routine</Text>
+              <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.menuRow} onPress={() => navigateTo('/caregiver')}>
+              <View style={styles.menuIconContainer}>
+                <Ionicons name="person" size={24} color="#8B5CF6" />
+              </View>
+              <Text style={styles.menuRowText}>Caregiver Portal</Text>
+              <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 // Keep your existing styles array exactly as it is!
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#F3F4F6', paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0 },
