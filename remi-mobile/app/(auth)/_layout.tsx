@@ -6,20 +6,20 @@ export default function AuthLayout() {
   return (
     <Tabs 
       screenOptions={{
-        headerShown: false, // Hides the default top header since we made our own
+        headerShown: false, 
         tabBarStyle: { 
-          backgroundColor: '#110C1D', // Keeps the dark bottom bar from your screenshot
+          backgroundColor: '#110C1D', 
           borderTopWidth: 0,
           elevation: 0,
           height: 60,
           paddingBottom: 10,
           paddingTop: 10,
         },
-        tabBarActiveTintColor: '#8B5CF6', // Remi Purple when selected
-        tabBarInactiveTintColor: '#9CA3AF', // Gray when not selected
+        tabBarActiveTintColor: '#8B5CF6', 
+        tabBarInactiveTintColor: '#9CA3AF', 
       }}
     >
-      {/* 🟣 TAB 1: THE REMI HOME SCREEN */}
+      {/* 🟣 TAB 1: REMI */}
       <Tabs.Screen
         name="index"
         options={{
@@ -28,23 +28,28 @@ export default function AuthLayout() {
         }}
       />
 
-      {/* 🖼️ TAB 2: THE MEMORIES SCREEN */}
+      {/* 🖼️ TAB 2: GALLERY */}
       <Tabs.Screen
-        name="memories" // Ensure you have a memories.tsx file in this folder!
+        name="gallery" 
         options={{
-          title: 'Memories',
+          title: 'Gallery',
           tabBarIcon: ({ color }) => <Ionicons name="images" size={24} color={color} />,
         }}
       />
 
-      {/* 🚫 HIDE OTHER SCREENS FROM THE TAB BAR */}
+      {/* 📅 TAB 3: ROUTINE */}
       <Tabs.Screen
-        name="schedule"
-        options={{ href: null }} // This hides the schedule screen from showing up as a bottom tab
+        name="routine" 
+        options={{
+          title: 'Routine',
+          tabBarIcon: ({ color }) => <Ionicons name="calendar" size={24} color={color} />,
+        }}
       />
+
+      {/* 🚫 HIDE OTHER SCREENS */}
       <Tabs.Screen
         name="caregiver"
-        options={{ href: null }} // This hides the caregiver screen from showing up as a bottom tab
+        options={{ href: null }} 
       />
     </Tabs>
   );
