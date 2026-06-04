@@ -28,8 +28,6 @@ export default function HomeScreen() {
   const [remiText, setRemiText] = useState("Hello! I am Remi. How can I help you?");
   const [greeting, setGreeting] = useState("Good morning");
   const [userName, setUserName] = useState("John");
-  
-  // 💡 NEW: State to hold our friendly date string
   const [currentDate, setCurrentDate] = useState("");
 
   const [primaryContact, setPrimaryContact] = useState<string | null>(null);
@@ -88,13 +86,11 @@ export default function HomeScreen() {
 
   useEffect(() => {
     const initializeHome = async () => {
-      // Set greeting based on time
       const hour = new Date().getHours();
       if (hour < 12) setGreeting("Good morning");
       else if (hour < 18) setGreeting("Good afternoon");
       else setGreeting("Good evening");
 
-      // 💡 NEW: Generate the friendly date string (e.g., "Thursday, June 4")
       const today = new Date();
       const formattedDate = today.toLocaleDateString('en-US', { 
         weekday: 'long', 
@@ -241,10 +237,14 @@ export default function HomeScreen() {
             <View>
               <Text style={styles.greetingText}>{greeting},</Text>
               <Text style={styles.nameText}>{userName}</Text>
-              {/* 💡 NEW: The Temporal Anchor display */}
               <Text style={styles.dateText}>{currentDate}</Text>
             </View>
-            <TouchableOpacity onPress={handleMenuOpen} style={styles.menuIconButton}>
+            {/* 💡 NEW: hitSlop added to the main menu button */}
+            <TouchableOpacity 
+              onPress={handleMenuOpen} 
+              style={styles.menuIconButton}
+              hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+            >
               <Ionicons name="menu" size={32} color="#111827" />
             </TouchableOpacity>
           </Animated.View>
@@ -310,7 +310,6 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      {/* Emergency Modal */}
       <Modal visible={showEmergencyMenu} transparent={true} animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={styles.emergencyModalContent}>
@@ -344,7 +343,6 @@ export default function HomeScreen() {
         </View>
       </Modal>
 
-      {/* Memory Modal - Light Theme */}
       <Modal visible={isMemoryExpanded} transparent={true} animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.imageCapsule}>
@@ -353,7 +351,12 @@ export default function HomeScreen() {
                 <Text style={styles.imageModalTitle}>{dailyMemory?.title}</Text>
                 <Text style={styles.imageModalDate}>{dailyMemory?.date || "A beautiful memory"}</Text>
               </View>
-              <TouchableOpacity onPress={() => setIsMemoryExpanded(false)} style={styles.closeImageButton}>
+              {/* 💡 NEW: hitSlop added to image close button */}
+              <TouchableOpacity 
+                onPress={() => setIsMemoryExpanded(false)} 
+                style={styles.closeImageButton}
+                hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+              >
                 <Ionicons name="close" size={28} color="#111827" />
               </TouchableOpacity>
             </View>
@@ -362,14 +365,17 @@ export default function HomeScreen() {
         </View>
       </Modal>
 
-      {/* Settings Menu Modal - Light Theme */}
       <Modal visible={isMenuVisible} transparent={true} animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalDragIndicator} />
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Settings</Text>
-              <TouchableOpacity onPress={() => setIsMenuVisible(false)}>
+              {/* 💡 NEW: hitSlop added to settings close button */}
+              <TouchableOpacity 
+                onPress={() => setIsMenuVisible(false)}
+                hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+              >
                 <Ionicons name="close" size={32} color="#111827" />
               </TouchableOpacity>
             </View>
@@ -401,10 +407,7 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginTop: 10, marginBottom: 5 },
   greetingText: { fontSize: 18, color: '#6B7280', fontWeight: '500' },
   nameText: { fontSize: 32, fontWeight: '800', color: '#111827', marginTop: 4, letterSpacing: -0.5 },
-  
-  // 💡 NEW: The styling for our temporal anchor
   dateText: { fontSize: 14, color: '#8B5CF6', fontWeight: '700', marginTop: 6, textTransform: 'uppercase', letterSpacing: 1 },
-  
   menuIconButton: { padding: 8, backgroundColor: '#F3F4F6', borderRadius: 20 },
   orbContainer: { alignItems: 'center', justifyContent: 'center', marginVertical: 20 },
   orb: { width: 110, height: 110, borderRadius: 55, backgroundColor: '#8B5CF6', shadowColor: '#8B5CF6', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.6, shadowRadius: 25, elevation: 15 },
