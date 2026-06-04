@@ -29,6 +29,9 @@ export default function HomeScreen() {
   const [greeting, setGreeting] = useState("Good morning");
   const [userName, setUserName] = useState("John");
   
+  // 💡 NEW: State to hold our friendly date string
+  const [currentDate, setCurrentDate] = useState("");
+
   const [primaryContact, setPrimaryContact] = useState<string | null>(null);
   const [secondaryContact, setSecondaryContact] = useState<string | null>(null);
 
@@ -85,10 +88,20 @@ export default function HomeScreen() {
 
   useEffect(() => {
     const initializeHome = async () => {
+      // Set greeting based on time
       const hour = new Date().getHours();
       if (hour < 12) setGreeting("Good morning");
       else if (hour < 18) setGreeting("Good afternoon");
       else setGreeting("Good evening");
+
+      // 💡 NEW: Generate the friendly date string (e.g., "Thursday, June 4")
+      const today = new Date();
+      const formattedDate = today.toLocaleDateString('en-US', { 
+        weekday: 'long', 
+        month: 'long', 
+        day: 'numeric' 
+      });
+      setCurrentDate(formattedDate);
 
       const { data: { user } } = await supabase.auth.getUser();
       let fetchedName = "John";
@@ -228,6 +241,8 @@ export default function HomeScreen() {
             <View>
               <Text style={styles.greetingText}>{greeting},</Text>
               <Text style={styles.nameText}>{userName}</Text>
+              {/* 💡 NEW: The Temporal Anchor display */}
+              <Text style={styles.dateText}>{currentDate}</Text>
             </View>
             <TouchableOpacity onPress={handleMenuOpen} style={styles.menuIconButton}>
               <Ionicons name="menu" size={32} color="#111827" />
@@ -383,9 +398,13 @@ const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#F3F4F6', paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0 },
   appCapsule: { flex: 1, backgroundColor: '#FFFFFF', borderRadius: 45, overflow: 'hidden', marginHorizontal: 10, marginBottom: 10, marginTop: 10, borderWidth: 1, borderColor: '#E5E7EB', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 5 },
   internalContent: { flex: 1, paddingHorizontal: 24, justifyContent: 'space-between', paddingTop: 20 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 10, marginBottom: 5 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginTop: 10, marginBottom: 5 },
   greetingText: { fontSize: 18, color: '#6B7280', fontWeight: '500' },
   nameText: { fontSize: 32, fontWeight: '800', color: '#111827', marginTop: 4, letterSpacing: -0.5 },
+  
+  // 💡 NEW: The styling for our temporal anchor
+  dateText: { fontSize: 14, color: '#8B5CF6', fontWeight: '700', marginTop: 6, textTransform: 'uppercase', letterSpacing: 1 },
+  
   menuIconButton: { padding: 8, backgroundColor: '#F3F4F6', borderRadius: 20 },
   orbContainer: { alignItems: 'center', justifyContent: 'center', marginVertical: 20 },
   orb: { width: 110, height: 110, borderRadius: 55, backgroundColor: '#8B5CF6', shadowColor: '#8B5CF6', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.6, shadowRadius: 25, elevation: 15 },
