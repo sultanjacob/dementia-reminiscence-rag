@@ -37,16 +37,15 @@ export default function AuthLayout() {
         }}
       />
 
-      {/* 📅 TAB 3: ROUTINE */}
+      {/* 🚫 HIDE ALL OTHER SCREENS FROM THE TAB BAR */}
       <Tabs.Screen
         name="routine" 
-        options={{
-          title: 'Routine',
-          tabBarIcon: ({ color }) => <Ionicons name="calendar" size={24} color={color} />,
-        }}
+        options={{ href: null }} 
       />
-
-      {/* 🚫 HIDE OTHER SCREENS */}
+      <Tabs.Screen
+        name="schedule" 
+        options={{ href: null }} 
+      />
       <Tabs.Screen
         name="caregiver"
         options={{ href: null }} 
