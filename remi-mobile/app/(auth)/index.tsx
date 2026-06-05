@@ -216,24 +216,19 @@ export default function HomeScreen() {
     Haptics.selectionAsync();
     setIsMenuVisible(true);
   };
-const handleMenuOpen = () => {
-    Haptics.selectionAsync();
-    setIsMenuVisible(true);
-  };
 
-  // 💡 NEW: The Reset Function
   const resetRemi = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setIsRecording(false);
     setIsProcessing(false);
     
-    // Restore the correct greeting based on if they have a memory or not
     if (dailyMemory) {
       setRemiText(`I was just admiring this photo of ${dailyMemory.title}.`);
     } else {
       setRemiText(`Hello ${userName}! I am Remi. How can I help you today?`);
     }
   };
+
   const handlePrimaryCall = () => {
     if (primaryContact) Linking.openURL(`tel:${primaryContact}`);
     else Alert.alert("Not Setup", "Please ask your family to add a Primary Contact in settings.");
@@ -250,14 +245,12 @@ const handleMenuOpen = () => {
       <View style={styles.appCapsule}>
         <View style={styles.internalContent}>
           
-<Animated.View style={[styles.header, { opacity: uiOpacity }]}>
+          <Animated.View style={[styles.header, { opacity: uiOpacity }]}>
             <View>
               <Text style={styles.greetingText}>{greeting},</Text>
               <Text style={styles.nameText}>{userName}</Text>
               <Text style={styles.dateText}>{currentDate}</Text>
             </View>
-            
-            {/* 💡 NEW: Grouped the icons together */}
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               <TouchableOpacity 
                 onPress={resetRemi} 
@@ -266,7 +259,6 @@ const handleMenuOpen = () => {
               >
                 <Ionicons name="refresh" size={26} color="#8B5CF6" />
               </TouchableOpacity>
-              
               <TouchableOpacity 
                 onPress={handleMenuOpen} 
                 style={styles.menuIconButton}
@@ -276,6 +268,7 @@ const handleMenuOpen = () => {
               </TouchableOpacity>
             </View>
           </Animated.View>
+
           <View style={styles.orbContainer}>
             <Animated.View style={[styles.orb, { transform: [{ scale: pulseAnim }] }]} />
           </View>
@@ -283,7 +276,6 @@ const handleMenuOpen = () => {
           <View style={styles.speechBubble}>
             <Text style={styles.remiSpeechText}>{remiText}</Text>
             
-            {/* 💡 NEW: The 'Hear Again' Button */}
             <TouchableOpacity 
               style={styles.repeatVoiceButton}
               onPress={() => {
@@ -451,11 +443,8 @@ const styles = StyleSheet.create({
   orb: { width: 110, height: 110, borderRadius: 55, backgroundColor: '#8B5CF6', shadowColor: '#8B5CF6', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.6, shadowRadius: 25, elevation: 15 },
   speechBubble: { backgroundColor: '#F9FAFB', padding: 24, borderRadius: 28, alignItems: 'center', marginBottom: 20, borderWidth: 1, borderColor: '#F3F4F6' },
   remiSpeechText: { fontSize: 20, color: '#1F2937', textAlign: 'center', lineHeight: 30, fontWeight: '600', marginBottom: 5 },
-  
-  // 💡 NEW: Repeat Button Styles
   repeatVoiceButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F5F3FF', paddingVertical: 8, paddingHorizontal: 16, borderRadius: 20, marginBottom: 5 },
   repeatVoiceText: { color: '#8B5CF6', fontSize: 15, fontWeight: '700', marginLeft: 6 },
-  
   memoryDropContainer: { width: '100%', borderRadius: 20, overflow: 'hidden', borderWidth: 1, borderColor: '#E5E7EB', backgroundColor: '#FFF' },
   memoryImage: { width: '100%', height: 140 },
   memoryOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(17, 24, 39, 0.75)', flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 16 },
@@ -468,7 +457,6 @@ const styles = StyleSheet.create({
   statusDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#8B5CF6', marginRight: 8 },
   statusText: { color: '#6B7280', fontSize: 16, fontWeight: '600' },
   dividerLine: { height: 4, backgroundColor: '#E5E7EB', width: 40, borderRadius: 2, alignSelf: 'center', marginBottom: 10 },
-  
   modalOverlay: { flex: 1, backgroundColor: 'rgba(17, 24, 39, 0.6)', justifyContent: 'flex-end' },
   modalContent: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 36, borderTopRightRadius: 36, paddingHorizontal: 28, paddingBottom: 50, paddingTop: 16, shadowColor: '#000', shadowOffset: { width: 0, height: -10 }, shadowOpacity: 0.1, shadowRadius: 20, elevation: 20 },
   modalDragIndicator: { width: 50, height: 6, backgroundColor: '#E5E7EB', borderRadius: 3, alignSelf: 'center', marginBottom: 24 },
@@ -477,14 +465,12 @@ const styles = StyleSheet.create({
   menuRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 20, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
   menuIconContainer: { backgroundColor: '#F5F3FF', padding: 12, borderRadius: 16, marginRight: 16 },
   menuRowText: { flex: 1, fontSize: 18, fontWeight: '600', color: '#374151' },
-  
   imageCapsule: { backgroundColor: '#FFFFFF', borderRadius: 35, padding: 24, alignSelf: 'center', width: '90%', marginBottom: '40%', shadowColor: '#000', shadowOffset: { width: 0, height: 20 }, shadowOpacity: 0.15, shadowRadius: 30, elevation: 20 },
   imageModalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 },
   imageModalTitle: { fontSize: 24, fontWeight: '800', color: '#111827' },
   imageModalDate: { fontSize: 16, color: '#8B5CF6', marginTop: 4, fontWeight: '600' },
   closeImageButton: { backgroundColor: '#F3F4F6', padding: 10, borderRadius: 20 },
   largeExpandedImage: { width: '100%', height: 350, borderRadius: 24 },
-  
   flashingEmergencyButton: { backgroundColor: '#EF4444', flexDirection: 'row', paddingVertical: 20, paddingHorizontal: 20, borderRadius: 35, marginVertical: 15, alignItems: 'center', justifyContent: 'center', shadowColor: '#EF4444', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.5, shadowRadius: 15, elevation: 12 },
   flashingEmergencyText: { color: '#FFFFFF', fontSize: 20, fontWeight: '800', letterSpacing: 1 },
   emergencyModalContent: { backgroundColor: '#1F2937', borderTopLeftRadius: 36, borderTopRightRadius: 36, paddingHorizontal: 28, paddingBottom: 50, paddingTop: 30 },
