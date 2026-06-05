@@ -216,7 +216,24 @@ export default function HomeScreen() {
     Haptics.selectionAsync();
     setIsMenuVisible(true);
   };
+const handleMenuOpen = () => {
+    Haptics.selectionAsync();
+    setIsMenuVisible(true);
+  };
 
+  // 💡 NEW: The Reset Function
+  const resetRemi = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setIsRecording(false);
+    setIsProcessing(false);
+    
+    // Restore the correct greeting based on if they have a memory or not
+    if (dailyMemory) {
+      setRemiText(`I was just admiring this photo of ${dailyMemory.title}.`);
+    } else {
+      setRemiText(`Hello ${userName}! I am Remi. How can I help you today?`);
+    }
+  };
   const handlePrimaryCall = () => {
     if (primaryContact) Linking.openURL(`tel:${primaryContact}`);
     else Alert.alert("Not Setup", "Please ask your family to add a Primary Contact in settings.");
