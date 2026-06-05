@@ -233,21 +233,32 @@ export default function HomeScreen() {
       <View style={styles.appCapsule}>
         <View style={styles.internalContent}>
           
-          <Animated.View style={[styles.header, { opacity: uiOpacity }]}>
+<Animated.View style={[styles.header, { opacity: uiOpacity }]}>
             <View>
               <Text style={styles.greetingText}>{greeting},</Text>
               <Text style={styles.nameText}>{userName}</Text>
               <Text style={styles.dateText}>{currentDate}</Text>
             </View>
-            <TouchableOpacity 
-              onPress={handleMenuOpen} 
-              style={styles.menuIconButton}
-              hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
-            >
-              <Ionicons name="menu" size={32} color="#111827" />
-            </TouchableOpacity>
+            
+            {/* 💡 NEW: Grouped the icons together */}
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <TouchableOpacity 
+                onPress={resetRemi} 
+                style={[styles.menuIconButton, { marginRight: 10 }]}
+                hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+              >
+                <Ionicons name="refresh" size={26} color="#8B5CF6" />
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                onPress={handleMenuOpen} 
+                style={styles.menuIconButton}
+                hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+              >
+                <Ionicons name="menu" size={32} color="#111827" />
+              </TouchableOpacity>
+            </View>
           </Animated.View>
-
           <View style={styles.orbContainer}>
             <Animated.View style={[styles.orb, { transform: [{ scale: pulseAnim }] }]} />
           </View>
