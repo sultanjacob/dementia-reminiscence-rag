@@ -1,8 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
-import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import * as Speech from 'expo-speech';
+import * as Haptics from 'expo-haptics';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   Alert,
@@ -29,6 +29,9 @@ export default function HomeScreen() {
   const [greeting, setGreeting] = useState("Good morning");
   const [userName, setUserName] = useState("John");
   const [currentDate, setCurrentDate] = useState("");
+  
+  // 💡 NEW: State to track if it's evening for our Sundowning UI
+  const [isEvening, setIsEvening] = useState(false);
 
   const [primaryContact, setPrimaryContact] = useState<string | null>(null);
   const [secondaryContact, setSecondaryContact] = useState<string | null>(null);
@@ -87,6 +90,10 @@ export default function HomeScreen() {
   useEffect(() => {
     const initializeHome = async () => {
       const hour = new Date().getHours();
+      
+      // 💡 NEW: Check if it's evening to trigger warm colors
+      setIsEvening(hour >= 17 || hour < 6);
+
       if (hour < 12) setGreeting("Good morning");
       else if (hour < 18) setGreeting("Good afternoon");
       else setGreeting("Good evening");
@@ -239,10 +246,23 @@ export default function HomeScreen() {
     else Alert.alert("Not Setup", "Please ask your family to add a Secondary Contact in settings.");
   };
 
+  // 💡 NEW: The function for when a patient taps a suggestion pill
+  const handleNudgePress = (suggestion: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const textPrompt = `Tap the microphone and ask me: "${suggestion}"`;
+    setRemiText(textPrompt);
+    speak(`Tap the purple microphone and ask me: ${suggestion}`);
+  };
+
+  // 💡 NEW: Dynamic color variables based on the time of day
+  const safeAreaBgColor = isEvening ? '#FEF3C7' : '#F3F4F6'; // Warm amber vs cool gray
+  const appCapsuleBgColor = isEvening ? '#FFFBEB' : '#FFFFFF'; // Warm cream vs stark white
+  const bubbleBgColor = isEvening ? '#FEF3C7' : '#F9FAFB';
+
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor="#F9FAFB" />
-      <View style={styles.appCapsule}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: safeAreaBgColor }]}>
+      <StatusBar barStyle="dark-content" backgroundColor={safeAreaBgColor} />
+      <View style={[styles.appCapsule, { backgroundColor: appCapsuleBgColor }]}>
         <View style={styles.internalContent}>
           
           <Animated.View style={[styles.header, { opacity: uiOpacity }]}>
@@ -273,11 +293,11 @@ export default function HomeScreen() {
             <Animated.View style={[styles.orb, { transform: [{ scale: pulseAnim }] }]} />
           </View>
 
-          <View style={styles.speechBubble}>
+          <View style={[styles.speechBubble, { backgroundColor: bubbleBgColor }]}>
             <Text style={styles.remiSpeechText}>{remiText}</Text>
             
             <TouchableOpacity 
-              style={styles.repeatVoiceButton}
+              style={[styles.repeatVoiceButton, { backgroundColor: isEvening ? '#FDE68A' : '#F5F3FF' }]}
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 speak(remiText);
@@ -318,6 +338,27 @@ export default function HomeScreen() {
                 <Text style={styles.flashingEmergencyText}>TAP HERE FOR HELP</Text>
               </TouchableOpacity>
             </Animated.View>
+          )}
+
+          {/* 💡 NEW: Cognitive Nudges (Only show when not recording or thinking) */}
+          {(!isRecording && !isProcessing && !isDistressed) && (
+             <Animated.View style={[styles.nudgesContainer, { opacity: uiOpacity }]}>
+                <Text style={styles.nudgeTitle}>Not sure what to say? Try asking:</Text>
+                <View style={styles.nudgeRow}>
+                  <TouchableOpacity 
+                    style={[styles.nudgePill, { backgroundColor: isEvening ? '#FDE68A' : '#F3F4F6' }]} 
+                    onPress={() => handleNudgePress("What are my plans today?")}
+                  >
+                    <Text style={styles.nudgeText}>My plans today</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={[styles.nudgePill, { backgroundColor: isEvening ? '#FDE68A' : '#F3F4F6' }]} 
+                    onPress={() => handleNudgePress("Tell me a story about my past.")}
+                  >
+                    <Text style={styles.nudgeText}>Tell me a story</Text>
+                  </TouchableOpacity>
+                </View>
+             </Animated.View>
           )}
 
           <TouchableOpacity 
@@ -431,8 +472,8 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#F3F4F6', paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0 },
-  appCapsule: { flex: 1, backgroundColor: '#FFFFFF', borderRadius: 45, overflow: 'hidden', marginHorizontal: 10, marginBottom: 10, marginTop: 10, borderWidth: 1, borderColor: '#E5E7EB', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 5 },
+  safeArea: { flex: 1, paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0 },
+  appCapsule: { flex: 1, borderRadius: 45, overflow: 'hidden', marginHorizontal: 10, marginBottom: 10, marginTop: 10, borderWidth: 1, borderColor: '#E5E7EB', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 5 },
   internalContent: { flex: 1, paddingHorizontal: 24, justifyContent: 'space-between', paddingTop: 20 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginTop: 10, marginBottom: 5 },
   greetingText: { fontSize: 18, color: '#6B7280', fontWeight: '500' },
@@ -441,10 +482,18 @@ const styles = StyleSheet.create({
   menuIconButton: { padding: 8, backgroundColor: '#F3F4F6', borderRadius: 20 },
   orbContainer: { alignItems: 'center', justifyContent: 'center', marginVertical: 20 },
   orb: { width: 110, height: 110, borderRadius: 55, backgroundColor: '#8B5CF6', shadowColor: '#8B5CF6', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.6, shadowRadius: 25, elevation: 15 },
-  speechBubble: { backgroundColor: '#F9FAFB', padding: 24, borderRadius: 28, alignItems: 'center', marginBottom: 20, borderWidth: 1, borderColor: '#F3F4F6' },
+  speechBubble: { padding: 24, borderRadius: 28, alignItems: 'center', marginBottom: 15, borderWidth: 1, borderColor: '#F3F4F6' },
   remiSpeechText: { fontSize: 20, color: '#1F2937', textAlign: 'center', lineHeight: 30, fontWeight: '600', marginBottom: 5 },
-  repeatVoiceButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F5F3FF', paddingVertical: 8, paddingHorizontal: 16, borderRadius: 20, marginBottom: 5 },
+  repeatVoiceButton: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, paddingHorizontal: 16, borderRadius: 20, marginBottom: 5 },
   repeatVoiceText: { color: '#8B5CF6', fontSize: 15, fontWeight: '700', marginLeft: 6 },
+  
+  // 💡 NEW: Cognitive Nudge Styles
+  nudgesContainer: { alignItems: 'center', marginBottom: 15 },
+  nudgeTitle: { fontSize: 14, color: '#6B7280', marginBottom: 10, fontWeight: '600' },
+  nudgeRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 10 },
+  nudgePill: { paddingVertical: 10, paddingHorizontal: 16, borderRadius: 20, borderWidth: 1, borderColor: '#E5E7EB' },
+  nudgeText: { color: '#4B5563', fontSize: 15, fontWeight: '700' },
+
   memoryDropContainer: { width: '100%', borderRadius: 20, overflow: 'hidden', borderWidth: 1, borderColor: '#E5E7EB', backgroundColor: '#FFF' },
   memoryImage: { width: '100%', height: 140 },
   memoryOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(17, 24, 39, 0.75)', flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 16 },
