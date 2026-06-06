@@ -27,11 +27,12 @@ export default function HomeScreen() {
   
   const [remiText, setRemiText] = useState("Hello! I am Remi. How can I help you?");
   const [greeting, setGreeting] = useState("Good morning");
-  const [userName, setUserName] = useState("Peter");
+  const [userName, setUserName] = useState("John");
   const [currentDate, setCurrentDate] = useState("");
-  
-  // 💡 NEW: State to track if it's evening for our Sundowning UI
   const [isEvening, setIsEvening] = useState(false);
+
+  // 💡 NEW: State to track if a suggestion pill was tapped
+  const [isNudgeActive, setIsNudgeActive] = useState(false);
 
   const [primaryContact, setPrimaryContact] = useState<string | null>(null);
   const [secondaryContact, setSecondaryContact] = useState<string | null>(null);
@@ -91,7 +92,6 @@ export default function HomeScreen() {
     const initializeHome = async () => {
       const hour = new Date().getHours();
       
-      // 💡 NEW: Check if it's evening to trigger warm colors
       setIsEvening(hour >= 17 || hour < 6);
 
       if (hour < 12) setGreeting("Good morning");
@@ -127,7 +127,7 @@ export default function HomeScreen() {
           const randomMem = memories[Math.floor(Math.random() * memories.length)];
           setDailyMemory(randomMem);
           
-          const memoryGreeting = `I was just admiring this lovely photo of ${randomMem.title}.`;
+          const memoryGreeting = `I was just admiring this photo of ${randomMem.title}.`;
           setRemiText(memoryGreeting);
           speak(memoryGreeting); 
         } else {
@@ -144,6 +144,10 @@ export default function HomeScreen() {
   const startRecording = async () => {
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      
+      // 💡 NEW: The second they start talking, we clear the nudge state so the image comes back later
+      setIsNudgeActive(false); 
+
       const permission = await Audio.requestPermissionsAsync();
       if (permission.status !== 'granted') return Alert.alert("Permission Denied", "Remi needs microphone access.");
       
@@ -229,6 +233,9 @@ export default function HomeScreen() {
     setIsRecording(false);
     setIsProcessing(false);
     
+    // 💡 NEW: Reset the nudge state when they press the refresh button
+    setIsNudgeActive(false);
+    
     if (dailyMemory) {
       setRemiText(`I was just admiring this photo of ${dailyMemory.title}.`);
     } else {
@@ -246,17 +253,19 @@ export default function HomeScreen() {
     else Alert.alert("Not Setup", "Please ask your family to add a Secondary Contact in settings.");
   };
 
-  // 💡 NEW: The function for when a patient taps a suggestion pill
   const handleNudgePress = (suggestion: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    
+    // 💡 NEW: Activate the nudge to trigger the UI cleanup
+    setIsNudgeActive(true); 
+    
     const textPrompt = `Tap the microphone and ask me: "${suggestion}"`;
     setRemiText(textPrompt);
     speak(`Tap the purple microphone and ask me: ${suggestion}`);
   };
 
-  // 💡 NEW: Dynamic color variables based on the time of day
-  const safeAreaBgColor = isEvening ? '#FEF3C7' : '#F3F4F6'; // Warm amber vs cool gray
-  const appCapsuleBgColor = isEvening ? '#FFFBEB' : '#FFFFFF'; // Warm cream vs stark white
+  const safeAreaBgColor = isEvening ? '#FEF3C7' : '#F3F4F6'; 
+  const appCapsuleBgColor = isEvening ? '#FFFBEB' : '#FFFFFF'; 
   const bubbleBgColor = isEvening ? '#FEF3C7' : '#F9FAFB';
 
   return (
@@ -308,7 +317,8 @@ export default function HomeScreen() {
               <Text style={styles.repeatVoiceText}>Hear again</Text>
             </TouchableOpacity>
             
-            {dailyMemory && (
+            {/* 💡 NEW: Only show the memory image if a nudge is NOT active */}
+            {dailyMemory && !isNudgeActive && (
               <Animated.View style={{ width: '100%', opacity: uiOpacity, marginTop: 15 }}>
                 <TouchableOpacity 
                   activeOpacity={0.8} 
@@ -340,8 +350,8 @@ export default function HomeScreen() {
             </Animated.View>
           )}
 
-          {/* 💡 NEW: Cognitive Nudges (Only show when not recording or thinking) */}
-          {(!isRecording && !isProcessing && !isDistressed) && (
+          {/* 💡 NEW: Hide the nudges container once one of them is clicked */}
+          {(!isRecording && !isProcessing && !isDistressed && !isNudgeActive) && (
              <Animated.View style={[styles.nudgesContainer, { opacity: uiOpacity }]}>
                 <Text style={styles.nudgeTitle}>Not sure what to say? Try asking:</Text>
                 <View style={styles.nudgeRow}>
@@ -487,7 +497,6 @@ const styles = StyleSheet.create({
   repeatVoiceButton: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, paddingHorizontal: 16, borderRadius: 20, marginBottom: 5 },
   repeatVoiceText: { color: '#8B5CF6', fontSize: 15, fontWeight: '700', marginLeft: 6 },
   
-  // 💡 NEW: Cognitive Nudge Styles
   nudgesContainer: { alignItems: 'center', marginBottom: 15 },
   nudgeTitle: { fontSize: 14, color: '#6B7280', marginBottom: 10, fontWeight: '600' },
   nudgeRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 10 },
