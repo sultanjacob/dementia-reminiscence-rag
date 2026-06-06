@@ -1,8 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
+import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import * as Speech from 'expo-speech';
-import * as Haptics from 'expo-haptics';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   Alert,
@@ -27,7 +27,7 @@ export default function HomeScreen() {
   
   const [remiText, setRemiText] = useState("Hello! I am Remi. How can I help you?");
   const [greeting, setGreeting] = useState("Good morning");
-  const [userName, setUserName] = useState("John");
+  const [userName, setUserName] = useState("Peter");
   const [currentDate, setCurrentDate] = useState("");
   
   // 💡 NEW: State to track if it's evening for our Sundowning UI
@@ -127,7 +127,7 @@ export default function HomeScreen() {
           const randomMem = memories[Math.floor(Math.random() * memories.length)];
           setDailyMemory(randomMem);
           
-          const memoryGreeting = `I was just admiring this photo of ${randomMem.title}.`;
+          const memoryGreeting = `I was just admiring this lovely photo of ${randomMem.title}.`;
           setRemiText(memoryGreeting);
           speak(memoryGreeting); 
         } else {
