@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import React from 'react';
+import { Platform } from 'react-native'; // 💡 NEW: Import Platform to check the device type
 
 export default function AuthLayout() {
   return (
@@ -11,8 +12,9 @@ export default function AuthLayout() {
           backgroundColor: '#110C1D', 
           borderTopWidth: 0,
           elevation: 0,
-          height: 60,
-          paddingBottom: 10,
+          // 💡 NEW: Flexible height and padding so it never gets crushed by the system nav bar
+          minHeight: Platform.OS === 'android' ? 70 : 85,
+          paddingBottom: Platform.OS === 'android' ? 15 : 30,
           paddingTop: 10,
         },
         tabBarActiveTintColor: '#8B5CF6', 
