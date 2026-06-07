@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
 import * as Haptics from 'expo-haptics';
-import { useRouter } from 'expo-router';
+import { useNavigation, useRouter } from 'expo-router'; // 💡 NEW: Added useNavigation
 import * as Speech from 'expo-speech';
 import React, { useEffect, useRef, useState } from 'react';
 import {
@@ -22,6 +22,7 @@ import { supabase } from '../../supabase';
 
 export default function HomeScreen() {
   const router = useRouter();
+  const navigation = useNavigation(); // 💡 NEW: Initialize navigation listener
   
   const API_URL = "https://dementia-reminiscence-rag.onrender.com"; 
   
@@ -30,8 +31,6 @@ export default function HomeScreen() {
   const [userName, setUserName] = useState("John");
   const [currentDate, setCurrentDate] = useState("");
   const [isEvening, setIsEvening] = useState(false);
-
-  // 💡 NEW: State to track if a suggestion pill was tapped
   const [isNudgeActive, setIsNudgeActive] = useState(false);
 
   const [primaryContact, setPrimaryContact] = useState<string | null>(null);
@@ -141,11 +140,31 @@ export default function HomeScreen() {
     initializeHome();
   }, []);
 
+  const resetRemi = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setIsRecording(false);
+    setIsProcessing(false);
+    setIsNudgeActive(false);
+    
+    if (dailyMemory) {
+      setRemiText(`I was just admiring this photo of ${dailyMemory.title}.`);
+    } else {
+      setRemiText(`Hello ${userName}! I am Remi. How can I help you today?`);
+    }
+  };
+
+  // 💡 NEW: Hijack the bottom tab press to force a reset
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('tabPress', (e) => {
+      // Whenever the user taps the Remi icon on the bottom, run the reset function
+      resetRemi();
+    });
+    return unsubscribe;
+  }, [navigation, dailyMemory, userName]);
+
   const startRecording = async () => {
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      
-      // 💡 NEW: The second they start talking, we clear the nudge state so the image comes back later
       setIsNudgeActive(false); 
 
       const permission = await Audio.requestPermissionsAsync();
@@ -228,21 +247,6 @@ export default function HomeScreen() {
     setIsMenuVisible(true);
   };
 
-  const resetRemi = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setIsRecording(false);
-    setIsProcessing(false);
-    
-    // 💡 NEW: Reset the nudge state when they press the refresh button
-    setIsNudgeActive(false);
-    
-    if (dailyMemory) {
-      setRemiText(`I was just admiring this photo of ${dailyMemory.title}.`);
-    } else {
-      setRemiText(`Hello ${userName}! I am Remi. How can I help you today?`);
-    }
-  };
-
   const handlePrimaryCall = () => {
     if (primaryContact) Linking.openURL(`tel:${primaryContact}`);
     else Alert.alert("Not Setup", "Please ask your family to add a Primary Contact in settings.");
@@ -255,10 +259,7 @@ export default function HomeScreen() {
 
   const handleNudgePress = (suggestion: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    
-    // 💡 NEW: Activate the nudge to trigger the UI cleanup
     setIsNudgeActive(true); 
-    
     const textPrompt = `Tap the microphone and ask me: "${suggestion}"`;
     setRemiText(textPrompt);
     speak(`Tap the purple microphone and ask me: ${suggestion}`);
@@ -317,7 +318,6 @@ export default function HomeScreen() {
               <Text style={styles.repeatVoiceText}>Hear again</Text>
             </TouchableOpacity>
             
-            {/* 💡 NEW: Only show the memory image if a nudge is NOT active */}
             {dailyMemory && !isNudgeActive && (
               <Animated.View style={{ width: '100%', opacity: uiOpacity, marginTop: 15 }}>
                 <TouchableOpacity 
@@ -350,7 +350,6 @@ export default function HomeScreen() {
             </Animated.View>
           )}
 
-          {/* 💡 NEW: Hide the nudges container once one of them is clicked */}
           {(!isRecording && !isProcessing && !isDistressed && !isNudgeActive) && (
              <Animated.View style={[styles.nudgesContainer, { opacity: uiOpacity }]}>
                 <Text style={styles.nudgeTitle}>Not sure what to say? Try asking:</Text>
@@ -496,13 +495,11 @@ const styles = StyleSheet.create({
   remiSpeechText: { fontSize: 20, color: '#1F2937', textAlign: 'center', lineHeight: 30, fontWeight: '600', marginBottom: 5 },
   repeatVoiceButton: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, paddingHorizontal: 16, borderRadius: 20, marginBottom: 5 },
   repeatVoiceText: { color: '#8B5CF6', fontSize: 15, fontWeight: '700', marginLeft: 6 },
-  
   nudgesContainer: { alignItems: 'center', marginBottom: 15 },
   nudgeTitle: { fontSize: 14, color: '#6B7280', marginBottom: 10, fontWeight: '600' },
   nudgeRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 10 },
   nudgePill: { paddingVertical: 10, paddingHorizontal: 16, borderRadius: 20, borderWidth: 1, borderColor: '#E5E7EB' },
   nudgeText: { color: '#4B5563', fontSize: 15, fontWeight: '700' },
-
   memoryDropContainer: { width: '100%', borderRadius: 20, overflow: 'hidden', borderWidth: 1, borderColor: '#E5E7EB', backgroundColor: '#FFF' },
   memoryImage: { width: '100%', height: 140 },
   memoryOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(17, 24, 39, 0.75)', flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 16 },
