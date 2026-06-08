@@ -28,7 +28,7 @@ export default function HomeScreen() {
   
   const [remiText, setRemiText] = useState("Hello! I am Remi. How can I help you?");
   const [greeting, setGreeting] = useState("Good morning");
-  const [userName, setUserName] = useState("John");
+  const [userName, setUserName] = useState("Peter");
   const [currentDate, setCurrentDate] = useState("");
   const [isEvening, setIsEvening] = useState(false);
   const [isNudgeActive, setIsNudgeActive] = useState(false);
@@ -147,7 +147,7 @@ export default function HomeScreen() {
     setIsNudgeActive(false);
     
     if (dailyMemory) {
-      setRemiText(`I was just admiring this photo of ${dailyMemory.title}.`);
+      setRemiText(`I was just admiring this lovely photo of ${dailyMemory.title}.`);
     } else {
       setRemiText(`Hello ${userName}! I am Remi. How can I help you today?`);
     }
