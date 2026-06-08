@@ -360,7 +360,7 @@ export default function HomeScreen() {
                   </TouchableOpacity>
                   <TouchableOpacity 
                     style={[styles.nudgePill, { backgroundColor: isEvening ? '#FDE68A' : '#F3F4F6' }]} 
-                    onPress={() => handleNudgePress("Tell me a story about my past.")}
+                    onPress={() => handleNudgePress("Tell me a story about your past.")}
                   >
                     <Text style={styles.nudgeText}>Tell me a story</Text>
                   </TouchableOpacity>
