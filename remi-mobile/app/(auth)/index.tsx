@@ -354,7 +354,7 @@ export default function HomeScreen() {
                 <View style={styles.nudgeRow}>
                   <TouchableOpacity 
                     style={[styles.nudgePill, { backgroundColor: isEvening ? '#FDE68A' : '#F3F4F6' }]} 
-                    onPress={() => handleNudgePress("What are my plans today?")}
+                    onPress={() => handleNudgePress("What are your plans today?")}
                   >
                     <Text style={styles.nudgeText}>My plans today</Text>
                   </TouchableOpacity>
