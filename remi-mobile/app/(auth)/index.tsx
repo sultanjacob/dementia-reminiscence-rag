@@ -195,7 +195,7 @@ export default function HomeScreen() {
     }
   };
 
-  const sendAudioToBackend = async (fileUri: string) => {
+const sendAudioToBackend = async (fileUri: string) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       const formData = new FormData();
@@ -209,6 +209,37 @@ export default function HomeScreen() {
           'Content-Type': 'multipart/form-data'
         },
       });
+
+      const responseData = await response.json();
+      if (response.ok) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        const aiText = responseData.message || "I didn't quite catch that.";
+        setRemiText(aiText);
+        speak(aiText);
+
+        if (aiText.toLowerCase().includes("call family")) {
+          setIsDistressed(true);
+        } else {
+          setIsDistressed(false); 
+        }
+
+      } else {
+        throw new Error(responseData.message || "Server error");
+      }
+    } catch (error) {
+      console.error("Backend Error:", error);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      
+      // 💡 NEW: The Graceful Offline Fallback
+      const fallbackMessage = "I'm having a little trouble connecting to the internet right now. Let's try again in a minute.";
+      setRemiText(fallbackMessage);
+      
+      // This forces the physical device to speak using its local audio chip, even with zero Wi-Fi
+      speak(fallbackMessage); 
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
       const responseData = await response.json();
       if (response.ok) {
