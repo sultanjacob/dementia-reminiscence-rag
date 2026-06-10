@@ -1,18 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
-import * as Notifications from 'expo-notifications';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Platform, SafeAreaView, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { supabase } from '../../supabase';
-
-// Tell the phone how to handle notifications when the app is open
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-  }),
-});
 
 export default function RoutineScreen() {
   const router = useRouter();
@@ -24,15 +14,7 @@ export default function RoutineScreen() {
 
   useEffect(() => { 
     fetchRoutines(); 
-    requestNotificationPermissions();
   }, []);
-
-  const requestNotificationPermissions = async () => {
-    const { status } = await Notifications.requestPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permission needed', 'Please allow notifications so Remi can remind you of your routine.');
-    }
-  };
 
   const fetchRoutines = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -47,31 +29,6 @@ export default function RoutineScreen() {
     
     if (error) console.error("Fetch Error:", error);
     setRoutines(data || []);
-  };
-
-  // Helper function to schedule the alarm on the physical phone
-  const scheduleLocalNotification = async (taskTime: string, taskActivity: string) => {
-    try {
-      // Very basic parser: assumes format like "10:00" or "14:30" for 24hr reliability
-      const [hourStr, minuteStr] = taskTime.replace(/[^0-9:]/g, '').split(':');
-      const hour = parseInt(hourStr, 10);
-      const minute = parseInt(minuteStr, 10);
-
-      await Notifications.scheduleNotificationAsync({
-        content: {
-          title: "Remi Reminder 🔔",
-          body: `It is time for: ${taskActivity}`,
-          sound: true,
-        },
-        trigger: {
-          hour: hour,
-          minute: minute,
-          repeats: true, // Reminds them every single day!
-        },
-      });
-    } catch (error) {
-      console.log("Could not schedule exact time notification:", error);
-    }
   };
 
   const addRoutine = async () => {
@@ -91,9 +48,6 @@ export default function RoutineScreen() {
     if (error) {
       Alert.alert("Error", error.message);
     } else {
-      // 💡 NEW: Schedule the native phone notification!
-      await scheduleLocalNotification(time, activity);
-
       setTime(""); 
       setActivity("");
       fetchRoutines(); 
@@ -125,7 +79,7 @@ export default function RoutineScreen() {
               <Ionicons name="time" size={24} color="#A78BFA" />
               <Text style={styles.title}>Add Daily Task</Text>
             </View>
-            <Text style={styles.subtitle}>Set a time to automatically trigger a phone notification.</Text>
+            <Text style={styles.subtitle}>Tasks will sync to Remi's memory.</Text>
             
             <Text style={styles.inputLabel}>Time (24-hour format)</Text>
             <TextInput 
