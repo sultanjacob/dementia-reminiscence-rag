@@ -22,7 +22,7 @@ export default function AuthScreen() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   
-  // --- NEW: Role & Signup States ---
+  // --- Role & Signup States ---
   const [isSignUpMode, setIsSignUpMode] = useState(false);
   const [role, setRole] = useState<'patient' | 'family'>('patient');
   
@@ -61,11 +61,13 @@ export default function AuthScreen() {
   async function signInWithEmail() {
     setLoading(true);
     const { error } = await supabase.auth.signInWithPassword({ email, password });
+    
     if (error) {
       Alert.alert("Sign In Failed", error.message);
-    } else {
-      router.replace('/(auth)'); 
-    }
+    } 
+    // Notice there is NO router.replace() here anymore.
+    // The _layout.tsx Traffic Controller handles the routing automatically!
+    
     setLoading(false);
   }
 
@@ -76,7 +78,7 @@ export default function AuthScreen() {
     if (error) {
       Alert.alert("Sign Up Failed", error.message);
     } else {
-      // --- NEW: Instantly update their profile with the selected role ---
+      // Instantly update their profile with the selected role
       if (authData.user) {
         const { error: profileError } = await supabase
           .from('profiles')
@@ -123,7 +125,7 @@ export default function AuthScreen() {
                 </Text>
               </View>
 
-              {/* --- NEW: Role Selector (Only shows during Sign Up) --- */}
+              {/* Role Selector (Only shows during Sign Up) */}
               {isSignUpMode && (
                 <View style={styles.roleSelectorContainer}>
                   <Text style={styles.roleLabel}>I am setting this up for:</Text>
