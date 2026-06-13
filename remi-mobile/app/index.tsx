@@ -65,9 +65,6 @@ export default function AuthScreen() {
     if (error) {
       Alert.alert("Sign In Failed", error.message);
     } 
-    // Notice there is NO router.replace() here anymore.
-    // The _layout.tsx Traffic Controller handles the routing automatically!
-    
     setLoading(false);
   }
 
@@ -92,12 +89,6 @@ export default function AuthScreen() {
 
       Alert.alert("Success", "Account created! You can now sign in.");
       setIsSignUpMode(false); 
-    }
-    setLoading(false);
-  }
-
-      Alert.alert("Success", "Account created! You can now sign in.");
-      setIsSignUpMode(false); // Send them back to the login view
     }
     setLoading(false);
   }
