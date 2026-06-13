@@ -78,15 +78,23 @@ export default function AuthScreen() {
     if (error) {
       Alert.alert("Sign Up Failed", error.message);
     } else {
-      // Instantly update their profile with the selected role
+      // --- THE FIX: We use UPSERT to actually CREATE the row if it doesn't exist ---
       if (authData.user) {
         const { error: profileError } = await supabase
           .from('profiles')
-          .update({ role: role })
-          .eq('id', authData.user.id);
+          .upsert({ 
+            id: authData.user.id, 
+            role: role 
+          });
           
         if (profileError) console.error("Profile update error:", profileError);
       }
+
+      Alert.alert("Success", "Account created! You can now sign in.");
+      setIsSignUpMode(false); 
+    }
+    setLoading(false);
+  }
 
       Alert.alert("Success", "Account created! You can now sign in.");
       setIsSignUpMode(false); // Send them back to the login view
