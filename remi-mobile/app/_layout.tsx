@@ -11,7 +11,7 @@ export default function RootLayout() {
   const segments = useSegments();
   const router = useRouter();
 
-  // Helper function to fetch user and their role
+// Helper function to fetch user and their role
   const checkUserAndRole = async (sessionUser: any) => {
     if (!sessionUser) {
       setUser(null);
@@ -22,18 +22,18 @@ export default function RootLayout() {
 
     setUser(sessionUser);
 
-    // Look up the role in the profiles table
+    // --- THE FIX: We use maybeSingle() so it doesn't crash if it checks too fast ---
     const { data, error } = await supabase
       .from('profiles')
       .select('role')
       .eq('id', sessionUser.id)
-      .single();
+      .maybeSingle(); 
 
     if (error) {
       console.error("Error fetching role:", error);
     }
 
-    // Default to 'patient' as a safety net if no role is found
+    // Default to 'patient' as a safety net
     setUserRole(data?.role || 'patient');
     setInitializing(false);
   };
