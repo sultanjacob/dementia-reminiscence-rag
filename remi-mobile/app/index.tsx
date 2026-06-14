@@ -18,7 +18,6 @@ import { supabase } from '../supabase';
 
 export default function AuthScreen() {
   const router = useRouter();
-  const [patientCode, setPatientCode] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -26,6 +25,7 @@ export default function AuthScreen() {
   // --- Role & Signup States ---
   const [isSignUpMode, setIsSignUpMode] = useState(false);
   const [role, setRole] = useState<'patient' | 'family'>('patient');
+  const [patientCode, setPatientCode] = useState(''); // New state for linking
   
   const [showWelcome, setShowWelcome] = useState(true);
 
@@ -70,19 +70,26 @@ export default function AuthScreen() {
   }
 
   async function signUpWithEmail() {
+    // Prevent family members from signing up without a patient link
+    if (role === 'family' && !patientCode.trim()) {
+      Alert.alert("Missing Information", "Please enter the Patient's Connection Code so we can link your accounts.");
+      return;
+    }
+
     setLoading(true);
     const { data: authData, error } = await supabase.auth.signUp({ email, password });
     
     if (error) {
       Alert.alert("Sign Up Failed", error.message);
     } else {
-      // --- THE FIX: We use UPSERT to actually CREATE the row if it doesn't exist ---
       if (authData.user) {
         const { error: profileError } = await supabase
           .from('profiles')
           .upsert({ 
             id: authData.user.id, 
-            role: role 
+            role: role,
+            // Automatically link the patient code if they are family
+            linked_patient_id: role === 'family' ? patientCode.trim() : null
           });
           
         if (profileError) console.error("Profile update error:", profileError);
@@ -90,6 +97,7 @@ export default function AuthScreen() {
 
       Alert.alert("Success", "Account created! You can now sign in.");
       setIsSignUpMode(false); 
+      setPatientCode(''); // Clear the code field for next time
     }
     setLoading(false);
   }
@@ -145,6 +153,24 @@ export default function AuthScreen() {
                       <Ionicons name="people" size={20} color={role === 'family' ? '#FFFFFF' : '#6B7280'} />
                       <Text style={[styles.roleText, role === 'family' && styles.roleTextActive]}>Family</Text>
                     </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+
+              {/* Connection Code Input (Only shows during Sign Up IF Family is selected) */}
+              {isSignUpMode && role === 'family' && (
+                <View style={styles.inputGroup}>
+                  <Text style={styles.roleLabel}>Patient's Connection Code:</Text>
+                  <View style={styles.inputWrapper}>
+                    <Ionicons name="link" size={20} color="#6B7280" style={styles.inputIcon} />
+                    <TextInput
+                      style={styles.input}
+                      placeholder="e.g., Patient's Email or ID"
+                      placeholderTextColor="#6B7280"
+                      value={patientCode}
+                      onChangeText={setPatientCode}
+                      autoCapitalize="none"
+                    />
                   </View>
                 </View>
               )}
@@ -289,13 +315,13 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   roleSelectorContainer: {
-    marginBottom: 20,
+    marginBottom: 15,
   },
   roleLabel: {
     color: '#E2D8F0',
     fontSize: 14,
     marginBottom: 10,
-    textAlign: 'center',
+    textAlign: 'left',
   },
   roleButtons: {
     flexDirection: 'row',
@@ -327,14 +353,14 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   inputGroup: {
-    marginBottom: 20,
+    marginBottom: 15,
   },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#1A1325',
     borderRadius: 16,
-    marginBottom: 16,
+    marginBottom: 10,
     borderWidth: 1,
     borderColor: '#231A31',
     paddingHorizontal: 15,
@@ -349,7 +375,7 @@ const styles = StyleSheet.create({
     paddingVertical: 18,
   },
   buttonGroup: {
-    marginTop: 10,
+    marginTop: 5,
   },
   primaryButton: {
     backgroundColor: '#8B5CF6',
