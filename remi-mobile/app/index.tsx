@@ -18,6 +18,7 @@ import { supabase } from '../supabase';
 
 export default function AuthScreen() {
   const router = useRouter();
+  const [patientCode, setPatientCode] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
