@@ -239,14 +239,19 @@ export default function HomeScreen() {
     }
   };
 
-  const navigateTo = (path: any) => {
-    setIsMenuVisible(false); 
-    router.push(path);       
-  };
-
   const handleMenuOpen = () => {
     Haptics.selectionAsync();
     setIsMenuVisible(true);
+  };
+
+  // --- NEW: Handle Sign Out ---
+  const handleSignOut = async () => {
+    setIsMenuVisible(false);
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      Alert.alert("Sign Out Error", error.message);
+    }
+    // _layout.tsx will automatically detect this and route us back to the login screen!
   };
 
   const handlePrimaryCall = () => {
@@ -461,20 +466,26 @@ export default function HomeScreen() {
                 <Ionicons name="close" size={32} color="#111827" />
               </TouchableOpacity>
             </View>
-            <TouchableOpacity style={styles.menuRow} onPress={() => navigateTo('/routine')}>
+            
+            {/* --- UPDATED MENU ITEMS --- */}
+            <TouchableOpacity style={styles.menuRow} onPress={() => {
+              setIsMenuVisible(false);
+              Alert.alert("Coming Soon", "App settings will go here.");
+            }}>
               <View style={styles.menuIconContainer}>
-                <Ionicons name="calendar" size={24} color="#8B5CF6" />
+                <Ionicons name="settings" size={24} color="#8B5CF6" />
               </View>
-              <Text style={styles.menuRowText}>Manage Routine</Text>
+              <Text style={styles.menuRowText}>App Settings</Text>
               <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.menuRow} onPress={() => navigateTo('/caregiver')}>
-              <View style={styles.menuIconContainer}>
-                <Ionicons name="person" size={24} color="#8B5CF6" />
+
+            <TouchableOpacity style={styles.menuRow} onPress={handleSignOut}>
+              <View style={[styles.menuIconContainer, { backgroundColor: '#FEE2E2' }]}>
+                <Ionicons name="log-out" size={24} color="#EF4444" />
               </View>
-              <Text style={styles.menuRowText}>Caregiver Portal</Text>
-              <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
+              <Text style={[styles.menuRowText, { color: '#EF4444' }]}>Sign Out</Text>
             </TouchableOpacity>
+            
           </View>
         </View>
       </Modal>
