@@ -470,8 +470,8 @@ export default function HomeScreen() {
             {/* --- UPDATED MENU ITEMS --- */}
             <TouchableOpacity style={styles.menuRow} onPress={() => {
               setIsMenuVisible(false);
-              Alert.alert("Coming Soon", "App settings will go here.");
-            }}>
+              router.push('/settings');
+              }}>
               <View style={styles.menuIconContainer}>
                 <Ionicons name="settings" size={24} color="#8B5CF6" />
               </View>
