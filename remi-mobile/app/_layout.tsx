@@ -29,7 +29,7 @@ export default function RootLayout() {
       .maybeSingle(); 
 
     if (error) {
-      console.error("Error fetching role:", error);
+      console.error("Error fetching that role:", error);
     }
 
     // THE FIX: If data isn't there yet (during a fresh sign-up), wait 1 second and retry.
