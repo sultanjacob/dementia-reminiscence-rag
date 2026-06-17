@@ -72,7 +72,7 @@ export default function AuthScreen() {
   async function signUpWithEmail() {
     // Prevent family members from signing up without a patient link
     if (role === 'family' && !patientCode.trim()) {
-      Alert.alert("Missing Information", "Please enter the Patient's Connection Code so we can link your accounts.");
+      Alert.alert("Missing Information", "Please enter the Patient's Connection Code so we can link your accounts. Thank you!");
       return;
     }
 
