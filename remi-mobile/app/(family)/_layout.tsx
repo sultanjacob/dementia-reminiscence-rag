@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import React from 'react';
+import { Platform } from 'react-native';
 
 export default function FamilyLayout() {
   return (
@@ -11,9 +12,10 @@ export default function FamilyLayout() {
           backgroundColor: '#110C1D',
           borderTopWidth: 1,
           borderTopColor: '#231A31',
-          paddingBottom: 8,
-          paddingTop: 8,
-          height: 60,
+          // INCREASED PADDING AND HEIGHT BELOW
+          paddingBottom: Platform.OS === 'android' ? 15 : 28,
+          paddingTop: 10,
+          height: Platform.OS === 'android' ? 70 : 88,
         },
         tabBarActiveTintColor: '#8B5CF6',
         tabBarInactiveTintColor: '#6B7280',
