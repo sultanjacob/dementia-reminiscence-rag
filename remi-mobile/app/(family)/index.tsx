@@ -12,7 +12,6 @@ import {
 } from 'react-native';
 
 export default function FamilyDashboard() {
-  // Mock data for now – we will connect this to Supabase later!
   const patientName = "Mary";
   const recentActivities = [
     { id: 1, time: "2:30 PM", text: "Remi asked about the 1985 Lake House trip.", icon: "image-outline", color: "#4ADE80" },
@@ -36,7 +35,6 @@ export default function FamilyDashboard() {
 
       <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
         
-        {/* --- AT A GLANCE STATUS --- */}
         <Text style={styles.sectionTitle}>At a Glance</Text>
         <View style={styles.statusCard}>
           <View style={styles.statusHeader}>
@@ -60,7 +58,6 @@ export default function FamilyDashboard() {
           </Text>
         </View>
 
-        {/* --- QUICK ACTIONS --- */}
         <Text style={styles.sectionTitle}>Quick Actions</Text>
         <View style={styles.actionGrid}>
           <TouchableOpacity style={styles.actionCard}>
@@ -85,10 +82,9 @@ export default function FamilyDashboard() {
           <Text style={styles.emergencyText}>Emergency Contacts</Text>
         </TouchableOpacity>
 
-        {/* --- RECENT ACTIVITY LOG --- */}
         <Text style={styles.sectionTitle}>Today's Activity</Text>
         <View style={styles.activityContainer}>
-          {recentActivities.map((activity, index) => (
+          {recentActivities.map((activity) => (
             <View key={activity.id} style={styles.activityItem}>
               <View style={[styles.activityIcon, { borderColor: activity.color }]}>
                 <Ionicons name={activity.icon as any} size={16} color={activity.color} />
@@ -101,7 +97,7 @@ export default function FamilyDashboard() {
           ))}
         </View>
 
-        <View style={{ height: 40 }} /> {/* Bottom Padding */}
+        <View style={{ height: 40 }} />
       </ScrollView>
     </SafeAreaView>
   );
