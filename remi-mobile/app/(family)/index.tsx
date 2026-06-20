@@ -49,36 +49,7 @@ export default function FamilyDashboard() {
           </View>
         </View>
 
-        {/* --- 2. COMPACT ACTION BAR --- */}
-        <View style={styles.actionBar}>
-          <TouchableOpacity style={styles.actionItem}>
-            <View style={[styles.actionIconBadge, { backgroundColor: 'rgba(139, 92, 246, 0.15)' }]}>
-              <Ionicons name="images" size={24} color="#8B5CF6" />
-            </View>
-            <Text style={styles.actionItemText}>Vault</Text>
-          </TouchableOpacity>
 
-          <TouchableOpacity style={styles.actionItem}>
-            <View style={[styles.actionIconBadge, { backgroundColor: 'rgba(96, 165, 250, 0.15)' }]}>
-              <Ionicons name="calendar" size={24} color="#60A5FA" />
-            </View>
-            <Text style={styles.actionItemText}>Routines</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.actionItem}>
-            <View style={[styles.actionIconBadge, { backgroundColor: 'rgba(52, 211, 153, 0.15)' }]}>
-              <Ionicons name="people" size={24} color="#34D399" />
-            </View>
-            <Text style={styles.actionItemText}>Care Team</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.actionItem}>
-            <View style={[styles.actionIconBadge, { backgroundColor: 'rgba(248, 113, 113, 0.15)' }]}>
-              <Ionicons name="warning" size={24} color="#F87171" />
-            </View>
-            <Text style={styles.actionItemText}>SOS</Text>
-          </TouchableOpacity>
-        </View>
 
         {/* --- 3. SWIPEABLE INSIGHT CAROUSEL --- */}
         <View style={styles.sectionHeaderRow}>
