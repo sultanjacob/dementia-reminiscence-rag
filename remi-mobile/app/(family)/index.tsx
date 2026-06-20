@@ -207,8 +207,8 @@ const styles = StyleSheet.create({
   },
   actionBar: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: 30,
+    justifyContent: 'space-evenly', // Changed from space-between
+    paddingHorizontal: 10, // Reduced padding to let them spread naturally
     marginTop: 30,
     marginBottom: 10,
   },
