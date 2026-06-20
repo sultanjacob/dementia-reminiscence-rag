@@ -12,10 +12,10 @@ export default function FamilyLayout() {
           backgroundColor: '#110C1D',
           borderTopWidth: 1,
           borderTopColor: '#231A31',
-          // INCREASED PADDING AND HEIGHT BELOW
-          paddingBottom: Platform.OS === 'android' ? 15 : 28,
+          // INCREASED these Android numbers to push the icons up higher
+          paddingBottom: Platform.OS === 'android' ? 25 : 28,
           paddingTop: 10,
-          height: Platform.OS === 'android' ? 70 : 88,
+          height: Platform.OS === 'android' ? 85 : 88,
         },
         tabBarActiveTintColor: '#8B5CF6',
         tabBarInactiveTintColor: '#6B7280',
