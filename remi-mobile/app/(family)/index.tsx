@@ -1,46 +1,30 @@
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
-import {
-  Platform,
-  SafeAreaView,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View
-} from 'react-native';
+import { SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export default function FamilyDashboard() {
-  const patientName = "Mary";
-  
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor="#000000" />
-      
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.greeting}>Hello, Sarah</Text>
-          <Text style={styles.subGreeting}>Family Dashboard</Text>
+    <SafeAreaView style={styles.container}>
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        {/* --- 1. HEADER & STATUS CARD --- */}
+        <View style={styles.header}>
+          <View>
+            <Text style={styles.greeting}>Hello, Sarah</Text>
+            <Text style={styles.subtitle}>Family Dashboard</Text>
+          </View>
+          <TouchableOpacity style={styles.profileButton}>
+            <Ionicons name="person-outline" size={24} color="#E5E7EB" />
+          </TouchableOpacity>
         </View>
-        <TouchableOpacity style={styles.profileButton}>
-          <Ionicons name="person-outline" size={24} color="#FFFFFF" />
-        </TouchableOpacity>
-      </View>
 
-      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-        
-        {/* --- 1. AT A GLANCE (The Anchor) --- */}
         <View style={styles.statusCard}>
           <View style={styles.statusHeader}>
-            <View style={styles.patientInfo}>
-              <View style={styles.avatar}>
-                <Text style={styles.avatarText}>{patientName[0]}</Text>
-              </View>
-              <View>
-                <Text style={styles.patientName}>{patientName}</Text>
-                <Text style={styles.statusText}>Doing well today</Text>
-              </View>
+            <View style={styles.avatar}>
+              <Text style={styles.avatarText}>M</Text>
+            </View>
+            <View style={styles.statusInfo}>
+              <Text style={styles.patientName}>Mary</Text>
+              <Text style={styles.patientStatus}>Doing well today</Text>
             </View>
             <View style={styles.onlineBadge}>
               <View style={styles.onlineDot} />
@@ -49,168 +33,163 @@ export default function FamilyDashboard() {
           </View>
         </View>
 
+        {/* --- 2. COMPACT ACTION BAR (Routines Removed, Spaced Evenly) --- */}
+        <View style={styles.actionBar}>
+          <TouchableOpacity style={styles.actionItem}>
+            <View style={[styles.actionIconBadge, { backgroundColor: 'rgba(139, 92, 246, 0.15)' }]}>
+              <Ionicons name="images" size={24} color="#8B5CF6" />
+            </View>
+            <Text style={styles.actionItemText}>Vault</Text>
+          </TouchableOpacity>
 
+          <TouchableOpacity style={styles.actionItem}>
+            <View style={[styles.actionIconBadge, { backgroundColor: 'rgba(52, 211, 153, 0.15)' }]}>
+              <Ionicons name="people" size={24} color="#34D399" />
+            </View>
+            <Text style={styles.actionItemText}>Care Team</Text>
+          </TouchableOpacity>
 
-        {/* --- 3. SWIPEABLE INSIGHT CAROUSEL --- */}
-        <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionTitle}>Daily Insights</Text>
-          <Text style={styles.lastUpdatedText}>Updated 10m ago</Text>
+          <TouchableOpacity style={styles.actionItem}>
+            <View style={[styles.actionIconBadge, { backgroundColor: 'rgba(248, 113, 113, 0.15)' }]}>
+              <Ionicons name="warning" size={24} color="#F87171" />
+            </View>
+            <Text style={styles.actionItemText}>SOS</Text>
+          </TouchableOpacity>
         </View>
 
-        {/* Note the horizontal ScrollView here */}
-        <ScrollView 
-          horizontal 
-          showsHorizontalScrollIndicator={false} 
-          contentContainerStyle={styles.carouselContainer}
-          decelerationRate="fast"
-          snapToInterval={280 + 15} // Card width + gap for smooth snapping
-        >
-          
-          {/* Insight Card 1: Vibe Check */}
-          <View style={[styles.insightCard, { borderColor: 'rgba(251, 191, 36, 0.3)' }]}>
-            <View style={styles.insightCardHeader}>
-              <Ionicons name="happy" size={20} color="#FBBF24" />
-              <Text style={styles.insightCardTitle}>Vibe Check</Text>
+        {/* --- 3. DAILY INSIGHTS --- */}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Daily Insights</Text>
+          <Text style={styles.sectionSubtitle}>Updated 10m ago</Text>
+        </View>
+
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.insightsScroll}>
+          {/* Insight Card 1 */}
+          <View style={styles.insightCard}>
+            <View style={styles.insightHeader}>
+              <Text style={styles.insightEmoji}>🙂</Text>
+              <Text style={styles.insightTitle}>Vibe Check</Text>
             </View>
-            <Text style={styles.insightMainText}>Calm & Conversational</Text>
-            <Text style={styles.insightSubText}>Mary sounds relaxed today during 3 chats with Remi.</Text>
+            <Text style={styles.insightHighlight}>Calm & Conversational</Text>
+            <Text style={styles.insightDesc}>Mary sounds relaxed today during 3 chats with Remi.</Text>
           </View>
 
-          {/* Insight Card 2: Location */}
-          <View style={[styles.insightCard, { borderColor: 'rgba(52, 211, 153, 0.3)' }]}>
-            <View style={styles.insightCardHeader}>
-              <Ionicons name="location" size={20} color="#34D399" />
-              <Text style={styles.insightCardTitle}>Safe Zone</Text>
+          {/* Insight Card 2 */}
+          <View style={styles.insightCard}>
+            <View style={styles.insightHeader}>
+              <Ionicons name="chatbubble" size={16} color="#8B5CF6" style={{ marginRight: 8 }} />
+              <Text style={styles.insightTitle}>Latest Chat</Text>
             </View>
-            <Ionicons name="home" size={32} color="#34D399" style={{ marginVertical: 10 }} />
-            <Text style={styles.insightMainText}>Safely at Home</Text>
+            <Text style={styles.insightDesc}>"Remi asked about the 1985 Lake House trip. Mary recalled baking pies with Aunt Susan."</Text>
+            <Text style={styles.insightLink}>Tap to read full report</Text>
           </View>
-
-          {/* Insight Card 3: Recent Activity */}
-          <View style={[styles.insightCard, { borderColor: 'rgba(139, 92, 246, 0.3)' }]}>
-            <View style={styles.insightCardHeader}>
-              <Ionicons name="chatbubbles" size={20} color="#8B5CF6" />
-              <Text style={styles.insightCardTitle}>Latest Chat</Text>
-            </View>
-            <Text style={styles.insightSubText} numberOfLines={3}>
-              "Remi asked about the 1985 Lake House trip. Mary recalled baking pies with Aunt Susan."
-            </Text>
-            <Text style={[styles.insightSubText, { color: '#8B5CF6', marginTop: 10 }]}>Tap to read full report</Text>
-          </View>
-
         </ScrollView>
-
-        <View style={{ height: 40 }} />
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
+  container: {
     flex: 1,
     backgroundColor: '#000000',
-    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
+  },
+  scrollContent: {
+    padding: 20,
+    paddingBottom: 40,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 20,
+    marginTop: 20,
+    marginBottom: 30,
   },
   greeting: {
-    fontSize: 32,
-    fontWeight: 'bold',
     color: '#FFFFFF',
-    letterSpacing: -0.5,
+    fontSize: 28,
+    fontWeight: 'bold',
   },
-  subGreeting: {
-    fontSize: 16,
+  subtitle: {
     color: '#8B5CF6',
+    fontSize: 16,
+    fontWeight: '600',
     marginTop: 4,
-    fontWeight: '500',
   },
   profileButton: {
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#1A1325',
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: '#110C1D',
     borderWidth: 1,
     borderColor: '#231A31',
-  },
-  container: {
-    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   statusCard: {
     backgroundColor: '#110C1D',
-    borderRadius: 24,
+    borderRadius: 20,
     padding: 20,
-    marginHorizontal: 20,
     borderWidth: 1,
     borderColor: '#231A31',
   },
   statusHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  patientInfo: {
-    flexDirection: 'row',
     alignItems: 'center',
   },
   avatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     backgroundColor: '#8B5CF6',
-    alignItems: 'center',
     justifyContent: 'center',
+    alignItems: 'center',
     marginRight: 15,
   },
   avatarText: {
-    fontSize: 22,
-    fontWeight: 'bold',
     color: '#FFFFFF',
+    fontSize: 24,
+    fontWeight: 'bold',
+  },
+  statusInfo: {
+    flex: 1,
   },
   patientName: {
-    fontSize: 22,
-    fontWeight: 'bold',
     color: '#FFFFFF',
+    fontSize: 20,
+    fontWeight: 'bold',
   },
-  statusText: {
-    fontSize: 15,
-    color: '#A396B5',
+  patientStatus: {
+    color: '#9CA3AF',
+    fontSize: 14,
     marginTop: 4,
   },
   onlineBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(74, 222, 128, 0.15)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
+    backgroundColor: 'rgba(52, 211, 153, 0.15)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
   },
   onlineDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#4ADE80',
+    backgroundColor: '#34D399',
     marginRight: 6,
   },
   onlineText: {
-    fontSize: 13,
-    color: '#4ADE80',
-    fontWeight: '700',
+    color: '#34D399',
+    fontSize: 12,
+    fontWeight: 'bold',
   },
   actionBar: {
     flexDirection: 'row',
-    justifyContent: 'space-evenly', // Changed from space-between
-    paddingHorizontal: 10, // Reduced padding to let them spread naturally
+    justifyContent: 'space-evenly', 
     marginTop: 30,
-    marginBottom: 10,
+    marginBottom: 30,
+    paddingHorizontal: 10,
   },
   actionItem: {
     alignItems: 'center',
@@ -219,65 +198,72 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    alignItems: 'center',
     justifyContent: 'center',
+    alignItems: 'center',
     marginBottom: 8,
   },
   actionItemText: {
-    color: '#E2D8F0',
-    fontSize: 13,
-    fontWeight: '600',
+    color: '#E5E7EB',
+    fontSize: 14,
+    fontWeight: '500',
   },
-  sectionHeaderRow: {
+  sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-end',
-    paddingHorizontal: 20,
-    marginTop: 35,
     marginBottom: 15,
   },
   sectionTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  lastUpdatedText: {
-    fontSize: 13,
-    color: '#6B7280',
-    fontWeight: '500',
-  },
-  carouselContainer: {
-    paddingHorizontal: 20,
-    gap: 15, // Space between cards
-  },
-  insightCard: {
-    width: 280, // Fixed width so they peek off the edge of the screen
-    backgroundColor: '#110C1D',
-    borderRadius: 24,
-    padding: 20,
-    borderWidth: 1,
-    justifyContent: 'center',
-  },
-  insightCardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 15,
-  },
-  insightCardTitle: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-    marginLeft: 8,
-  },
-  insightMainText: {
     color: '#FFFFFF',
     fontSize: 22,
     fontWeight: 'bold',
-    marginBottom: 8,
   },
-  insightSubText: {
+  sectionSubtitle: {
+    color: '#6B7280',
+    fontSize: 12,
+  },
+  insightsScroll: {
+    marginLeft: -20,
+    paddingLeft: 20,
+  },
+  insightCard: {
+    backgroundColor: '#110C1D',
+    borderRadius: 20,
+    padding: 20,
+    width: 260,
+    marginRight: 15,
+    borderWidth: 1,
+    borderColor: '#231A31',
+  },
+  insightHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  insightEmoji: {
+    fontSize: 16,
+    marginRight: 8,
+  },
+  insightTitle: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  insightHighlight: {
+    color: '#FFFFFF',
+    fontSize: 22,
+    fontWeight: 'bold',
+    marginBottom: 10,
+  },
+  insightDesc: {
     color: '#9CA3AF',
     fontSize: 14,
-    lineHeight: 22,
+    lineHeight: 20,
+  },
+  insightLink: {
+    color: '#8B5CF6',
+    fontSize: 14,
+    marginTop: 15,
+    fontWeight: '500',
   },
 });
