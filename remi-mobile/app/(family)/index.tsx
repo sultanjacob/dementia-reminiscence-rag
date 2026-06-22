@@ -36,15 +36,14 @@ export default function FamilyDashboard() {
         </View>
 
         {/* --- 2. COMPACT ACTION BAR (Routines Removed, Spaced Evenly) --- */}
-        <View style={styles.actionBar}>
-          <TouchableOpacity style={styles.actionItem}>
-            <View style={[styles.actionIconBadge, { backgroundColor: 'rgba(139, 92, 246, 0.15)' }]}>
-              <Ionicons name="images" size={24} color="#8B5CF6" />
-            </View>
-            <Text style={styles.actionItemText}>Vault</Text>
-          </TouchableOpacity>
+        <TouchableOpacity style={styles.actionItem} onPress={() => router.push('/(family)/vault')}>
+        <View style={[styles.actionIconBadge, { backgroundColor: 'rgba(139, 92, 246, 0.15)' }]}>
+    <Ionicons name="images" size={24} color="#8B5CF6" />
+  </View>
+  <Text style={styles.actionItemText}>Vault</Text>
+</TouchableOpacity>
 
-          <TouchableOpacity style={styles.actionItem}>
+          <TouchableOpacity style={styles.actionItem} onPress={() => router.push('/(family)/care-team')}>
             <View style={[styles.actionIconBadge, { backgroundColor: 'rgba(52, 211, 153, 0.15)' }]}>
               <Ionicons name="people" size={24} color="#34D399" />
             </View>
