@@ -27,9 +27,10 @@ export default function MemoryVaultScreen() {
   useEffect(() => {
     fetchVaultImages();
   }, []);
-const [isCaptionModalVisible, setCaptionModalVisible] = useState(false);
-const [pendingImage, setPendingImage] = useState<any>(null);
-const [captionText, setCaptionText] = useState('');
+  const [isCaptionModalVisible, setCaptionModalVisible] = useState(false);
+  const [pendingImage, setPendingImage] = useState<any>(null);
+  const [captionText, setCaptionText] = useState('');
+
   const fetchVaultImages = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -50,24 +51,43 @@ const [captionText, setCaptionText] = useState('');
     }
   };
 
-  const pickAndUploadImage = async () => {
+  // 1. Pick the image and open the caption popup
+  const pickImage = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: false,
+      quality: 0.5,
+      base64: true,
+    });
+
+    if (!result.canceled) {
+      setPendingImage(result.assets[0]); // Save the image temporarily
+      setCaptionModalVisible(true);      // Open the text popup
+    }
+  };
+
+  // 2. Upload everything together
+   const uploadWithCaption = async () => {
+    setCaptionModalVisible(false); // Close the popup
+    if (!pendingImage) return;
+
     try {
-      // 1. Ask for permission and pick the image
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: false,
-        aspect: [4, 3],
-        quality: 0.5, // Compress slightly for faster uploads
-        base64: true, // Crucial for Supabase mobile uploads
-      });
+      // --- PASTE YOUR EXISTING SUPABASE UPLOAD LOGIC HERE ---
+      // (The code that uploads to the storage bucket and gets the public URL)
 
-      if (result.canceled || !result.assets[0].base64) {
-        return;
-      }
+      // When you insert into your database table, make sure you include the caption!
+      // Example: 
+      // await supabase.from('memory_vault').insert({ 
+      //   image_url: publicUrl, 
+      //   caption: captionText  <-- ADD THIS
+      // });
 
-      setUploading(true);
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
+      setPendingImage(null); // Clear the temporary image
+      setCaptionText('');    // Clear the typed text
+    } catch (error) {
+      console.error("Upload error:", error);
+    }
+  };
 
       // 2. Prepare the file for Supabase
       const base64FileData = result.assets[0].base64;
