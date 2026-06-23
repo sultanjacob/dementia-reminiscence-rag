@@ -53,10 +53,10 @@ export default function MemoryVaultScreen() {
       // 1. Ask for permission and pick the image
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
+        allowsEditing: false,
         aspect: [4, 3],
         quality: 0.5, // Compress slightly for faster uploads
-        base64: false, // Crucial for Supabase mobile uploads
+        base64: true, // Crucial for Supabase mobile uploads
       });
 
       if (result.canceled || !result.assets[0].base64) {
