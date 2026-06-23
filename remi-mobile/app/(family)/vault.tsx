@@ -217,6 +217,65 @@ export default function MemoryVaultScreen() {
 }
 
 const styles = StyleSheet.create({
+    modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: '#110C1D',
+    borderRadius: 20,
+    padding: 20,
+    width: '100%',
+    borderWidth: 1,
+    borderColor: '#231A31',
+  },
+  modalTitle: {
+    color: '#FFFFFF',
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 15,
+  },
+  captionInput: {
+    backgroundColor: '#000000',
+    color: '#FFFFFF',
+    borderRadius: 10,
+    padding: 15,
+    minHeight: 100,
+    borderWidth: 1,
+    borderColor: '#231A31',
+    textAlignVertical: 'top',
+    marginBottom: 20,
+    fontSize: 16,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 15,
+  },
+  cancelButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+    justifyContent: 'center',
+  },
+  cancelButtonText: {
+    color: '#9CA3AF',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  saveButton: {
+    backgroundColor: '#8B5CF6',
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+    borderRadius: 10,
+  },
+  saveButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
   safeArea: { flex: 1, backgroundColor: '#000000', paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 15 },
   backButton: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#110C1D', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#231A31' },
