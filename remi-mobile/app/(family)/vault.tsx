@@ -27,7 +27,9 @@ export default function MemoryVaultScreen() {
   useEffect(() => {
     fetchVaultImages();
   }, []);
-
+const [isCaptionModalVisible, setCaptionModalVisible] = useState(false);
+const [pendingImage, setPendingImage] = useState<any>(null);
+const [captionText, setCaptionText] = useState('');
   const fetchVaultImages = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
