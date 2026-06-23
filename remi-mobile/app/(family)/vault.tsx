@@ -180,6 +180,38 @@ export default function MemoryVaultScreen() {
           </View>
         </ScrollView>
       )}
+      {/* CAPTION MODAL */}
+      <Modal visible={isCaptionModalVisible} transparent={true} animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Add a Memory</Text>
+            
+            <TextInput
+              style={styles.captionInput}
+              placeholder="What's the story behind this photo?"
+              placeholderTextColor="#9CA3AF"
+              value={captionText}
+              onChangeText={setCaptionText}
+              multiline
+            />
+            
+            <View style={styles.modalButtons}>
+              <TouchableOpacity 
+                style={styles.cancelButton} 
+                onPress={() => {
+                  setCaptionModalVisible(false);
+                  setPendingImage(null);
+                }}>
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity style={styles.saveButton} onPress={uploadWithCaption}>
+                <Text style={styles.saveButtonText}>Save & Upload</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
