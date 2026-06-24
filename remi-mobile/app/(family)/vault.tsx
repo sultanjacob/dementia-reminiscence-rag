@@ -23,7 +23,6 @@ import { supabase } from '../../supabase';
 export default function MemoryVaultScreen() {
   const router = useRouter();
   
-  // State Variables
   const [images, setImages] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -31,7 +30,6 @@ export default function MemoryVaultScreen() {
   const [pendingImage, setPendingImage] = useState<any>(null);
   const [captionText, setCaptionText] = useState('');
 
-  // Fetch images when screen loads
   useEffect(() => {
     fetchVaultImages();
   }, []);
@@ -56,24 +54,22 @@ export default function MemoryVaultScreen() {
     }
   };
 
-  // 1. Pick the image and open the caption popup
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: false, // Prevents the cropping bug
+      allowsEditing: false,
       quality: 0.5,
       base64: true,
     });
 
     if (!result.canceled) {
-      setPendingImage(result.assets[0]); // Save the image temporarily
-      setCaptionModalVisible(true);      // Open the text popup
+      setPendingImage(result.assets[0]);
+      setCaptionModalVisible(true);
     }
   };
 
-  // 2. Upload everything together
   const uploadWithCaption = async () => {
-    setCaptionModalVisible(false); // Close the popup immediately
+    setCaptionModalVisible(false);
     if (!pendingImage) return;
 
     setUploading(true);
@@ -82,12 +78,10 @@ export default function MemoryVaultScreen() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-      // Prepare the file for Supabase
       const base64FileData = pendingImage.base64;
       const ext = pendingImage.uri.split('.').pop()?.toLowerCase() || 'jpeg';
       const fileName = `${user.id}/${Date.now()}.${ext}`;
 
-      // Upload to Storage Bucket
       const { error: uploadError } = await supabase.storage
         .from('memory_vault')
         .upload(fileName, decode(base64FileData), {
@@ -96,33 +90,72 @@ export default function MemoryVaultScreen() {
 
       if (uploadError) throw uploadError;
 
-      // Get the public URL
       const { data: { publicUrl } } = supabase.storage
         .from('memory_vault')
         .getPublicUrl(fileName);
 
-      // Save the record to the Database WITH the caption
       const { error: dbError } = await supabase
         .from('memory_vault')
         .insert({
           uploader_id: user.id,
-          patient_code: user.id, // Replace with linked_patient_id later if needed
+          patient_code: user.id,
           image_url: publicUrl,
-          caption: captionText,  // Captures whatever Sarah typed
+          caption: captionText,
         });
 
       if (dbError) throw dbError;
 
-      Alert.alert("Success", "Memory added to the vault!");
-      fetchVaultImages(); // Refresh the gallery to show the new photo
+      fetchVaultImages();
 
     } catch (error: any) {
       Alert.alert("Upload Failed", error.message);
     } finally {
-      // Clean up all state
       setUploading(false);
       setPendingImage(null);
       setCaptionText('');
+    }
+  };
+
+  // --- NEW DELETE LOGIC ---
+  const confirmDelete = (img: any) => {
+    Alert.alert(
+      "Delete Memory",
+      "Are you sure you want to remove this photo from the vault?",
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Delete", style: "destructive", onPress: () => deleteImage(img) }
+      ]
+    );
+  };
+
+  const deleteImage = async (img: any) => {
+    setLoading(true);
+    try {
+      // 1. Extract the specific file path from the full public URL
+      const filePath = img.image_url.split('/memory_vault/')[1];
+      
+      // 2. Remove the actual image file from the Supabase Storage Bucket
+      if (filePath) {
+        const { error: storageError } = await supabase.storage
+          .from('memory_vault')
+          .remove([filePath]);
+        if (storageError) throw storageError;
+      }
+
+      // 3. Delete the text record from the database table
+      const { error: dbError } = await supabase
+        .from('memory_vault')
+        .delete()
+        .eq('id', img.id);
+        
+      if (dbError) throw dbError;
+
+      // 4. Refresh the gallery
+      fetchVaultImages();
+
+    } catch (error: any) {
+      Alert.alert("Delete Failed", error.message);
+      setLoading(false); // Only stop loading if it fails, otherwise fetchVaultImages handles it
     }
   };
 
@@ -130,7 +163,6 @@ export default function MemoryVaultScreen() {
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="light-content" backgroundColor="#000000" />
       
-      {/* HEADER */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
@@ -139,7 +171,6 @@ export default function MemoryVaultScreen() {
         <View style={{ width: 44 }} /> 
       </View>
 
-      {/* MAIN CONTENT */}
       {loading ? (
         <View style={styles.centerContainer}>
           <ActivityIndicator size="large" color="#8B5CF6" />
@@ -148,10 +179,9 @@ export default function MemoryVaultScreen() {
         <ScrollView contentContainerStyle={styles.scrollContent}>
           <Text style={styles.subtitle}>Photos uploaded here will be visible to Mary in her Remi app.</Text>
 
-          {/* UPLOAD BUTTON */}
           <TouchableOpacity 
             style={[styles.uploadCard, uploading && styles.uploadCardDisabled]} 
-            onPress={pickImage} // Triggers the popup flow
+            onPress={pickImage}
             disabled={uploading}
           >
             {uploading ? (
@@ -167,12 +197,11 @@ export default function MemoryVaultScreen() {
             )}
           </TouchableOpacity>
 
-          {/* GALLERY GRID */}
           <View style={styles.galleryGrid}>
             {images.map((img) => (
               <View key={img.id} style={styles.imageContainer}>
                 <Image source={{ uri: img.image_url }} style={styles.image} />
-                {/* Shows the caption on top of the image if it exists */}
+                
                 {img.caption ? (
                   <View style={styles.captionOverlay}>
                     <Text style={styles.captionText} numberOfLines={2}>
@@ -180,6 +209,16 @@ export default function MemoryVaultScreen() {
                     </Text>
                   </View>
                 ) : null}
+
+                {/* THE NEW DELETE BUTTON */}
+                <TouchableOpacity 
+                  style={styles.deleteButton} 
+                  onPress={() => confirmDelete(img)}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="trash-outline" size={16} color="#FFFFFF" />
+                </TouchableOpacity>
+
               </View>
             ))}
             
@@ -190,7 +229,6 @@ export default function MemoryVaultScreen() {
         </ScrollView>
       )}
 
-      {/* CAPTION MODAL */}
       <Modal visible={isCaptionModalVisible} transparent={true} animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
@@ -246,9 +284,22 @@ const styles = StyleSheet.create({
   galleryGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
   imageContainer: { width: '48%', aspectRatio: 1, marginBottom: 15, borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: '#231A31', position: 'relative' },
   image: { width: '100%', height: '100%' },
-  captionOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.6)', padding: 8 },
+  captionOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.7)', padding: 10 },
   captionText: { color: '#FFFFFF', fontSize: 12, lineHeight: 16 },
   emptyText: { color: '#6B7280', width: '100%', textAlign: 'center', marginTop: 20 },
+
+  // --- NEW DELETE BUTTON STYLE ---
+  deleteButton: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: 'rgba(239, 68, 68, 0.85)', // A nice semi-transparent red
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.7)', justifyContent: 'center', alignItems: 'center', padding: 20 },
   modalContent: { backgroundColor: '#110C1D', borderRadius: 20, padding: 20, width: '100%', borderWidth: 1, borderColor: '#231A31' },
