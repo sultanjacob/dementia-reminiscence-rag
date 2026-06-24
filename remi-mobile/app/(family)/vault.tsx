@@ -1,3 +1,4 @@
+import { Modal, TextInput, /* your other imports like View, Text, etc. */ } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { decode } from 'base64-arraybuffer';
 import * as ImagePicker from 'expo-image-picker';
