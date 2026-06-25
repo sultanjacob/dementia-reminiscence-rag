@@ -33,7 +33,7 @@ export default function RoutineScreen() {
 
   const addRoutine = async () => {
     if (!time || !activity) return Alert.alert("Error", "Please fill in both time and activity.");
-    if (!userId) return Alert.alert("Error", "User not authenticated.");
+    if (!userId) return Alert.alert("Error", "User not authenticated. Try another way");
 
     setLoading(true);
     
