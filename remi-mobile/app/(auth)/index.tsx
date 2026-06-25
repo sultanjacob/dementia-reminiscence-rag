@@ -120,13 +120,16 @@ export default function HomeScreen() {
           if (profileData.secondaryContact) setSecondaryContact(profileData.secondary_contact);
         }
 
-        const { data: memories } = await supabase.from('memories').select('*').eq('user_id', user.id);
+        // --- NEW: FETCH FROM LIVE MEMORY VAULT ---
+        const { data: memories } = await supabase.from('memory_vault').select('*');
         
         if (memories && memories.length > 0) {
           const randomMem = memories[Math.floor(Math.random() * memories.length)];
           setDailyMemory(randomMem);
           
-          const memoryGreeting = `I was just admiring this photo of ${randomMem.title}.`;
+          const memoryCaption = randomMem.caption ? randomMem.caption : "";
+          const memoryGreeting = `I was just admiring this photo. ${memoryCaption}`.trim();
+          
           setRemiText(memoryGreeting);
           speak(memoryGreeting); 
         } else {
@@ -147,7 +150,8 @@ export default function HomeScreen() {
     setIsNudgeActive(false);
     
     if (dailyMemory) {
-      setRemiText(`I was just admiring this lovely photo of ${dailyMemory.title}.`);
+      const memoryCaption = dailyMemory.caption ? dailyMemory.caption : "";
+      setRemiText(`I was just admiring this photo. ${memoryCaption}`.trim());
     } else {
       setRemiText(`Hello ${userName}! I am Remi. How can I help you today?`);
     }
@@ -244,14 +248,12 @@ export default function HomeScreen() {
     setIsMenuVisible(true);
   };
 
-  // --- NEW: Handle Sign Out ---
   const handleSignOut = async () => {
     setIsMenuVisible(false);
     const { error } = await supabase.auth.signOut();
     if (error) {
       Alert.alert("Sign Out Error", error.message);
     }
-    // _layout.tsx will automatically detect this and route us back to the login screen!
   };
 
   const handlePrimaryCall = () => {
@@ -338,7 +340,10 @@ export default function HomeScreen() {
                   <Image source={{ uri: dailyMemory.image_url }} style={styles.memoryImage} resizeMode="cover" />
                   <View style={styles.memoryOverlay}>
                     <Ionicons name="scan-circle-outline" size={18} color="#FFFFFF" style={{marginRight: 6}} />
-                    <Text style={styles.memoryTitleText}>Tap to view {dailyMemory.title}</Text>
+                    {/* TRUNCATES THE CAPTION IF IT IS TOO LONG SO IT DOESN'T BREAK UI */}
+                    <Text style={styles.memoryTitleText}>
+                      Tap to view {dailyMemory.caption ? (dailyMemory.caption.length > 20 ? dailyMemory.caption.substring(0, 20) + '...' : dailyMemory.caption) : "photo"}
+                    </Text>
                   </View>
                 </TouchableOpacity>
               </Animated.View>
@@ -436,9 +441,11 @@ export default function HomeScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.imageCapsule}>
             <View style={styles.imageModalHeader}>
-              <View>
-                <Text style={styles.imageModalTitle}>{dailyMemory?.title}</Text>
-                <Text style={styles.imageModalDate}>{dailyMemory?.date || "A beautiful memory"}</Text>
+              <View style={{ flex: 1, paddingRight: 15 }}>
+                <Text style={styles.imageModalTitle}>{dailyMemory?.caption || "A beautiful memory"}</Text>
+                <Text style={styles.imageModalDate}>
+                  {dailyMemory?.created_at ? new Date(dailyMemory.created_at).toLocaleDateString() : "Shared by family"}
+                </Text>
               </View>
               <TouchableOpacity 
                 onPress={() => setIsMemoryExpanded(false)} 
@@ -467,7 +474,6 @@ export default function HomeScreen() {
               </TouchableOpacity>
             </View>
             
-            {/* --- UPDATED MENU ITEMS --- */}
             <TouchableOpacity style={styles.menuRow} onPress={() => {
               setIsMenuVisible(false);
               router.push('/settings');
@@ -535,7 +541,7 @@ const styles = StyleSheet.create({
   menuRowText: { flex: 1, fontSize: 18, fontWeight: '600', color: '#374151' },
   imageCapsule: { backgroundColor: '#FFFFFF', borderRadius: 35, padding: 24, alignSelf: 'center', width: '90%', marginBottom: '40%', shadowColor: '#000', shadowOffset: { width: 0, height: 20 }, shadowOpacity: 0.15, shadowRadius: 30, elevation: 20 },
   imageModalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 },
-  imageModalTitle: { fontSize: 24, fontWeight: '800', color: '#111827' },
+  imageModalTitle: { fontSize: 20, fontWeight: '800', color: '#111827' },
   imageModalDate: { fontSize: 16, color: '#8B5CF6', marginTop: 4, fontWeight: '600' },
   closeImageButton: { backgroundColor: '#F3F4F6', padding: 10, borderRadius: 20 },
   largeExpandedImage: { width: '100%', height: 350, borderRadius: 24 },
