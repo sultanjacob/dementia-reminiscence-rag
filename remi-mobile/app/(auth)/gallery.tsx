@@ -26,7 +26,6 @@ export default function PatientGalleryScreen() {
 
   const fetchMemories = async () => {
     try {
-      // Fetches the photos Sarah just uploaded to the vault!
       const { data, error } = await supabase
         .from('memory_vault')
         .select('*')
@@ -45,13 +44,12 @@ export default function PatientGalleryScreen() {
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="light-content" backgroundColor="#000000" />
       
-      {/* SIMPLE, ACCESSIBLE HEADER */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={32} color="#FFFFFF" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>My Memories</Text>
-        <View style={{ width: 50 }} /> {/* Spacer to center title */}
+        <View style={{ width: 50 }} /> 
       </View>
 
       {loading ? (
@@ -73,9 +71,9 @@ export default function PatientGalleryScreen() {
             </View>
           ))}
 
-          {images.length === 0 && (
+          {images.length === 0 ? (
             <Text style={styles.emptyText}>Your family hasn't added any photos yet.</Text>
-          )}
+          ) : null}
           
           <View style={{ height: 40 }} />
         </ScrollView>
@@ -110,7 +108,7 @@ const styles = StyleSheet.create({
     borderColor: '#231A31' 
   },
   headerTitle: { 
-    fontSize: 28, // Massive font for readability
+    fontSize: 28, 
     fontWeight: 'bold', 
     color: '#FFFFFF' 
   },
@@ -140,7 +138,7 @@ const styles = StyleSheet.create({
   },
   captionText: { 
     color: '#FFFFFF', 
-    fontSize: 24, // Extra large, highly readable text
+    fontSize: 24, 
     lineHeight: 34,
     fontWeight: '500'
   },
