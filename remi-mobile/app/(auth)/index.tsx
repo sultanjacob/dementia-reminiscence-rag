@@ -250,13 +250,20 @@ export default function HomeScreen() {
 
   const handleSignOut = async () => {
     setIsMenuVisible(false);
-    const { error } = await supabase.auth.signOut();
     
-    if (error) {
+    try {
+      // 1. Tell Supabase to sign out
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      
+      // 2. Wait just one-third of a second for the phone's storage to completely clear
+      // before navigating. This prevents the login screen from bouncing us back!
+      setTimeout(() => {
+        router.replace('/');
+      }, 300);
+
+    } catch (error: any) {
       Alert.alert("Sign Out Error", error.message);
-    } else {
-      // Explicitly kick the user back to the root login screen
-      router.replace('/'); 
     }
   };
 
