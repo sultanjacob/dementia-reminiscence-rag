@@ -253,6 +253,9 @@ export default function HomeScreen() {
     const { error } = await supabase.auth.signOut();
     if (error) {
       Alert.alert("Sign Out Error", error.message);
+    } else {
+      //explicitly kick the user back to the root login screen router.replace ('/')
+;
     }
   };
 
