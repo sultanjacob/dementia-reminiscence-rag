@@ -251,22 +251,20 @@ export default function HomeScreen() {
   const handleSignOut = async () => {
     setIsMenuVisible(false);
     
-    try {
-      // 1. Tell Supabase to sign out
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
-      
-      // 2. Wait just one-third of a second for the phone's storage to completely clear
-      // before navigating. This prevents the login screen from bouncing us back!
-      setTimeout(() => {
-        router.replace('/');
-      }, 300);
-
-    } catch (error: any) {
+    const { error } = await supabase.auth.signOut();
+    
+    if (error) {
       Alert.alert("Sign Out Error", error.message);
+      return;
     }
+    
+    // Force the router to completely clear the navigation stack 
+    // and go to the absolute root file (app/index.tsx)
+    while (router.canGoBack()) {
+      router.back();
+    }
+    router.replace({ pathname: '/' });
   };
-
   const handlePrimaryCall = () => {
     if (primaryContact) Linking.openURL(`tel:${primaryContact}`);
     else Alert.alert("Not Setup", "Please ask your family to add a Primary Contact in settings.");
