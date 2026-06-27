@@ -261,11 +261,13 @@ export default function HomeScreen() {
   const handleSignOut = async () => {
     setIsMenuVisible(false);
     
+    // We strictly sign out here and let the global RootLayout handle all the routing!
     const { error } = await supabase.auth.signOut();
+    
     if (error) {
       Alert.alert("Sign Out Error", error.message);
-      return;
     }
+  };
 
     // After signing out, aggressively clear the stack and push to the login screen
     while (router.canGoBack()) {
