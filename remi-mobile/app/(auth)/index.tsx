@@ -105,38 +105,47 @@ export default function HomeScreen() {
       });
       setCurrentDate(formattedDate);
 
+      // 1. Fetch user session
       const { data: { user } } = await supabase.auth.getUser();
+      
+      // 2. THE EVICTION RULE: If there is no active session, redirect to the login screen immediately
+      if (!user) {
+        while (router.canGoBack()) {
+          router.back();
+        }
+        router.replace('/');
+        return;
+      }
+
       let fetchedName = "John";
       
-      if (user) {
-        const { data: profileData } = await supabase.from('profiles').select('nickname, primary_contact, secondary_contact').eq('id', user.id).single();
-        
-        if (profileData) {
-          if (profileData.nickname) {
-            fetchedName = profileData.nickname;
-            setUserName(fetchedName);
-          }
-          if (profileData.primary_contact) setPrimaryContact(profileData.primary_contact);
-          if (profileData.secondaryContact) setSecondaryContact(profileData.secondary_contact);
+      // 3. Normal profile & memory fetch if logged in
+      const { data: profileData } = await supabase.from('profiles').select('nickname, primary_contact, secondary_contact').eq('id', user.id).single();
+      
+      if (profileData) {
+        if (profileData.nickname) {
+          fetchedName = profileData.nickname;
+          setUserName(fetchedName);
         }
+        if (profileData.primary_contact) setPrimaryContact(profileData.primary_contact);
+        if (profileData.secondaryContact) setSecondaryContact(profileData.secondary_contact);
+      }
 
-        // --- NEW: FETCH FROM LIVE MEMORY VAULT ---
-        const { data: memories } = await supabase.from('memory_vault').select('*');
+      const { data: memories } = await supabase.from('memory_vault').select('*');
+      
+      if (memories && memories.length > 0) {
+        const randomMem = memories[Math.floor(Math.random() * memories.length)];
+        setDailyMemory(randomMem);
         
-        if (memories && memories.length > 0) {
-          const randomMem = memories[Math.floor(Math.random() * memories.length)];
-          setDailyMemory(randomMem);
-          
-          const memoryCaption = randomMem.caption ? randomMem.caption : "";
-          const memoryGreeting = `I was just admiring this photo. ${memoryCaption}`.trim();
-          
-          setRemiText(memoryGreeting);
-          speak(memoryGreeting); 
-        } else {
-          const defaultGreeting = `Hello ${fetchedName}! I am Remi. How can I help you today?`;
-          setRemiText(defaultGreeting);
-          speak(defaultGreeting);
-        }
+        const memoryCaption = randomMem.caption ? randomMem.caption : "";
+        const memoryGreeting = `I was just admiring this photo. ${memoryCaption}`.trim();
+        
+        setRemiText(memoryGreeting);
+        speak(memoryGreeting); 
+      } else {
+        const defaultGreeting = `Hello ${fetchedName}! I am Remi. How can I help you today?`;
+        setRemiText(defaultGreeting);
+        speak(defaultGreeting);
       }
     };
     
@@ -248,27 +257,23 @@ export default function HomeScreen() {
     setIsMenuVisible(true);
   };
 
+  // THE CORRECTED ASYNC SIGNOUT FUNCTION
   const handleSignOut = async () => {
     setIsMenuVisible(false);
-    // Clear session. The app will immediately re-run initializeHome, 
-    // detect there is no user, and trigger the eviction rule above!
-    await supabase.auth.signOut();
-  };
     
     const { error } = await supabase.auth.signOut();
-    
     if (error) {
       Alert.alert("Sign Out Error", error.message);
       return;
     }
-    
-    // Force the router to completely clear the navigation stack 
-    // and go to the absolute root file (app/index.tsx)
+
+    // After signing out, aggressively clear the stack and push to the login screen
     while (router.canGoBack()) {
       router.back();
     }
-    router.replace({ pathname: '/' });
+    router.replace('/');
   };
+
   const handlePrimaryCall = () => {
     if (primaryContact) Linking.openURL(`tel:${primaryContact}`);
     else Alert.alert("Not Setup", "Please ask your family to add a Primary Contact in settings.");
@@ -353,7 +358,6 @@ export default function HomeScreen() {
                   <Image source={{ uri: dailyMemory.image_url }} style={styles.memoryImage} resizeMode="cover" />
                   <View style={styles.memoryOverlay}>
                     <Ionicons name="scan-circle-outline" size={18} color="#FFFFFF" style={{marginRight: 6}} />
-                    {/* TRUNCATES THE CAPTION IF IT IS TOO LONG SO IT DOESN'T BREAK UI */}
                     <Text style={styles.memoryTitleText}>
                       Tap to view {dailyMemory.caption ? (dailyMemory.caption.length > 20 ? dailyMemory.caption.substring(0, 20) + '...' : dailyMemory.caption) : "photo"}
                     </Text>
