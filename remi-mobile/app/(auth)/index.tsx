@@ -250,6 +250,10 @@ export default function HomeScreen() {
 
   const handleSignOut = async () => {
     setIsMenuVisible(false);
+    // Clear session. The app will immediately re-run initializeHome, 
+    // detect there is no user, and trigger the eviction rule above!
+    await supabase.auth.signOut();
+  };
     
     const { error } = await supabase.auth.signOut();
     
