@@ -105,21 +105,14 @@ export default function HomeScreen() {
       });
       setCurrentDate(formattedDate);
 
-      // 1. Fetch user session
       const { data: { user } } = await supabase.auth.getUser();
       
-      // 2. THE EVICTION RULE: If there is no active session, redirect to the login screen immediately
-      if (!user) {
-        while (router.canGoBack()) {
-          router.back();
-        }
-        router.replace('/');
-        return;
-      }
+      // If there is no user, stop running this code immediately. 
+      // The _layout.tsx file will handle kicking the user to the login screen.
+      if (!user) return;
 
       let fetchedName = "John";
       
-      // 3. Normal profile & memory fetch if logged in
       const { data: profileData } = await supabase.from('profiles').select('nickname, primary_contact, secondary_contact').eq('id', user.id).single();
       
       if (profileData) {
@@ -257,23 +250,15 @@ export default function HomeScreen() {
     setIsMenuVisible(true);
   };
 
-  // THE CORRECTED ASYNC SIGNOUT FUNCTION
   const handleSignOut = async () => {
     setIsMenuVisible(false);
     
-    // We strictly sign out here and let the global RootLayout handle all the routing!
+    // Completely defer routing to _layout.tsx!
     const { error } = await supabase.auth.signOut();
     
     if (error) {
       Alert.alert("Sign Out Error", error.message);
     }
-  };
-
-    // After signing out, aggressively clear the stack and push to the login screen
-    while (router.canGoBack()) {
-      router.back();
-    }
-    router.replace('/');
   };
 
   const handlePrimaryCall = () => {
