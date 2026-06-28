@@ -253,11 +253,13 @@ export default function HomeScreen() {
   const handleSignOut = async () => {
     setIsMenuVisible(false);
     
-    // Completely defer routing to _layout.tsx!
     const { error } = await supabase.auth.signOut();
     
     if (error) {
       Alert.alert("Sign Out Error", error.message);
+    } else {
+      // Explicitly kick the user to the root login screen
+      router.replace('/');
     }
   };
 
