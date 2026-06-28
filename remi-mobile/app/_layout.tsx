@@ -60,12 +60,10 @@ export default function RootLayout() {
     const inAuthGroup = segments[0] === '(auth)';
     const inFamilyGroup = segments[0] === '(family)';
 
+    // DIRECT ROUTING - NO TIMEOUTS
     if (!user) {
       if (inAuthGroup || inFamilyGroup) {
-        // THE FIX: A tiny delay ensures no route collisions occur during unmount
-        setTimeout(() => {
-          router.replace('/');
-        }, 100);
+        router.replace('/');
       }
     } else if (user && userRole) {
       if (userRole === 'family' && !inFamilyGroup) {
