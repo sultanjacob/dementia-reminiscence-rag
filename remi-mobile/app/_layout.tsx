@@ -11,7 +11,6 @@ export default function RootLayout() {
   const segments = useSegments();
   const router = useRouter();
 
-  // Added a retry mechanism to fix the database timing race condition
   const checkUserAndRole = async (sessionUser: any, retryCount = 0) => {
     if (!sessionUser) {
       setUser(null);
@@ -32,13 +31,11 @@ export default function RootLayout() {
       console.error("Error fetching that role:", error);
     }
 
-    // THE FIX: If data isn't there yet (during a fresh sign-up), wait 1 second and retry.
     if (!data && retryCount < 3) {
       setTimeout(() => checkUserAndRole(sessionUser, retryCount + 1), 1000);
       return;
     }
 
-    // Removed the "|| 'patient'" trapdoor. It now strictly respects the database value.
     setUserRole(data?.role || null);
     setInitializing(false);
   };
@@ -65,10 +62,12 @@ export default function RootLayout() {
 
     if (!user) {
       if (inAuthGroup || inFamilyGroup) {
-        router.replace('/');
+        // THE FIX: A tiny delay ensures no route collisions occur during unmount
+        setTimeout(() => {
+          router.replace('/');
+        }, 100);
       }
     } else if (user && userRole) {
-      // Strict role-based routing
       if (userRole === 'family' && !inFamilyGroup) {
         router.replace('/(family)');
       } else if (userRole === 'patient' && !inAuthGroup) {
