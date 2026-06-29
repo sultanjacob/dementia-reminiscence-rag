@@ -107,8 +107,7 @@ export default function HomeScreen() {
 
       const { data: { user } } = await supabase.auth.getUser();
       
-      // If there is no user, stop running this code immediately. 
-      // The _layout.tsx file will handle kicking the user to the login screen.
+      // Stop execution if logged out
       if (!user) return;
 
       let fetchedName = "John";
@@ -201,13 +200,13 @@ export default function HomeScreen() {
     }
   };
 
+  // --- DIAGNOSTIC BACKEND FUNCTION ---
   const sendAudioToBackend = async (fileUri: string) => {
     try {
       console.log("Preparing to send audio...");
       const { data: { user } } = await supabase.auth.getUser();
       
       const formData = new FormData();
-      // Ensure the file is perfectly formatted for React Native's Fetch API
       formData.append('file', { 
         uri: fileUri, 
         name: 'recording.m4a', 
@@ -231,7 +230,6 @@ export default function HomeScreen() {
 
       console.log("Server responded with HTTP Status:", response.status);
 
-      // Read as raw text first so it doesn't crash if the server sends HTML instead of JSON
       const responseText = await response.text();
       console.log("Raw Server Response:", responseText);
 
@@ -254,7 +252,6 @@ export default function HomeScreen() {
           setIsDistressed(false); 
         }
       } else {
-        // Capture exact errors whether it's Python/FastAPI (.detail), Node (.error), or standard (.message)
         const errorMessage = responseData.detail || responseData.error || responseData.message || "Unknown Server Error";
         throw new Error(`[HTTP ${response.status}] ${JSON.stringify(errorMessage)}`);
       }
@@ -271,47 +268,16 @@ export default function HomeScreen() {
     }
   };
 
-      const responseData = await response.json();
-      if (response.ok) {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        const aiText = responseData.message || "I didn't quite catch that.";
-        setRemiText(aiText);
-        speak(aiText);
-
-        if (aiText.toLowerCase().includes("call family")) {
-          setIsDistressed(true);
-        } else {
-          setIsDistressed(false); 
-        }
-
-      } else {
-        throw new Error(responseData.message || "Server error");
-      }
-    } catch (error) {
-      console.error("Backend Error:", error);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      
-      const fallbackMessage = "I'm having a little trouble connecting to the internet right now. Let's try again in a minute.";
-      setRemiText(fallbackMessage);
-      
-      speak(fallbackMessage); 
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
   const handleMenuOpen = () => {
     Haptics.selectionAsync();
     setIsMenuVisible(true);
   };
 
+  // --- DELAYED SIGN OUT ---
   const handleSignOut = async () => {
-    // 1. Close the Settings Modal
     setIsMenuVisible(false);
     
-    // 2. Wait 500 milliseconds for the modal to finish animating closed
     setTimeout(async () => {
-      // 3. NOW it is safe to trigger the global sign-out and route change
       const { error } = await supabase.auth.signOut();
       
       if (error) {
