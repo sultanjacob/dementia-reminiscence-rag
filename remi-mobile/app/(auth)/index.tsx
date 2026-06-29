@@ -251,16 +251,18 @@ export default function HomeScreen() {
   };
 
   const handleSignOut = async () => {
+    // 1. Close the Settings Modal
     setIsMenuVisible(false);
     
-    const { error } = await supabase.auth.signOut();
-    
-    if (error) {
-      Alert.alert("Sign Out Error", error.message);
-    } else {
-      // Explicitly kick the user to the root login screen
-      router.replace('/');
-    }
+    // 2. Wait 500 milliseconds for the modal to finish animating closed
+    setTimeout(async () => {
+      // 3. NOW it is safe to trigger the global sign-out and route change
+      const { error } = await supabase.auth.signOut();
+      
+      if (error) {
+        Alert.alert("Sign Out Error", error.message);
+      }
+    }, 500);
   };
 
   const handlePrimaryCall = () => {
