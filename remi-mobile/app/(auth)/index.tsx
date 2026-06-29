@@ -203,18 +203,73 @@ export default function HomeScreen() {
 
   const sendAudioToBackend = async (fileUri: string) => {
     try {
+      console.log("Preparing to send audio...");
       const { data: { user } } = await supabase.auth.getUser();
+      
       const formData = new FormData();
-      formData.append('file', { uri: fileUri, name: 'recording.m4a', type: 'audio/m4a' } as any);
-      if (user) formData.append('user_id', user.id);
+      // Ensure the file is perfectly formatted for React Native's Fetch API
+      formData.append('file', { 
+        uri: fileUri, 
+        name: 'recording.m4a', 
+        type: 'audio/m4a' 
+      } as any);
+      
+      if (user) {
+        formData.append('user_id', user.id);
+      }
+
+      console.log(`Sending POST request to: ${API_URL}/voice-chat`);
 
       const response = await fetch(`${API_URL}/voice-chat`, {
         method: 'POST',
         body: formData,
         headers: { 
-          'Content-Type': 'multipart/form-data'
+          'Content-Type': 'multipart/form-data',
+          'Accept': 'application/json'
         },
       });
+
+      console.log("Server responded with HTTP Status:", response.status);
+
+      // Read as raw text first so it doesn't crash if the server sends HTML instead of JSON
+      const responseText = await response.text();
+      console.log("Raw Server Response:", responseText);
+
+      let responseData;
+      try {
+        responseData = JSON.parse(responseText);
+      } catch (parseError) {
+        throw new Error(`Server returned invalid JSON: ${responseText.substring(0, 100)}`);
+      }
+
+      if (response.ok) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        const aiText = responseData.message || "I didn't quite catch that.";
+        setRemiText(aiText);
+        speak(aiText);
+
+        if (aiText.toLowerCase().includes("call family")) {
+          setIsDistressed(true);
+        } else {
+          setIsDistressed(false); 
+        }
+      } else {
+        // Capture exact errors whether it's Python/FastAPI (.detail), Node (.error), or standard (.message)
+        const errorMessage = responseData.detail || responseData.error || responseData.message || "Unknown Server Error";
+        throw new Error(`[HTTP ${response.status}] ${JSON.stringify(errorMessage)}`);
+      }
+
+    } catch (error: any) {
+      console.error("Backend Error Details:", error.message || error);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      
+      const fallbackMessage = "I'm having a little trouble connecting to the internet right now. Let's try again in a minute.";
+      setRemiText(fallbackMessage);
+      speak(fallbackMessage); 
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
       const responseData = await response.json();
       if (response.ok) {
