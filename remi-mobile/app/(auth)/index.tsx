@@ -426,7 +426,7 @@ export default function HomeScreen() {
           <View style={styles.bottomStatus}>
             <View style={[styles.statusDot, isRecording && { backgroundColor: '#EF4444' }]} />
             <Text style={styles.statusText}>
-              {isRecording ? "Recording your voice..." : "Remi is listening"}
+              {isRecording ? "Recording your voice..." : "Remi is listening..."}
             </Text>
           </View>
           <View style={styles.dividerLine} />
