@@ -442,7 +442,7 @@ export default function HomeScreen() {
               <Ionicons name="person" size={24} color="#8B5CF6" />
               <View style={{ marginLeft: 15 }}>
                 <Text style={styles.contactText}>Primary Contact</Text>
-                <Text style={styles.numberText}>{primaryContact || "Not Setup"}</Text>
+                <Text style={styles.numberText}>{primaryContact || "Not Setup!"}</Text>
               </View>
             </TouchableOpacity>
 
