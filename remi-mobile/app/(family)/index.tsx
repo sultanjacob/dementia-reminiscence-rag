@@ -37,7 +37,6 @@ export default function FamilyDashboard() {
         </View>
 
         {/* --- 2. COMPACT ACTION BAR --- */}
-        {/* ADDED THE WRAPPER VIEW BACK HERE */}
         <View style={styles.actionBar}>
           <TouchableOpacity style={styles.actionItem} onPress={() => router.push('/(family)/vault')}>
             <View style={[styles.actionIconBadge, { backgroundColor: 'rgba(139, 92, 246, 0.15)' }]}>
@@ -46,7 +45,8 @@ export default function FamilyDashboard() {
             <Text style={styles.actionItemText}>Vault</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.actionItem} onPress={() => router.push('/(family)/care-team')}>
+          {/* EXACT ROUTE FIX APPLIED HERE */}
+          <TouchableOpacity style={styles.actionItem} onPress={() => router.push('/(family)/careteam')}>
             <View style={[styles.actionIconBadge, { backgroundColor: 'rgba(52, 211, 153, 0.15)' }]}>
               <Ionicons name="people" size={24} color="#34D399" />
             </View>
@@ -60,7 +60,6 @@ export default function FamilyDashboard() {
             <Text style={styles.actionItemText}>SOS</Text>
           </TouchableOpacity>
         </View>
-        {/* END OF WRAPPER VIEW */}
 
         {/* --- 3. DAILY INSIGHTS --- */}
         <View style={styles.sectionHeader}>
