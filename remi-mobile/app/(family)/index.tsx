@@ -84,7 +84,7 @@ export default function FamilyDashboard() {
               <Ionicons name="chatbubble" size={16} color="#8B5CF6" style={{ marginRight: 8 }} />
               <Text style={styles.insightTitle}>Latest Chat</Text>
             </View>
-            <Text style={styles.insightDesc}>"Remi asked about the 1985 Lake House trip. Mary recalled baking pies with Aunt Susan."</Text>
+            <Text style={styles.insightDesc}>"Remi asked about the amazing 1985 Lake House trip. Mary recalled baking pies with Aunt Susan."</Text>
             <Text style={styles.insightLink}>Tap to read full report</Text>
           </View>
         </ScrollView>
