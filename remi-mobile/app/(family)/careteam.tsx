@@ -99,7 +99,7 @@ export default function CareTeamScreen() {
             contentContainerStyle={styles.listContainer}
             showsVerticalScrollIndicator={false}
             ListEmptyComponent={
-              <Text style={styles.emptyText}>No care team members found.</Text>
+              <Text style={styles.descriptionText}>No care team members found.</Text>
             }
           />
         )}
