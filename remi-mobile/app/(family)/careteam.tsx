@@ -98,8 +98,13 @@ export default function CareTeamScreen() {
             renderItem={renderTeamMember}
             contentContainerStyle={styles.listContainer}
             showsVerticalScrollIndicator={false}
+            ListHeaderComponent={
+              <Text style={styles.descriptionText}>
+                Manage who has access to Remi. You can assign different permissions for editing routines or memories to the vault.
+              </Text>
+            }
             ListEmptyComponent={
-              <Text style={styles.descriptionText}>No care team members found.</Text>
+              <Text style={styles.emptyText}>No care team members found.</Text>
             }
           />
         )}
