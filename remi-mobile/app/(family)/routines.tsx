@@ -50,7 +50,7 @@ export default function FamilyRoutinesScreen() {
 
   const handleAddRoutine = async () => {
     if (!newActivity.trim() || !newTime.trim()) {
-      Alert.alert("Missing Info", "Please enter both an activity and a time.");
+      Alert.alert("Missing Info", "Please enter both an activity and a time, thank you!");
       return;
     }
 
