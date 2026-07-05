@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import React from 'react';
-import { Platform } from 'react-native'; // 💡 NEW: Import Platform to check the device type
+import { Platform } from 'react-native';
 
 export default function AuthLayout() {
   return (
@@ -12,7 +12,6 @@ export default function AuthLayout() {
           backgroundColor: '#110C1D', 
           borderTopWidth: 0,
           elevation: 0,
-          // 💡 NEW: Flexible height and padding so it never gets crushed by the system nav bar
           minHeight: Platform.OS === 'android' ? 70 : 85,
           paddingBottom: Platform.OS === 'android' ? 15 : 30,
           paddingTop: 10,
@@ -39,11 +38,16 @@ export default function AuthLayout() {
         }}
       />
 
-      {/* 🚫 HIDE ALL OTHER SCREENS FROM THE TAB BAR */}
+      {/* 📅 TAB 3: ROUTINES (Now visible!) */}
       <Tabs.Screen
         name="routine" 
-        options={{ href: null }} 
+        options={{ 
+          title: 'Routines',
+          tabBarIcon: ({ color }) => <Ionicons name="calendar" size={24} color={color} /> 
+        }} 
       />
+
+      {/* 🚫 HIDE ALL OTHER SCREENS FROM THE TAB BAR */}
       <Tabs.Screen
         name="schedule" 
         options={{ href: null }} 
