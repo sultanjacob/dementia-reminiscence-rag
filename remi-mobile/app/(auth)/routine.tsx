@@ -1,159 +1,234 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import * as Haptics from 'expo-haptics';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Platform, SafeAreaView, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator,
+  FlatList,
+  Platform,
+  SafeAreaView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
+} from 'react-native';
 import { supabase } from '../../supabase';
 
-export default function RoutineScreen() {
-  const router = useRouter();
+export default function PatientRoutineScreen() {
   const [routines, setRoutines] = useState<any[]>([]);
-  const [time, setTime] = useState("");
-  const [activity, setActivity] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [userId, setUserId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => { 
-    fetchRoutines(); 
+  useEffect(() => {
+    fetchRoutines();
   }, []);
 
   const fetchRoutines = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-    setUserId(user.id);
-    
-    const { data, error } = await supabase
-      .from('routines')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('time', { ascending: true });
-    
-    if (error) console.error("Fetch Error:", error);
-    setRoutines(data || []);
+    try {
+      setIsLoading(true);
+      // We are fetching all routines. (RLS will handle the filtering on the backend)
+      const { data, error } = await supabase
+        .from('routines')
+        .select('*')
+        .order('time', { ascending: true });
+
+      if (error) throw error;
+      if (data) setRoutines(data);
+    } catch (error) {
+      console.error("Error fetching routines:", error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const addRoutine = async () => {
-    if (!time || !activity) return Alert.alert("Error", "Please fill in both time and activity.");
-    if (!userId) return Alert.alert("Error", "User not authenticated. Try another way");
-
-    setLoading(true);
+  const toggleRoutine = async (id: string, currentStatus: boolean) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     
+    // Optimistic UI update for instant feedback
+    setRoutines(currentRoutines => 
+      currentRoutines.map(r => r.id === id ? { ...r, is_completed: !currentStatus } : r)
+    );
+
+    // Update the database
     const { error } = await supabase
       .from('routines')
-      .insert([{ 
-        time, 
-        activity, 
-        user_id: userId  
-      }]);
-    
+      .update({ is_completed: !currentStatus })
+      .eq('id', id);
+
     if (error) {
-      Alert.alert("Error", error.message);
-    } else {
-      setTime(""); 
-      setActivity("");
+      console.error("Error updating routine:", error);
+      // Revert if it fails
       fetchRoutines(); 
     }
-    setLoading(false);
   };
 
-  const deleteRoutine = async (id: string) => {
-    const { error } = await supabase.from('routines').delete().eq('id', id);
-    if (error) Alert.alert("Error", "Could not delete task.");
-    fetchRoutines();
+  const renderRoutine = ({ item }: { item: any }) => {
+    const isDone = item.is_completed;
+
+    return (
+      <TouchableOpacity 
+        style={[styles.taskCard, isDone && styles.taskCardDone]}
+        activeOpacity={0.7}
+        onPress={() => toggleRoutine(item.id, isDone)}
+      >
+        <View style={[styles.iconBox, isDone ? styles.iconBoxDone : styles.iconBoxPending]}>
+          <Ionicons 
+            name={item.icon || 'star-outline'} 
+            size={32} 
+            color={isDone ? '#FFFFFF' : '#8B5CF6'} 
+          />
+        </View>
+
+        <View style={styles.taskInfo}>
+          <Text style={[styles.timeText, isDone && styles.textDone]}>{item.time}</Text>
+          <Text style={[styles.activityText, isDone && styles.textDone]}>{item.activity}</Text>
+        </View>
+
+        <View style={styles.checkbox}>
+          {isDone ? (
+            <Ionicons name="checkmark-circle" size={40} color="#10B981" />
+          ) : (
+            <Ionicons name="ellipse-outline" size={40} color="#D1D5DB" />
+          )}
+        </View>
+      </TouchableOpacity>
+    );
   };
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor="#000000" />
-      <View style={styles.appCapsule}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Routine Manager</Text>
-          <View style={{ width: 40 }} /> 
-        </View>
+      <StatusBar barStyle="dark-content" backgroundColor="#F3F4F6" />
+      
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>My Daily Plan</Text>
+        <Text style={styles.headerSubtitle}>Tap a task when you finish it</Text>
+      </View>
 
-        <View style={styles.content}>
-          <View style={styles.addCard}>
-            <View style={styles.cardHeader}>
-              <Ionicons name="time" size={24} color="#A78BFA" />
-              <Text style={styles.title}>Add Daily Task</Text>
-            </View>
-            <Text style={styles.subtitle}>Tasks will sync to Remi's memory.</Text>
-            
-            <Text style={styles.inputLabel}>Time (24-hour format)</Text>
-            <TextInput 
-              style={styles.input} 
-              placeholder="e.g. 14:30" 
-              placeholderTextColor="#6B7280"
-              value={time} 
-              onChangeText={setTime} 
-              keyboardType="numbers-and-punctuation"
-            />
-            
-            <Text style={styles.inputLabel}>Activity</Text>
-            <TextInput 
-              style={styles.input} 
-              placeholder="e.g. Heart Meds" 
-              placeholderTextColor="#6B7280"
-              value={activity} 
-              onChangeText={setActivity} 
-            />
-            
-            <TouchableOpacity style={styles.button} onPress={addRoutine} disabled={loading}>
-              {loading ? <ActivityIndicator color="#110C1D" /> : <Text style={styles.buttonText}>Add to Schedule</Text>}
-            </TouchableOpacity>
-          </View>
-
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
-            {routines.length === 0 ? (
-              <View style={styles.emptyState}>
-                <Ionicons name="calendar-clear-outline" size={48} color="#3D2F4F" />
-                <Text style={styles.emptyText}>No tasks scheduled yet.</Text>
+      <View style={styles.container}>
+        {isLoading ? (
+          <ActivityIndicator size="large" color="#8B5CF6" style={{ marginTop: 40 }} />
+        ) : (
+          <FlatList
+            data={routines}
+            keyExtractor={(item) => item.id.toString()}
+            renderItem={renderRoutine}
+            contentContainerStyle={styles.listContainer}
+            showsVerticalScrollIndicator={false}
+            ListEmptyComponent={
+              <View style={styles.emptyContainer}>
+                <Ionicons name="sunny-outline" size={60} color="#9CA3AF" />
+                <Text style={styles.emptyText}>Nothing scheduled yet.</Text>
+                <Text style={styles.emptySubtext}>Enjoy your day!</Text>
               </View>
-            ) : (
-              routines.map((item) => (
-                <View key={item.id} style={styles.routineRow}>
-                  <View style={styles.routineInfo}>
-                    <View style={styles.timePill}>
-                      <Text style={styles.timeText}>{item.time}</Text>
-                    </View>
-                    <Text style={styles.activityText}>{item.activity}</Text>
-                  </View>
-                  <TouchableOpacity onPress={() => deleteRoutine(item.id)} style={styles.deleteButton}>
-                    <Ionicons name="trash" size={20} color="#EF4444" />
-                  </TouchableOpacity>
-                </View>
-              ))
-            )}
-          </ScrollView>
-        </View>
+            }
+          />
+        )}
       </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#000000', paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0 },
-  appCapsule: { flex: 1, backgroundColor: '#110C1D', borderRadius: 45, overflow: 'hidden', marginHorizontal: 10, marginBottom: 10, marginTop: 10, borderWidth: 1, borderColor: '#231A31' },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 20, paddingBottom: 20, borderBottomWidth: 1, borderBottomColor: '#231A31' },
-  backButton: { padding: 8, backgroundColor: '#1A1325', borderRadius: 20 },
-  headerTitle: { fontSize: 20, fontWeight: 'bold', color: '#FFFFFF' },
-  content: { flex: 1, padding: 20 },
-  addCard: { backgroundColor: '#1A1325', padding: 24, borderRadius: 24, marginBottom: 24, borderWidth: 1, borderColor: '#231A31' },
-  cardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
-  title: { fontSize: 20, fontWeight: 'bold', color: '#FFFFFF', marginLeft: 10 },
-  subtitle: { color: '#A396B5', fontSize: 14, marginBottom: 20 },
-  inputLabel: { color: '#E2D8F0', fontSize: 14, fontWeight: '600', marginBottom: 8 },
-  input: { backgroundColor: '#110C1D', borderWidth: 1, borderColor: '#231A31', color: '#FFFFFF', paddingHorizontal: 16, paddingVertical: 14, borderRadius: 16, fontSize: 16, marginBottom: 16 },
-  button: { backgroundColor: '#A78BFA', padding: 16, borderRadius: 20, marginTop: 10, alignItems: 'center' },
-  buttonText: { color: '#110C1D', fontWeight: 'bold', fontSize: 16 },
-  emptyState: { alignItems: 'center', justifyContent: 'center', marginTop: 40 },
-  emptyText: { color: '#A396B5', marginTop: 10, fontSize: 16 },
-  routineRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#1A1325', padding: 16, borderRadius: 20, marginBottom: 12, borderWidth: 1, borderColor: '#231A31' },
-  routineInfo: { flexDirection: 'row', alignItems: 'center', flex: 1 },
-  timePill: { backgroundColor: '#3D2F4F', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 12, marginRight: 15 },
-  timeText: { fontWeight: 'bold', color: '#E2D8F0', fontSize: 14 },
-  activityText: { fontSize: 16, color: '#FFFFFF', flex: 1, fontWeight: '500' },
-  deleteButton: { padding: 10, backgroundColor: 'rgba(239, 68, 68, 0.1)', borderRadius: 15 }
+  safeArea: { 
+    flex: 1, 
+    backgroundColor: '#F3F4F6', 
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
+  },
+  header: {
+    paddingHorizontal: 24,
+    paddingVertical: 20,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  headerTitle: { 
+    fontSize: 32, 
+    fontWeight: '800', 
+    color: '#111827',
+  },
+  headerSubtitle: {
+    fontSize: 18,
+    color: '#6B7280',
+    marginTop: 6,
+    fontWeight: '500',
+  },
+  container: { 
+    flex: 1, 
+    paddingHorizontal: 16,
+  },
+  listContainer: {
+    paddingTop: 16,
+    paddingBottom: 40,
+  },
+  taskCard: {
+    flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 20,
+    marginBottom: 16,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 3,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  taskCardDone: {
+    backgroundColor: '#F9FAFB',
+    borderColor: '#E5E7EB',
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  iconBox: {
+    width: 60,
+    height: 60,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  iconBoxPending: {
+    backgroundColor: '#F5F3FF',
+  },
+  iconBoxDone: {
+    backgroundColor: '#10B981',
+  },
+  taskInfo: {
+    flex: 1,
+  },
+  timeText: {
+    color: '#8B5CF6',
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 4,
+    textTransform: 'uppercase',
+  },
+  activityText: {
+    color: '#111827',
+    fontSize: 22,
+    fontWeight: '700',
+  },
+  textDone: {
+    color: '#9CA3AF',
+    textDecorationLine: 'line-through',
+  },
+  checkbox: {
+    marginLeft: 10,
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    marginTop: 80,
+  },
+  emptyText: {
+    color: '#374151',
+    fontSize: 24,
+    fontWeight: '700',
+    marginTop: 20,
+  },
+  emptySubtext: {
+    color: '#6B7280',
+    fontSize: 18,
+    marginTop: 8,
+  }
 });
