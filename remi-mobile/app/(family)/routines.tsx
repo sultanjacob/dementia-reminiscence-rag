@@ -105,16 +105,18 @@ export default function FamilyRoutinesScreen() {
   const renderRoutine = ({ item }: { item: any }) => {
     const isDone = item.is_completed;
     
-    // Display standard 12-hour AM/PM format in the UI for readability
+    // Safer manual AM/PM conversion that works perfectly on Android
     let displayTime = item.time;
-    try {
-      const [h, m] = item.time.split(':');
-      const dateObj = new Date();
-      dateObj.setHours(parseInt(h, 10));
-      dateObj.setMinutes(parseInt(m, 10));
-      displayTime = dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    } catch (e) {
-      // Fallback if the database has a weird legacy string
+    if (item.time && item.time.includes(':')) {
+      const parts = item.time.split(':');
+      const h = parseInt(parts[0], 10);
+      const m = parts[1].substring(0, 2); // Grab exactly the minutes
+      
+      if (!isNaN(h)) {
+        const ampm = h >= 12 ? 'PM' : 'AM';
+        const displayH = h % 12 || 12; // Converts 0 to 12, 13 to 1, etc.
+        displayTime = `${displayH}:${m} ${ampm}`;
+      }
     }
 
     return (
