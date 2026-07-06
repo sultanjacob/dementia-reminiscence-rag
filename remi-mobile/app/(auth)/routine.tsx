@@ -1,9 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import * as Speech from 'expo-speech';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  Modal,
   Platform,
   SafeAreaView,
   StatusBar,
@@ -17,15 +19,40 @@ import { supabase } from '../../supabase';
 export default function PatientRoutineScreen() {
   const [routines, setRoutines] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  
+  // State for the active reminder popup
+  const [activeReminder, setActiveReminder] = useState<any | null>(null);
 
   useEffect(() => {
     fetchRoutines();
   }, []);
 
+  // --- THE REMINDER ENGINE ---
+  useEffect(() => {
+    // Check the time every 60 seconds
+    const interval = setInterval(() => {
+      const now = new Date();
+      // Format current time to match "HH:MM" (e.g., "14:30") or "hh:mm A" (e.g., "02:30 PM")
+      // depending on how the family inputs it. We will do a basic string match here.
+      const currentTimeString24 = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+      const currentTimeString12 = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+
+      routines.forEach(routine => {
+        if (!routine.is_completed) {
+          // If the routine time matches the exact current time, trigger the alarm
+          if (routine.time === currentTimeString24 || routine.time === currentTimeString12) {
+            triggerReminder(routine);
+          }
+        }
+      });
+    }, 60000); // 60,000 ms = 1 minute
+
+    return () => clearInterval(interval);
+  }, [routines]);
+
   const fetchRoutines = async () => {
     try {
       setIsLoading(true);
-      // We are fetching all routines. (RLS will handle the filtering on the backend)
       const { data, error } = await supabase
         .from('routines')
         .select('*')
@@ -34,42 +61,53 @@ export default function PatientRoutineScreen() {
       if (error) throw error;
       if (data) setRoutines(data);
     } catch (error) {
-      console.error("Error fetching routines:!!", error);
+      console.error("Error fetching routines:", error);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const toggleRoutine = async (id: string, currentStatus: boolean) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  const triggerReminder = (routine: any) => {
+    // Prevent triggering the same alarm multiple times
+    if (activeReminder?.id === routine.id) return;
     
-    // Optimistic UI update for instant feedback
-    setRoutines(currentRoutines => 
-      currentRoutines.map(r => r.id === id ? { ...r, is_completed: !currentStatus } : r)
-    );
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setActiveReminder(routine);
+    
+    const announcement = `Hello! It is time to ${routine.activity}.`;
+    Speech.speak(announcement, { language: 'en-GB', pitch: 0.9, rate: 0.8 });
+  };
 
-    // Update the database
+  const handleAcknowledgeTask = async () => {
+    if (!activeReminder) return;
+    
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    Speech.stop();
+    
+    // Mark as completed in the database so the Family Dashboard sees it's done
     const { error } = await supabase
       .from('routines')
-      .update({ is_completed: !currentStatus })
-      .eq('id', id);
+      .update({ is_completed: true })
+      .eq('id', activeReminder.id);
 
     if (error) {
-      console.error("Error updating routine:", error);
-      // Revert if it fails
-      fetchRoutines(); 
+      console.error("Failed to update status:", error);
+    } else {
+      // Update local state to remove the strike-through
+      setRoutines(current => 
+        current.map(r => r.id === activeReminder.id ? { ...r, is_completed: true } : r)
+      );
     }
+    
+    setActiveReminder(null);
   };
 
   const renderRoutine = ({ item }: { item: any }) => {
     const isDone = item.is_completed;
 
     return (
-      <TouchableOpacity 
-        style={[styles.taskCard, isDone && styles.taskCardDone]}
-        activeOpacity={0.7}
-        onPress={() => toggleRoutine(item.id, isDone)}
-      >
+      // Changed from TouchableOpacity to View - the patient only looks at this list, they don't edit it.
+      <View style={[styles.taskCard, isDone && styles.taskCardDone]}>
         <View style={[styles.iconBox, isDone ? styles.iconBoxDone : styles.iconBoxPending]}>
           <Ionicons 
             name={item.icon || 'star-outline'} 
@@ -83,14 +121,14 @@ export default function PatientRoutineScreen() {
           <Text style={[styles.activityText, isDone && styles.textDone]}>{item.activity}</Text>
         </View>
 
-        <View style={styles.checkbox}>
+        <View style={styles.statusIndicator}>
           {isDone ? (
-            <Ionicons name="checkmark-circle" size={40} color="#10B981" />
+            <Text style={styles.doneText}>Finished</Text>
           ) : (
-            <Ionicons name="ellipse-outline" size={40} color="#D1D5DB" />
+            <Text style={styles.waitingText}>Waiting...</Text>
           )}
         </View>
-      </TouchableOpacity>
+      </View>
     );
   };
 
@@ -99,8 +137,8 @@ export default function PatientRoutineScreen() {
       <StatusBar barStyle="dark-content" backgroundColor="#F3F4F6" />
       
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>My Daily Plan</Text>
-        <Text style={styles.headerSubtitle}>Tap a task when you finish it</Text>
+        <Text style={styles.headerTitle}>Today's Schedule</Text>
+        <Text style={styles.headerSubtitle}>Remi will let you know when it's time!</Text>
       </View>
 
       <View style={styles.container}>
@@ -123,112 +161,71 @@ export default function PatientRoutineScreen() {
           />
         )}
       </View>
+
+      {/* --- ACTIVE REMINDER POPUP --- */}
+      <Modal visible={!!activeReminder} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.reminderCapsule}>
+            <View style={styles.orbContainer}>
+               <View style={styles.orb} />
+            </View>
+            
+            <Text style={styles.reminderTime}>{activeReminder?.time}</Text>
+            <Text style={styles.reminderTitle}>Time to</Text>
+            <Text style={styles.reminderActivity}>{activeReminder?.activity}</Text>
+            
+            <TouchableOpacity 
+              style={styles.repeatVoiceButton}
+              onPress={() => Speech.speak(`It is time to ${activeReminder?.activity}.`, { language: 'en-GB', pitch: 0.9, rate: 0.8 })}
+            >
+              <Ionicons name="volume-high" size={24} color="#8B5CF6" />
+              <Text style={styles.repeatVoiceText}>Hear again</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.acknowledgeButton} onPress={handleAcknowledgeTask}>
+              <Ionicons name="checkmark-circle" size={28} color="#FFFFFF" style={{ marginRight: 10 }} />
+              <Text style={styles.acknowledgeButtonText}>Okay, I'll do it now</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: { 
-    flex: 1, 
-    backgroundColor: '#F3F4F6', 
-    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
-  },
-  header: {
-    paddingHorizontal: 24,
-    paddingVertical: 20,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-  },
-  headerTitle: { 
-    fontSize: 32, 
-    fontWeight: '800', 
-    color: '#111827',
-  },
-  headerSubtitle: {
-    fontSize: 18,
-    color: '#6B7280',
-    marginTop: 6,
-    fontWeight: '500',
-  },
-  container: { 
-    flex: 1, 
-    paddingHorizontal: 16,
-  },
-  listContainer: {
-    paddingTop: 16,
-    paddingBottom: 40,
-  },
-  taskCard: {
-    flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    padding: 20,
-    marginBottom: 16,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    elevation: 3,
-    borderWidth: 2,
-    borderColor: 'transparent',
-  },
-  taskCardDone: {
-    backgroundColor: '#F9FAFB',
-    borderColor: '#E5E7EB',
-    shadowOpacity: 0,
-    elevation: 0,
-  },
-  iconBox: {
-    width: 60,
-    height: 60,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
-  },
-  iconBoxPending: {
-    backgroundColor: '#F5F3FF',
-  },
-  iconBoxDone: {
-    backgroundColor: '#10B981',
-  },
-  taskInfo: {
-    flex: 1,
-  },
-  timeText: {
-    color: '#8B5CF6',
-    fontSize: 16,
-    fontWeight: '700',
-    marginBottom: 4,
-    textTransform: 'uppercase',
-  },
-  activityText: {
-    color: '#111827',
-    fontSize: 22,
-    fontWeight: '700',
-  },
-  textDone: {
-    color: '#9CA3AF',
-    textDecorationLine: 'line-through',
-  },
-  checkbox: {
-    marginLeft: 10,
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    marginTop: 80,
-  },
-  emptyText: {
-    color: '#374151',
-    fontSize: 24,
-    fontWeight: '700',
-    marginTop: 20,
-  },
-  emptySubtext: {
-    color: '#6B7280',
-    fontSize: 18,
-    marginTop: 8,
-  }
+  safeArea: { flex: 1, backgroundColor: '#F3F4F6', paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0 },
+  header: { paddingHorizontal: 24, paddingVertical: 20, backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: '#E5E7EB' },
+  headerTitle: { fontSize: 32, fontWeight: '800', color: '#111827' },
+  headerSubtitle: { fontSize: 16, color: '#8B5CF6', marginTop: 6, fontWeight: '700' },
+  container: { flex: 1, paddingHorizontal: 16 },
+  listContainer: { paddingTop: 16, paddingBottom: 40 },
+  taskCard: { flexDirection: 'row', backgroundColor: '#FFFFFF', borderRadius: 24, padding: 20, marginBottom: 16, alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 3 },
+  taskCardDone: { backgroundColor: '#F9FAFB', shadowOpacity: 0, elevation: 0 },
+  iconBox: { width: 60, height: 60, borderRadius: 20, justifyContent: 'center', alignItems: 'center', marginRight: 16 },
+  iconBoxPending: { backgroundColor: '#F5F3FF' },
+  iconBoxDone: { backgroundColor: '#10B981' },
+  taskInfo: { flex: 1 },
+  timeText: { color: '#8B5CF6', fontSize: 16, fontWeight: '700', marginBottom: 4, textTransform: 'uppercase' },
+  activityText: { color: '#111827', fontSize: 22, fontWeight: '700' },
+  textDone: { color: '#9CA3AF', textDecorationLine: 'line-through' },
+  statusIndicator: { marginLeft: 10, backgroundColor: '#F3F4F6', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 12 },
+  waitingText: { color: '#6B7280', fontSize: 14, fontWeight: '600' },
+  doneText: { color: '#10B981', fontSize: 14, fontWeight: '700' },
+  emptyContainer: { alignItems: 'center', marginTop: 80 },
+  emptyText: { color: '#374151', fontSize: 24, fontWeight: '700', marginTop: 20 },
+  emptySubtext: { color: '#6B7280', fontSize: 18, marginTop: 8 },
+  
+  // Modal Styles
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(17, 24, 39, 0.8)', justifyContent: 'center', alignItems: 'center', padding: 20 },
+  reminderCapsule: { backgroundColor: '#FFFFFF', width: '100%', borderRadius: 40, padding: 30, alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.3, shadowRadius: 20, elevation: 15 },
+  orbContainer: { marginBottom: 20 },
+  orb: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#8B5CF6', shadowColor: '#8B5CF6', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.6, shadowRadius: 20, elevation: 10 },
+  reminderTime: { color: '#8B5CF6', fontSize: 20, fontWeight: '800', marginBottom: 10 },
+  reminderTitle: { color: '#6B7280', fontSize: 24, fontWeight: '600' },
+  reminderActivity: { color: '#111827', fontSize: 36, fontWeight: '800', textAlign: 'center', marginTop: 10, marginBottom: 30 },
+  repeatVoiceButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F5F3FF', paddingVertical: 12, paddingHorizontal: 24, borderRadius: 25, marginBottom: 20 },
+  repeatVoiceText: { color: '#8B5CF6', fontSize: 18, fontWeight: '700', marginLeft: 8 },
+  acknowledgeButton: { flexDirection: 'row', backgroundColor: '#10B981', width: '100%', paddingVertical: 20, borderRadius: 30, justifyContent: 'center', alignItems: 'center' },
+  acknowledgeButtonText: { color: '#FFFFFF', fontSize: 20, fontWeight: 'bold' }
 });
