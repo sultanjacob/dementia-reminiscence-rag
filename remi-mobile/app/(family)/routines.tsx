@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -21,10 +22,11 @@ export default function FamilyRoutinesScreen() {
   const [routines, setRoutines] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
-  // Modal State
+  // Modal & Form State
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [newActivity, setNewActivity] = useState('');
-  const [newTime, setNewTime] = useState('');
+  const [selectedTime, setSelectedTime] = useState(new Date());
+  const [showAndroidPicker, setShowAndroidPicker] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -48,26 +50,38 @@ export default function FamilyRoutinesScreen() {
     }
   };
 
+  const onTimeChange = (event: any, date?: Date) => {
+    if (Platform.OS === 'android') {
+      setShowAndroidPicker(false);
+    }
+    if (date) {
+      setSelectedTime(date);
+    }
+  };
+
   const handleAddRoutine = async () => {
-    if (!newActivity.trim() || !newTime.trim()) {
-      Alert.alert("Missing Info", "Please enter both an activity and a time, thank you!");
+    if (!newActivity.trim()) {
+      Alert.alert("Missing Info", "Please enter an activity name.");
       return;
     }
 
     try {
       setIsSubmitting(true);
-      
       const { data: { user } } = await supabase.auth.getUser();
       
-      // Insert the new routine into Supabase
+      // Force strict 24-hour "HH:MM" format for the database
+      const hours = selectedTime.getHours().toString().padStart(2, '0');
+      const minutes = selectedTime.getMinutes().toString().padStart(2, '0');
+      const formattedTime = `${hours}:${minutes}`; 
+
       const { error } = await supabase
         .from('routines')
         .insert([
           { 
             activity: newActivity, 
-            time: newTime, 
+            time: formattedTime, 
             is_completed: false,
-            icon: 'calendar-outline', // Default icon for now
+            icon: 'calendar-outline', 
             user_id: user?.id 
           }
         ]);
@@ -76,14 +90,12 @@ export default function FamilyRoutinesScreen() {
 
       // Reset form and close modal
       setNewActivity('');
-      setNewTime('');
+      setSelectedTime(new Date());
       setIsModalVisible(false);
       
-      // Refresh the list to show the new item
       fetchRoutines();
       
     } catch (error: any) {
-      console.error("Error adding routine:", error);
       Alert.alert("Error", error.message || "Failed to add routine.");
     } finally {
       setIsSubmitting(false);
@@ -92,32 +104,30 @@ export default function FamilyRoutinesScreen() {
 
   const renderRoutine = ({ item }: { item: any }) => {
     const isDone = item.is_completed;
+    
+    // Display standard 12-hour AM/PM format in the UI for readability
+    let displayTime = item.time;
+    try {
+      const [h, m] = item.time.split(':');
+      const dateObj = new Date();
+      dateObj.setHours(parseInt(h, 10));
+      dateObj.setMinutes(parseInt(m, 10));
+      displayTime = dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    } catch (e) {
+      // Fallback if the database has a weird legacy string
+    }
 
     return (
       <View style={[styles.routineCard, isDone && styles.routineCardDone]}>
         <View style={[styles.iconContainer, isDone && styles.iconContainerDone]}>
-          <Ionicons 
-            name={item.icon || 'checkmark-circle-outline'} 
-            size={24} 
-            color={isDone ? '#10B981' : '#8B5CF6'} 
-          />
+          <Ionicons name={item.icon || 'checkmark-circle-outline'} size={24} color={isDone ? '#10B981' : '#8B5CF6'} />
         </View>
-        
         <View style={styles.routineInfo}>
-          <Text style={[styles.activityText, isDone && styles.textDone]}>
-            {item.activity}
-          </Text>
-          <Text style={styles.timeText}>
-            <Ionicons name="time-outline" size={12} /> {item.time}
-          </Text>
+          <Text style={[styles.activityText, isDone && styles.textDone]}>{item.activity}</Text>
+          <Text style={styles.timeText}><Ionicons name="time-outline" size={12} /> {displayTime}</Text>
         </View>
-
         <View style={styles.statusBadge}>
-          {isDone ? (
-            <Ionicons name="checkmark-circle" size={24} color="#10B981" />
-          ) : (
-            <View style={styles.pendingCircle} />
-          )}
+          {isDone ? <Ionicons name="checkmark-circle" size={24} color="#10B981" /> : <View style={styles.pendingCircle} />}
         </View>
       </View>
     );
@@ -126,7 +136,6 @@ export default function FamilyRoutinesScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="light-content" backgroundColor="#0B0F19" />
-      
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Daily Routines</Text>
         <Text style={styles.headerSubtitle}>Manage the patient's daily schedule</Text>
@@ -142,34 +151,16 @@ export default function FamilyRoutinesScreen() {
             renderItem={renderRoutine}
             contentContainerStyle={styles.listContainer}
             showsVerticalScrollIndicator={false}
-            ListEmptyComponent={
-              <View style={styles.emptyContainer}>
-                <Ionicons name="calendar-outline" size={48} color="#374151" />
-                <Text style={styles.emptyText}>No routines scheduled yet.</Text>
-                <Text style={styles.emptySubtext}>
-                  Tap the button below to add your first routine.
-                </Text>
-              </View>
-            }
           />
         )}
-
-        <TouchableOpacity 
-          style={styles.addButton} 
-          activeOpacity={0.8}
-          onPress={() => setIsModalVisible(true)}
-        >
+        <TouchableOpacity style={styles.addButton} activeOpacity={0.8} onPress={() => setIsModalVisible(true)}>
           <Ionicons name="add" size={24} color="#FFFFFF" />
           <Text style={styles.addButtonText}>Add Routine</Text>
         </TouchableOpacity>
       </View>
 
-      {/* --- ADD ROUTINE MODAL --- */}
       <Modal visible={isModalVisible} transparent animationType="slide">
-        <KeyboardAvoidingView 
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.modalOverlay}
-        >
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>New Routine</Text>
@@ -191,25 +182,36 @@ export default function FamilyRoutinesScreen() {
 
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>Time</Text>
-              <TextInput
-                style={styles.textInput}
-                placeholder="e.g. 08:00 AM"
-                placeholderTextColor="#6B7280"
-                value={newTime}
-                onChangeText={setNewTime}
-              />
+              {Platform.OS === 'ios' ? (
+                <View style={{ alignItems: 'flex-start' }}>
+                  <DateTimePicker
+                    value={selectedTime}
+                    mode="time"
+                    display="default"
+                    onChange={onTimeChange}
+                    themeVariant="dark" 
+                  />
+                </View>
+              ) : (
+                <TouchableOpacity style={styles.textInput} onPress={() => setShowAndroidPicker(true)}>
+                  <Text style={{ color: '#FFFFFF', fontSize: 16 }}>
+                    {selectedTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </Text>
+                </TouchableOpacity>
+              )}
+              
+              {Platform.OS === 'android' && showAndroidPicker && (
+                <DateTimePicker
+                  value={selectedTime}
+                  mode="time"
+                  display="default"
+                  onChange={onTimeChange}
+                />
+              )}
             </View>
 
-            <TouchableOpacity 
-              style={[styles.saveButton, isSubmitting && { opacity: 0.7 }]} 
-              onPress={handleAddRoutine}
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? (
-                <ActivityIndicator color="#FFFFFF" />
-              ) : (
-                <Text style={styles.saveButtonText}>Save Routine</Text>
-              )}
+            <TouchableOpacity style={[styles.saveButton, isSubmitting && { opacity: 0.7 }]} onPress={handleAddRoutine} disabled={isSubmitting}>
+              {isSubmitting ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.saveButtonText}>Save Routine</Text>}
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
@@ -235,13 +237,8 @@ const styles = StyleSheet.create({
   timeText: { color: '#9CA3AF', fontSize: 14, fontWeight: '500' },
   statusBadge: { marginLeft: 10, justifyContent: 'center', alignItems: 'center' },
   pendingCircle: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: '#374151' },
-  emptyContainer: { alignItems: 'center', marginTop: 60 },
-  emptyText: { color: '#FFFFFF', fontSize: 18, fontWeight: '600', marginTop: 16 },
-  emptySubtext: { color: '#6B7280', fontSize: 14, textAlign: 'center', marginTop: 8, paddingHorizontal: 20 },
   addButton: { flexDirection: 'row', backgroundColor: '#8B5CF6', position: 'absolute', bottom: 30, alignSelf: 'center', paddingVertical: 16, paddingHorizontal: 24, borderRadius: 30, alignItems: 'center', shadowColor: '#8B5CF6', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 8 },
   addButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: 'bold', marginLeft: 8 },
-  
-  // Modal Styles
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.7)', justifyContent: 'flex-end' },
   modalContent: { backgroundColor: '#111827', borderTopLeftRadius: 30, borderTopRightRadius: 30, padding: 25, paddingBottom: Platform.OS === 'ios' ? 40 : 25, borderWidth: 1, borderColor: '#1F2937' },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 25 },
