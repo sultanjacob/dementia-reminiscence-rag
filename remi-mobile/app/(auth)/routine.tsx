@@ -91,7 +91,7 @@ export default function PatientRoutineScreen() {
       .eq('id', activeReminder.id);
 
     if (error) {
-      console.error("Failed to update status:", error);
+      console.error("Failed to update status:!", error);
     } else {
       // Update local state to remove the strike-through
       setRoutines(current => 
