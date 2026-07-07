@@ -61,7 +61,7 @@ export default function PatientRoutineScreen() {
       if (error) throw error;
       if (data) setRoutines(data);
     } catch (error) {
-      console.error("Error fetching routines:", error);
+      console.error("Error fetching routines:!", error);
     } finally {
       setIsLoading(false);
     }
