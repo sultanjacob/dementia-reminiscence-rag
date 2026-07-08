@@ -16,6 +16,17 @@ import {
 } from 'react-native';
 import { supabase } from '../../supabase';
 
+// Helper to convert database "14:30" to readable "2:30 PM"
+const formatTime12Hour = (time24: string) => {
+  if (!time24 || !time24.includes(':')) return time24;
+  const [hStr, mStr] = time24.split(':');
+  const h = parseInt(hStr, 10);
+  if (isNaN(h)) return time24;
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const displayH = h % 12 || 12;
+  return `${displayH}:${mStr.substring(0, 2)} ${ampm}`;
+};
+
 export default function PatientRoutineScreen() {
   const [routines, setRoutines] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -27,25 +38,23 @@ export default function PatientRoutineScreen() {
     fetchRoutines();
   }, []);
 
-  // --- THE REMINDER ENGINE ---
+  // --- ROBUST REMINDER ENGINE ---
   useEffect(() => {
-    // Check the time every 60 seconds
     const interval = setInterval(() => {
       const now = new Date();
-      // Format current time to match "HH:MM" (e.g., "14:30") or "hh:mm A" (e.g., "02:30 PM")
-      // depending on how the family inputs it. We will do a basic string match here.
-      const currentTimeString24 = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
-      const currentTimeString12 = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+      
+      // Force 24-hour HH:MM format manually to perfectly match the database
+      const hours = now.getHours().toString().padStart(2, '0');
+      const minutes = now.getMinutes().toString().padStart(2, '0');
+      const currentTimeString = `${hours}:${minutes}`;
 
       routines.forEach(routine => {
-        if (!routine.is_completed) {
-          // If the routine time matches the exact current time, trigger the alarm
-          if (routine.time === currentTimeString24 || routine.time === currentTimeString12) {
-            triggerReminder(routine);
-          }
+        // Only trigger if not completed AND time is an exact match
+        if (!routine.is_completed && routine.time === currentTimeString) {
+          triggerReminder(routine);
         }
       });
-    }, 60000); // 60,000 ms = 1 minute
+    }, 30000); // Checks every 30 seconds to ensure it never misses a minute roll-over
 
     return () => clearInterval(interval);
   }, [routines]);
@@ -61,14 +70,13 @@ export default function PatientRoutineScreen() {
       if (error) throw error;
       if (data) setRoutines(data);
     } catch (error) {
-      console.error("Error fetching routines:!", error);
+      console.error("Error fetching routines:", error);
     } finally {
       setIsLoading(false);
     }
   };
 
   const triggerReminder = (routine: any) => {
-    // Prevent triggering the same alarm multiple times
     if (activeReminder?.id === routine.id) return;
     
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -84,16 +92,14 @@ export default function PatientRoutineScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     Speech.stop();
     
-    // Mark as completed in the database so the Family Dashboard sees it's done
     const { error } = await supabase
       .from('routines')
       .update({ is_completed: true })
       .eq('id', activeReminder.id);
 
     if (error) {
-      console.error("Failed to update status:!", error);
+      console.error("Failed to update status:", error);
     } else {
-      // Update local state to remove the strike-through
       setRoutines(current => 
         current.map(r => r.id === activeReminder.id ? { ...r, is_completed: true } : r)
       );
@@ -104,9 +110,9 @@ export default function PatientRoutineScreen() {
 
   const renderRoutine = ({ item }: { item: any }) => {
     const isDone = item.is_completed;
+    const displayTime = formatTime12Hour(item.time);
 
     return (
-      // Changed from TouchableOpacity to View - the patient only looks at this list, they don't edit it.
       <View style={[styles.taskCard, isDone && styles.taskCardDone]}>
         <View style={[styles.iconBox, isDone ? styles.iconBoxDone : styles.iconBoxPending]}>
           <Ionicons 
@@ -117,7 +123,7 @@ export default function PatientRoutineScreen() {
         </View>
 
         <View style={styles.taskInfo}>
-          <Text style={[styles.timeText, isDone && styles.textDone]}>{item.time}</Text>
+          <Text style={[styles.timeText, isDone && styles.textDone]}>{displayTime}</Text>
           <Text style={[styles.activityText, isDone && styles.textDone]}>{item.activity}</Text>
         </View>
 
@@ -170,7 +176,7 @@ export default function PatientRoutineScreen() {
                <View style={styles.orb} />
             </View>
             
-            <Text style={styles.reminderTime}>{activeReminder?.time}</Text>
+            <Text style={styles.reminderTime}>{formatTime12Hour(activeReminder?.time)}</Text>
             <Text style={styles.reminderTitle}>Time to</Text>
             <Text style={styles.reminderActivity}>{activeReminder?.activity}</Text>
             
