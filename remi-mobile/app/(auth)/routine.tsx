@@ -16,7 +16,6 @@ import {
 } from 'react-native';
 import { supabase } from '../../supabase';
 
-// Helper to convert database "14:30" to readable "2:30 PM"
 const formatTime12Hour = (time24: string) => {
   if (!time24 || !time24.includes(':')) return time24;
   const [hStr, mStr] = time24.split(':');
@@ -30,34 +29,46 @@ const formatTime12Hour = (time24: string) => {
 export default function PatientRoutineScreen() {
   const [routines, setRoutines] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  
-  // State for the active reminder popup
   const [activeReminder, setActiveReminder] = useState<any | null>(null);
 
+  // --- THE POLLING & REMINDER ENGINE ---
   useEffect(() => {
+    // 1. Fetch immediately when screen opens
     fetchRoutines();
-  }, []);
 
-  // --- ROBUST REMINDER ENGINE ---
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const now = new Date();
-      
-      // Force 24-hour HH:MM format manually to perfectly match the database
-      const hours = now.getHours().toString().padStart(2, '0');
-      const minutes = now.getMinutes().toString().padStart(2, '0');
-      const currentTimeString = `${hours}:${minutes}`;
+    // 2. Silently fetch and check time every 30 seconds
+    const interval = setInterval(async () => {
+      try {
+        // Silently pull the freshest data so we never miss family updates
+        const { data, error } = await supabase
+          .from('routines')
+          .select('*')
+          .order('time', { ascending: true });
 
-      routines.forEach(routine => {
-        // Only trigger if not completed AND time is an exact match
-        if (!routine.is_completed && routine.time === currentTimeString) {
-          triggerReminder(routine);
-        }
-      });
-    }, 30000); // Checks every 30 seconds to ensure it never misses a minute roll-over
+        if (error || !data) return;
+        
+        // Quietly update the UI list
+        setRoutines(data);
+
+        // Calculate current time exactly matching database format
+        const now = new Date();
+        const hours = now.getHours().toString().padStart(2, '0');
+        const minutes = now.getMinutes().toString().padStart(2, '0');
+        const currentTimeString = `${hours}:${minutes}`;
+
+        // Check if any task in this fresh data needs to ring right now
+        data.forEach(routine => {
+          if (!routine.is_completed && routine.time === currentTimeString) {
+            triggerReminder(routine);
+          }
+        });
+      } catch (err) {
+        console.error("Polling error:", err);
+      }
+    }, 30000); // Runs every 30 seconds
 
     return () => clearInterval(interval);
-  }, [routines]);
+  }, []); // Empty array so the timer sets up exactly once
 
   const fetchRoutines = async () => {
     try {
@@ -77,13 +88,16 @@ export default function PatientRoutineScreen() {
   };
 
   const triggerReminder = (routine: any) => {
-    if (activeReminder?.id === routine.id) return;
-    
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    setActiveReminder(routine);
-    
-    const announcement = `Hello! It is time to ${routine.activity}.`;
-    Speech.speak(announcement, { language: 'en-GB', pitch: 0.9, rate: 0.8 });
+    // We use a functional state update to guarantee we have the latest activeReminder state
+    setActiveReminder(currentActive => {
+      // If this exact alarm is already ringing, don't trigger it again
+      if (currentActive?.id === routine.id) return currentActive;
+      
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Speech.speak(`Hello! It is time to ${routine.activity}.`, { language: 'en-GB', pitch: 0.9, rate: 0.8 });
+      
+      return routine; // Set the new active reminder
+    });
   };
 
   const handleAcknowledgeTask = async () => {
@@ -115,24 +129,14 @@ export default function PatientRoutineScreen() {
     return (
       <View style={[styles.taskCard, isDone && styles.taskCardDone]}>
         <View style={[styles.iconBox, isDone ? styles.iconBoxDone : styles.iconBoxPending]}>
-          <Ionicons 
-            name={item.icon || 'star-outline'} 
-            size={32} 
-            color={isDone ? '#FFFFFF' : '#8B5CF6'} 
-          />
+          <Ionicons name={item.icon || 'star-outline'} size={32} color={isDone ? '#FFFFFF' : '#8B5CF6'} />
         </View>
-
         <View style={styles.taskInfo}>
           <Text style={[styles.timeText, isDone && styles.textDone]}>{displayTime}</Text>
           <Text style={[styles.activityText, isDone && styles.textDone]}>{item.activity}</Text>
         </View>
-
         <View style={styles.statusIndicator}>
-          {isDone ? (
-            <Text style={styles.doneText}>Finished</Text>
-          ) : (
-            <Text style={styles.waitingText}>Waiting...</Text>
-          )}
+          {isDone ? <Text style={styles.doneText}>Finished</Text> : <Text style={styles.waitingText}>Waiting...</Text>}
         </View>
       </View>
     );
@@ -168,7 +172,6 @@ export default function PatientRoutineScreen() {
         )}
       </View>
 
-      {/* --- ACTIVE REMINDER POPUP --- */}
       <Modal visible={!!activeReminder} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={styles.reminderCapsule}>
@@ -221,8 +224,6 @@ const styles = StyleSheet.create({
   emptyContainer: { alignItems: 'center', marginTop: 80 },
   emptyText: { color: '#374151', fontSize: 24, fontWeight: '700', marginTop: 20 },
   emptySubtext: { color: '#6B7280', fontSize: 18, marginTop: 8 },
-  
-  // Modal Styles
   modalOverlay: { flex: 1, backgroundColor: 'rgba(17, 24, 39, 0.8)', justifyContent: 'center', alignItems: 'center', padding: 20 },
   reminderCapsule: { backgroundColor: '#FFFFFF', width: '100%', borderRadius: 40, padding: 30, alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.3, shadowRadius: 20, elevation: 15 },
   orbContainer: { marginBottom: 20 },
