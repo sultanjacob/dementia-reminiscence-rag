@@ -38,7 +38,7 @@ export default function AuthLayout() {
         }}
       />
 
-      {/* 📅 TAB 3: ROUTINES (Now visible!) */}
+      {/* 📅 TAB 3: ROUTINES */}
       <Tabs.Screen
         name="routine" 
         options={{ 
@@ -54,6 +54,12 @@ export default function AuthLayout() {
       />
       <Tabs.Screen
         name="caregiver"
+        options={{ href: null }} 
+      />
+      
+      {/* 💡 Explicitly hide settings so the modal can use it, but it won't show a tab icon */}
+      <Tabs.Screen
+        name="settings"
         options={{ href: null }} 
       />
     </Tabs>
