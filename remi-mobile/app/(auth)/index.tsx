@@ -273,24 +273,19 @@ export default function HomeScreen() {
     setIsMenuVisible(true);
   };
 
-  // --- ROBUST SIGN OUT ---
+  // --- BULLETPROOF SIGN OUT ---
   const handleSignOut = async () => {
-    // 1. Hide the menu to keep the UI feeling snappy
     setIsMenuVisible(false);
     
-    // 2. Wait just a moment for the menu animation to finish
     setTimeout(async () => {
-      // 3. Safely destroy the Supabase session
       const { error } = await supabase.auth.signOut();
       
       if (error) {
         Alert.alert("Sign Out Error", error.message);
       } else {
-        // 4. Use '../' to jump out of the (auth) folder and force a return to the main login screen
-        if (router.canGoBack()) {
-          router.dismissAll(); // Clears out the patient navigation history
-        }
-        router.replace('../'); 
+        // Explicitly route to your newly named login file
+        // No dismissAll() or goBack() to crash the tab navigator!
+        router.replace('/login'); 
       }
     }, 400);
   };
