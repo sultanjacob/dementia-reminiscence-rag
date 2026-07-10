@@ -88,18 +88,37 @@ export default function PatientRoutineScreen() {
   };
 
   const triggerReminder = (routine: any) => {
-    // We use a functional state update to guarantee we have the latest activeReminder state
     setActiveReminder(currentActive => {
       // If this exact alarm is already ringing, don't trigger it again
       if (currentActive?.id === routine.id) return currentActive;
       
+      // 1. Vibrate the phone
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      Speech.speak(`Hello! It is time to ${routine.activity}.`, { language: 'en-GB', pitch: 0.9, rate: 0.8 });
       
+      // 2. Play a gentle attention chime
+      const playChime = async () => {
+        try {
+          // Using a reliable, temporary remote sound file for instant testing
+          const { sound } = await Audio.Sound.createAsync(
+            { uri: 'https://actions.google.com/sounds/v1/alarms/beep_short.ogg' }
+          );
+          await sound.playAsync();
+        } catch (err) {
+          console.error("Could not play chime:", err);
+        }
+      };
+      playChime();
+      
+      // 3. Add a polite preamble and speak
+      // The slight delay allows the chime to ring first
+      setTimeout(() => {
+        const announcement = `Excuse me. It is time to ${routine.activity}.`;
+        Speech.speak(announcement, { language: 'en-GB', pitch: 0.9, rate: 0.8 });
+      }, 800); 
+
       return routine; // Set the new active reminder
     });
   };
-
   const handleAcknowledgeTask = async () => {
     if (!activeReminder) return;
     
