@@ -282,6 +282,9 @@ export default function HomeScreen() {
       
       if (error) {
         Alert.alert("Sign Out Error", error.message);
+      } else {
+        // Explicitly force the app back to the root/login screen
+        router.replace('/'); 
       }
     }, 500);
   };
