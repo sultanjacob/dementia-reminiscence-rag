@@ -1,4 +1,3 @@
-import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
@@ -35,8 +34,6 @@ export default function FamilySettingsScreen() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // In a fully linked database, you would fetch the patient's profile using the linked_patient_id.
-      // For now, we are fetching the current user's profile to populate the fields.
       const { data, error } = await supabase
         .from('profiles')
         .select('nickname, primary_contact, secondary_contact')
@@ -80,17 +77,6 @@ export default function FamilySettingsScreen() {
       Alert.alert("Error", error.message);
     } finally {
       setSaving(false);
-    }
-  };
-
-  const handleSignOut = async () => {
-    const { error } = await supabase.auth.signOut();
-    
-    if (error) {
-      Alert.alert("Sign Out Error", error.message);
-    } else {
-      // Instantly route back to your newly named login screen
-      router.replace('/login'); 
     }
   };
 
@@ -176,14 +162,6 @@ export default function FamilySettingsScreen() {
             )}
           </TouchableOpacity>
 
-          <View style={styles.dangerZone}>
-            <Text style={styles.dangerZoneTitle}>Account Management</Text>
-            <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
-              <Ionicons name="log-out-outline" size={20} color="#EF4444" style={{ marginRight: 8 }} />
-              <Text style={styles.signOutButtonText}>Sign Out of Family Portal</Text>
-            </TouchableOpacity>
-          </View>
-
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -208,8 +186,4 @@ const styles = StyleSheet.create({
   saveButton: { backgroundColor: '#8B5CF6', paddingVertical: 16, borderRadius: 16, alignItems: 'center', marginTop: 10, shadowColor: '#8B5CF6', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 5 },
   saveButtonDisabled: { backgroundColor: '#6B7280', shadowOpacity: 0 },
   saveButtonText: { color: '#FFFFFF', fontSize: 18, fontWeight: '700' },
-  dangerZone: { marginTop: 40, borderTopWidth: 1, borderTopColor: '#2D2040', paddingTop: 30 },
-  dangerZoneTitle: { color: '#6B7280', fontSize: 14, fontWeight: '700', textTransform: 'uppercase', marginBottom: 15, letterSpacing: 1 },
-  signOutButton: { flexDirection: 'row', backgroundColor: 'rgba(239, 68, 68, 0.1)', paddingVertical: 16, borderRadius: 16, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(239, 68, 68, 0.3)' },
-  signOutButtonText: { color: '#EF4444', fontSize: 16, fontWeight: '700' },
 });
