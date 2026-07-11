@@ -2,18 +2,18 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    KeyboardAvoidingView,
-    Platform,
-    SafeAreaView,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { supabase } from '../../supabase';
 
@@ -84,21 +84,14 @@ export default function FamilySettingsScreen() {
   };
 
   const handleSignOut = async () => {
-    Alert.alert(
-      "Sign Out",
-      "Are you sure you want to sign out of the Family account?",
-      [
-        { text: "Cancel", style: "cancel" },
-        { 
-          text: "Sign Out", 
-          style: "destructive",
-          onPress: async () => {
-            const { error } = await supabase.auth.signOut();
-            if (error) Alert.alert("Error", error.message);
-          }
-        }
-      ]
-    );
+    const { error } = await supabase.auth.signOut();
+    
+    if (error) {
+      Alert.alert("Sign Out Error", error.message);
+    } else {
+      // Instantly route back to your newly named login screen
+      router.replace('/login'); 
+    }
   };
 
   if (loading) {
