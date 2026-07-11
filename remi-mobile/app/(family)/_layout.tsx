@@ -21,6 +21,7 @@ export default function FamilyLayout() {
         tabBarInactiveTintColor: '#6B7280',
       }}
     >
+      {/* 🟢 VISIBLE TABS */}
       <Tabs.Screen
         name="index"
         options={{
@@ -35,12 +36,19 @@ export default function FamilyLayout() {
           tabBarIcon: ({ color }) => <Ionicons name="calendar" size={24} color={color} />,
         }}
       />
+
+      {/* 🚫 HIDDEN TABS (Removes them from the bottom bar) */}
       <Tabs.Screen
         name="settings"
-        options={{
-          title: 'Settings',
-          tabBarIcon: ({ color }) => <Ionicons name="settings" size={24} color={color} />,
-        }}
+        options={{ href: null }}
+      />
+      <Tabs.Screen
+        name="vault"
+        options={{ href: null }}
+      />
+      <Tabs.Screen
+        name="careteam"
+        options={{ href: null }}
       />
     </Tabs>
   );
