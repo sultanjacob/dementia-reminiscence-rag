@@ -4,19 +4,19 @@ import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    Image,
-    Modal,
-    Platform,
-    SafeAreaView,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Alert,
+  Image,
+  Modal,
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { supabase } from '../../supabase';
 
@@ -98,7 +98,7 @@ export default function MemoryVaultScreen() {
         .from('memory_vault')
         .insert({
           uploader_id: user.id,
-          patient_code: user.id,
+          patient_code: user.id, // In a real app, this would be the linked patient ID
           image_url: publicUrl,
           caption: captionText,
         });
@@ -116,7 +116,6 @@ export default function MemoryVaultScreen() {
     }
   };
 
-  // --- NEW DELETE LOGIC ---
   const confirmDelete = (img: any) => {
     Alert.alert(
       "Delete Memory",
@@ -131,10 +130,8 @@ export default function MemoryVaultScreen() {
   const deleteImage = async (img: any) => {
     setLoading(true);
     try {
-      // 1. Extract the specific file path from the full public URL
       const filePath = img.image_url.split('/memory_vault/')[1];
       
-      // 2. Remove the actual image file from the Supabase Storage Bucket
       if (filePath) {
         const { error: storageError } = await supabase.storage
           .from('memory_vault')
@@ -142,7 +139,6 @@ export default function MemoryVaultScreen() {
         if (storageError) throw storageError;
       }
 
-      // 3. Delete the text record from the database table
       const { error: dbError } = await supabase
         .from('memory_vault')
         .delete()
@@ -150,12 +146,11 @@ export default function MemoryVaultScreen() {
         
       if (dbError) throw dbError;
 
-      // 4. Refresh the gallery
       fetchVaultImages();
 
     } catch (error: any) {
       Alert.alert("Delete Failed", error.message);
-      setLoading(false); // Only stop loading if it fails, otherwise fetchVaultImages handles it
+      setLoading(false); 
     }
   };
 
@@ -210,7 +205,6 @@ export default function MemoryVaultScreen() {
                   </View>
                 ) : null}
 
-                {/* THE NEW DELETE BUTTON */}
                 <TouchableOpacity 
                   style={styles.deleteButton} 
                   onPress={() => confirmDelete(img)}
@@ -218,7 +212,6 @@ export default function MemoryVaultScreen() {
                 >
                   <Ionicons name="trash-outline" size={16} color="#FFFFFF" />
                 </TouchableOpacity>
-
               </View>
             ))}
             
@@ -229,14 +222,19 @@ export default function MemoryVaultScreen() {
         </ScrollView>
       )}
 
+      {/* --- UPDATED CAPTION MODAL WITH IMAGE PREVIEW --- */}
       <Modal visible={isCaptionModalVisible} transparent={true} animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Add a Memory</Text>
             
+            {pendingImage && (
+              <Image source={{ uri: pendingImage.uri }} style={styles.previewImage} />
+            )}
+            
             <TextInput
               style={styles.captionInput}
-              placeholder="What's the story behind this photo?"
+              placeholder="Who is in this photo? Where was it taken?"
               placeholderTextColor="#9CA3AF"
               value={captionText}
               onChangeText={setCaptionText}
@@ -274,36 +272,24 @@ const styles = StyleSheet.create({
   centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   scrollContent: { paddingHorizontal: 20, paddingBottom: 40 },
   subtitle: { color: '#9CA3AF', fontSize: 14, marginBottom: 25, lineHeight: 20, textAlign: 'center' },
-  
   uploadCard: { backgroundColor: '#110C1D', borderRadius: 24, padding: 30, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#231A31', borderStyle: 'dashed', marginBottom: 30 },
   uploadCardDisabled: { opacity: 0.5 },
   uploadIconBadge: { width: 60, height: 60, borderRadius: 30, backgroundColor: 'rgba(139, 92, 246, 0.15)', alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
   uploadTitle: { color: '#FFFFFF', fontSize: 18, fontWeight: 'bold', marginBottom: 4 },
   uploadSubtitle: { color: '#6B7280', fontSize: 14 },
-  
   galleryGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
   imageContainer: { width: '48%', aspectRatio: 1, marginBottom: 15, borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: '#231A31', position: 'relative' },
   image: { width: '100%', height: '100%' },
   captionOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.7)', padding: 10 },
   captionText: { color: '#FFFFFF', fontSize: 12, lineHeight: 16 },
   emptyText: { color: '#6B7280', width: '100%', textAlign: 'center', marginTop: 20 },
-
-  // --- NEW DELETE BUTTON STYLE ---
-  deleteButton: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    backgroundColor: 'rgba(239, 68, 68, 0.85)', // A nice semi-transparent red
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
+  deleteButton: { position: 'absolute', top: 8, right: 8, backgroundColor: 'rgba(239, 68, 68, 0.85)', width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  
+  // Modal Styles
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.7)', justifyContent: 'center', alignItems: 'center', padding: 20 },
   modalContent: { backgroundColor: '#110C1D', borderRadius: 20, padding: 20, width: '100%', borderWidth: 1, borderColor: '#231A31' },
   modalTitle: { color: '#FFFFFF', fontSize: 20, fontWeight: 'bold', marginBottom: 15 },
+  previewImage: { width: '100%', height: 200, borderRadius: 12, marginBottom: 15, resizeMode: 'cover' }, // NEW STYLE
   captionInput: { backgroundColor: '#000000', color: '#FFFFFF', borderRadius: 10, padding: 15, minHeight: 100, borderWidth: 1, borderColor: '#231A31', textAlignVertical: 'top', marginBottom: 20, fontSize: 16 },
   modalButtons: { flexDirection: 'row', justifyContent: 'flex-end', gap: 15 },
   cancelButton: { paddingVertical: 10, paddingHorizontal: 15, justifyContent: 'center' },
