@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import * as Speech from 'expo-speech';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -22,6 +23,10 @@ export default function PatientGalleryScreen() {
 
   useEffect(() => {
     fetchMemories();
+    // Stop any speech if the user leaves the screen
+    return () => {
+      Speech.stop();
+    };
   }, []);
 
   const fetchMemories = async () => {
@@ -40,16 +45,29 @@ export default function PatientGalleryScreen() {
     }
   };
 
+  // --- NEW: SPEECH FUNCTION ---
+  const speakMemory = (caption: string) => {
+    if (!caption) return;
+    
+    // Stop anything currently playing
+    Speech.stop(); 
+    
+    // Add a conversational prompt to the end of the family's caption
+    const conversationalText = `${caption}. What do you remember about this?`;
+    
+    Speech.speak(conversationalText, { 
+      language: 'en-GB', // Match Remi's accent
+      pitch: 0.9, 
+      rate: 0.8 // Speak slightly slower for easier comprehension
+    });
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="light-content" backgroundColor="#000000" />
       
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={32} color="#FFFFFF" />
-        </TouchableOpacity>
         <Text style={styles.headerTitle}>My Memories</Text>
-        <View style={{ width: 50 }} /> 
       </View>
 
       {loading ? (
@@ -66,6 +84,17 @@ export default function PatientGalleryScreen() {
               {img.caption ? (
                 <View style={styles.captionContainer}>
                   <Text style={styles.captionText}>{img.caption}</Text>
+                  
+                  {/* --- NEW: LISTEN BUTTON --- */}
+                  <TouchableOpacity 
+                    style={styles.speakButton} 
+                    onPress={() => speakMemory(img.caption)}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="volume-high" size={32} color="#000000" />
+                    <Text style={styles.speakButtonText}>Listen</Text>
+                  </TouchableOpacity>
+
                 </View>
               ) : null}
             </View>
@@ -91,24 +120,14 @@ const styles = StyleSheet.create({
   header: { 
     flexDirection: 'row', 
     alignItems: 'center', 
-    justifyContent: 'space-between', 
+    justifyContent: 'center', 
     paddingHorizontal: 20, 
     paddingVertical: 20,
     borderBottomWidth: 1,
     borderBottomColor: '#1A1325'
   },
-  backButton: { 
-    width: 50, 
-    height: 50, 
-    borderRadius: 25, 
-    backgroundColor: '#110C1D', 
-    alignItems: 'center', 
-    justifyContent: 'center', 
-    borderWidth: 2, 
-    borderColor: '#231A31' 
-  },
   headerTitle: { 
-    fontSize: 28, 
+    fontSize: 32, 
     fontWeight: 'bold', 
     color: '#FFFFFF' 
   },
@@ -138,9 +157,24 @@ const styles = StyleSheet.create({
   },
   captionText: { 
     color: '#FFFFFF', 
-    fontSize: 24, 
-    lineHeight: 34,
-    fontWeight: '500'
+    fontSize: 26, 
+    lineHeight: 38,
+    fontWeight: '600',
+    marginBottom: 25 // Added space for the button
+  },
+  speakButton: {
+    backgroundColor: '#FDE68A', // High contrast yellow
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 18,
+    borderRadius: 20,
+  },
+  speakButtonText: {
+    color: '#000000',
+    fontSize: 22,
+    fontWeight: 'bold',
+    marginLeft: 10,
   },
   emptyText: { 
     color: '#6B7280', 
