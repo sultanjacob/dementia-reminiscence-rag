@@ -316,7 +316,56 @@ export default function HomeScreen() {
   const safeAreaBgColor = isEvening ? '#FEF3C7' : '#F3F4F6'; 
   const appCapsuleBgColor = isEvening ? '#FFFBEB' : '#FFFFFF'; 
   const bubbleBgColor = isEvening ? '#FEF3C7' : '#F9FAFB';
+  // --- CAREGIVER UNLOCK LOGIC ---
+  const handleSecretTap = () => {
+  const now = Date.now();
+  // If taps are less than 800ms apart, count them
+  if (now - lastTapTime < 800) {
+    if (tapCount + 1 >= 3) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setShowPinModal(true);
+      setTapCount(0); // Reset for next time
+    } else {
+      setTapCount(tapCount + 1);
+    }
+  } else {
+    // Waited too long, reset to 1 tap
+    setTapCount(1);
+  }
+  setLastTapTime(now);
+};
 
+const verifyCaregiverPin = async (pinAttempt: string) => {
+  setEnteredPin(pinAttempt);
+  
+  // Auto-submit when they hit 4 digits
+  if (pinAttempt.length === 4) {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('caregiver_pin')
+        .eq('id', user.id)
+        .single();
+
+      if (data && data.caregiver_pin === pinAttempt) {
+        // Success! 
+        setShowPinModal(false);
+        setEnteredPin('');
+        router.push('/(caregiver)/dashboard'); // We will create this next!
+      } else {
+        // Failed
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        Alert.alert("Incorrect PIN", "That PIN does not match the Family settings.");
+        setEnteredPin('');
+      }
+    } catch (error) {
+      console.error("PIN check failed:", error);
+    }
+  }
+};
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: safeAreaBgColor }]}>
       <StatusBar barStyle="dark-content" backgroundColor={safeAreaBgColor} />
