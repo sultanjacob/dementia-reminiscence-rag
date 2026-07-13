@@ -643,4 +643,8 @@ const styles = StyleSheet.create({
   policeText: { color: '#FFFFFF', fontSize: 20, fontWeight: '800', marginLeft: 15 },
   cancelEmergencyButton: { paddingVertical: 15, alignItems: 'center' },
   cancelEmergencyText: { color: '#9CA3AF', fontSize: 18, fontWeight: '700' },
+  pinModalContent: { backgroundColor: '#1F2937', borderRadius: 24, padding: 30, width: '85%', alignItems: 'center', borderWidth: 1, borderColor: '#374151' },
+  pinModalTitle: { color: '#FFFFFF', fontSize: 22, fontWeight: 'bold', marginBottom: 8 },
+  pinModalSubtitle: { color: '#9CA3AF', fontSize: 14, textAlign: 'center', marginBottom: 25 },
+  pinInputDisplay: { backgroundColor: '#111827', width: '100%', borderWidth: 1, borderColor: '#374151', borderRadius: 16, paddingVertical: 20, color: '#FFFFFF', fontSize: 32, fontWeight: 'bold', textAlign: 'center', letterSpacing: 12, marginBottom: 20 },
 });
