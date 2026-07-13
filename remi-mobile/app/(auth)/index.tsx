@@ -46,6 +46,11 @@ export default function HomeScreen() {
 
   const [isDistressed, setIsDistressed] = useState(false);
   const [showEmergencyMenu, setShowEmergencyMenu] = useState(false);
+  // --- STEALTH UNLOCK STATES ---
+  const [tapCount, setTapCount] = useState(0);
+  const [lastTapTime, setLastTapTime] = useState(0);
+  const [showPinModal, setShowPinModal] = useState(false);
+  const [enteredPin, setEnteredPin] = useState('');
   
   const flashAnim = useRef(new Animated.Value(1)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
