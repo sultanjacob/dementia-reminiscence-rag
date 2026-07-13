@@ -15,6 +15,7 @@ import {
   StatusBar,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View
 } from 'react-native';
@@ -46,6 +47,7 @@ export default function HomeScreen() {
 
   const [isDistressed, setIsDistressed] = useState(false);
   const [showEmergencyMenu, setShowEmergencyMenu] = useState(false);
+
   // --- STEALTH UNLOCK STATES ---
   const [tapCount, setTapCount] = useState(0);
   const [lastTapTime, setLastTapTime] = useState(0);
@@ -111,8 +113,6 @@ export default function HomeScreen() {
       setCurrentDate(formattedDate);
 
       const { data: { user } } = await supabase.auth.getUser();
-      
-      // Stop execution if logged out
       if (!user) return;
 
       let fetchedName = "John";
@@ -208,7 +208,6 @@ export default function HomeScreen() {
   // --- DIAGNOSTIC BACKEND FUNCTION ---
   const sendAudioToBackend = async (fileUri: string) => {
     try {
-      console.log("Preparing to send audio...");
       const { data: { user } } = await supabase.auth.getUser();
       
       const formData = new FormData();
@@ -218,11 +217,7 @@ export default function HomeScreen() {
         type: 'audio/m4a' 
       } as any);
       
-      if (user) {
-        formData.append('user_id', user.id);
-      }
-
-      console.log(`Sending POST request to: ${API_URL}/voice-chat`);
+      if (user) formData.append('user_id', user.id);
 
       const response = await fetch(`${API_URL}/voice-chat`, {
         method: 'POST',
@@ -233,11 +228,7 @@ export default function HomeScreen() {
         },
       });
 
-      console.log("Server responded with HTTP Status:", response.status);
-
       const responseText = await response.text();
-      console.log("Raw Server Response:", responseText);
-
       let responseData;
       try {
         responseData = JSON.parse(responseText);
@@ -251,11 +242,8 @@ export default function HomeScreen() {
         setRemiText(aiText);
         speak(aiText);
 
-        if (aiText.toLowerCase().includes("call family")) {
-          setIsDistressed(true);
-        } else {
-          setIsDistressed(false); 
-        }
+        if (aiText.toLowerCase().includes("call family")) setIsDistressed(true);
+        else setIsDistressed(false); 
       } else {
         const errorMessage = responseData.detail || responseData.error || responseData.message || "Unknown Server Error";
         throw new Error(`[HTTP ${response.status}] ${JSON.stringify(errorMessage)}`);
@@ -284,15 +272,12 @@ export default function HomeScreen() {
     
     setTimeout(async () => {
       const { error } = await supabase.auth.signOut();
-      
       if (error) {
         Alert.alert("Sign Out Error", error.message);
       } else {
-        // Explicitly route to your newly named login file
-        // No dismissAll() or goBack() to crash the tab navigator!
         router.replace('/login'); 
       }
-    }, 400);
+    }, 500);
   };
 
   const handlePrimaryCall = () => {
@@ -313,59 +298,61 @@ export default function HomeScreen() {
     speak(`Tap the purple microphone and ask me: ${suggestion}`);
   };
 
+  // --- CAREGIVER UNLOCK LOGIC ---
+  const handleSecretTap = () => {
+    const now = Date.now();
+    // If taps are less than 800ms apart, count them
+    if (now - lastTapTime < 800) {
+      if (tapCount + 1 >= 3) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        setShowPinModal(true);
+        setTapCount(0); // Reset for next time
+      } else {
+        setTapCount(tapCount + 1);
+      }
+    } else {
+      // Waited too long, reset to 1 tap
+      setTapCount(1);
+    }
+    setLastTapTime(now);
+  };
+
+  const verifyCaregiverPin = async (pinAttempt: string) => {
+    setEnteredPin(pinAttempt);
+    
+    // Auto-submit when they hit 4 digits
+    if (pinAttempt.length === 4) {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('caregiver_pin')
+          .eq('id', user.id)
+          .single();
+
+        if (data && data.caregiver_pin === pinAttempt) {
+          // Success! 
+          setShowPinModal(false);
+          setEnteredPin('');
+          router.push('/(caregiver)/dashboard'); // Route to caregiver portal
+        } else {
+          // Failed
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+          Alert.alert("Incorrect PIN", "That PIN does not match the Family settings.");
+          setEnteredPin('');
+        }
+      } catch (error) {
+        console.error("PIN check failed:", error);
+      }
+    }
+  };
+
   const safeAreaBgColor = isEvening ? '#FEF3C7' : '#F3F4F6'; 
   const appCapsuleBgColor = isEvening ? '#FFFBEB' : '#FFFFFF'; 
   const bubbleBgColor = isEvening ? '#FEF3C7' : '#F9FAFB';
-  // --- CAREGIVER UNLOCK LOGIC ---
-  const handleSecretTap = () => {
-  const now = Date.now();
-  // If taps are less than 800ms apart, count them
-  if (now - lastTapTime < 800) {
-    if (tapCount + 1 >= 3) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      setShowPinModal(true);
-      setTapCount(0); // Reset for next time
-    } else {
-      setTapCount(tapCount + 1);
-    }
-  } else {
-    // Waited too long, reset to 1 tap
-    setTapCount(1);
-  }
-  setLastTapTime(now);
-};
 
-const verifyCaregiverPin = async (pinAttempt: string) => {
-  setEnteredPin(pinAttempt);
-  
-  // Auto-submit when they hit 4 digits
-  if (pinAttempt.length === 4) {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('caregiver_pin')
-        .eq('id', user.id)
-        .single();
-
-      if (data && data.caregiver_pin === pinAttempt) {
-        // Success! 
-        setShowPinModal(false);
-        setEnteredPin('');
-        router.push('/(caregiver)/dashboard'); // We will create this next!
-      } else {
-        // Failed
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-        Alert.alert("Incorrect PIN", "That PIN does not match the Family settings.");
-        setEnteredPin('');
-      }
-    } catch (error) {
-      console.error("PIN check failed:", error);
-    }
-  }
-};
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: safeAreaBgColor }]}>
       <StatusBar barStyle="dark-content" backgroundColor={safeAreaBgColor} />
@@ -396,9 +383,14 @@ const verifyCaregiverPin = async (pinAttempt: string) => {
             </View>
           </Animated.View>
 
-          <View style={styles.orbContainer}>
+          {/* CAREGIVER SECRET BUTTON */}
+          <TouchableOpacity 
+            activeOpacity={1} 
+            onPress={handleSecretTap} 
+            style={styles.orbContainer}
+          >
             <Animated.View style={[styles.orb, { transform: [{ scale: pulseAnim }] }]} />
-          </View>
+          </TouchableOpacity>
 
           <View style={[styles.speechBubble, { backgroundColor: bubbleBgColor }]}>
             <Text style={styles.remiSpeechText}>{remiText}</Text>
@@ -582,6 +574,36 @@ const verifyCaregiverPin = async (pinAttempt: string) => {
           </View>
         </View>
       </Modal>
+
+      {/* --- CAREGIVER PIN MODAL --- */}
+      <Modal visible={showPinModal} transparent={true} animationType="fade">
+        <View style={[styles.modalOverlay, { justifyContent: 'center', alignItems: 'center' }]}>
+          <View style={styles.pinModalContent}>
+            <Text style={styles.pinModalTitle}>Caregiver Access</Text>
+            <Text style={styles.pinModalSubtitle}>Enter 4-digit PIN to unlock Action Dashboard</Text>
+            
+            <TextInput
+              style={styles.pinInputDisplay}
+              value={enteredPin}
+              onChangeText={verifyCaregiverPin}
+              keyboardType="numeric"
+              secureTextEntry={true}
+              maxLength={4}
+              autoFocus={true}
+              placeholder="••••"
+              placeholderTextColor="#6B7280"
+            />
+
+            <TouchableOpacity style={styles.cancelEmergencyButton} onPress={() => {
+              setShowPinModal(false);
+              setEnteredPin('');
+            }}>
+              <Text style={styles.cancelEmergencyText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
     </SafeAreaView>
   );
 }
@@ -643,6 +665,8 @@ const styles = StyleSheet.create({
   policeText: { color: '#FFFFFF', fontSize: 20, fontWeight: '800', marginLeft: 15 },
   cancelEmergencyButton: { paddingVertical: 15, alignItems: 'center' },
   cancelEmergencyText: { color: '#9CA3AF', fontSize: 18, fontWeight: '700' },
+  
+  // NEW CAREGIVER PIN STYLES
   pinModalContent: { backgroundColor: '#1F2937', borderRadius: 24, padding: 30, width: '85%', alignItems: 'center', borderWidth: 1, borderColor: '#374151' },
   pinModalTitle: { color: '#FFFFFF', fontSize: 22, fontWeight: 'bold', marginBottom: 8 },
   pinModalSubtitle: { color: '#9CA3AF', fontSize: 14, textAlign: 'center', marginBottom: 25 },
