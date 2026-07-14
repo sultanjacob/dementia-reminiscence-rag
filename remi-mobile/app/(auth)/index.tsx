@@ -324,7 +324,10 @@ export default function HomeScreen() {
     if (pinAttempt.length === 4) {
       try {
         const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
+        if (!user) {
+          Alert.alert("Error", "No user is logged in.");
+          return;
+        }
 
         const { data, error } = await supabase
           .from('profiles')
@@ -332,19 +335,29 @@ export default function HomeScreen() {
           .eq('id', user.id)
           .single();
 
+        if (error) {
+          Alert.alert("Database Error", error.message);
+          setEnteredPin('');
+          return;
+        }
+
+        // Did we find a match?
         if (data && data.caregiver_pin === pinAttempt) {
-          // Success! 
           setShowPinModal(false);
           setEnteredPin('');
-          router.push('/(caregiver)/dashboard'); // Route to caregiver portal
+          router.push('/(caregiver)/dashboard'); 
         } else {
-          // Failed
+          // If it fails, tell us exactly what it saw!
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-          Alert.alert("Incorrect PIN", "That PIN does not match the Family settings.");
+          Alert.alert(
+            "Incorrect PIN", 
+            `You typed: ${pinAttempt}\nDatabase saw: ${data?.caregiver_pin || 'Nothing'}`
+          );
           setEnteredPin('');
         }
-      } catch (error) {
-        console.error("PIN check failed:", error);
+      } catch (error: any) {
+        Alert.alert("Code Error", error.message);
+        setEnteredPin('');
       }
     }
   };
