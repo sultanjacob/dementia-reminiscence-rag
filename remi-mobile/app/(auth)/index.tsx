@@ -345,7 +345,7 @@ export default function HomeScreen() {
         if (data && data.caregiver_pin === pinAttempt) {
           setShowPinModal(false);
           setEnteredPin('');
-          router.push('/(caregiver)/dashboard'); 
+          router.push('/(caregiver)'); 
         } else {
           // If it fails, tell us exactly what it saw!
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
