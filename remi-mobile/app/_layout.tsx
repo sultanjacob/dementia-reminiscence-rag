@@ -59,16 +59,19 @@ export default function RootLayout() {
 
     const inAuthGroup = segments[0] === '(auth)';
     const inFamilyGroup = segments[0] === '(family)';
+    const inCaregiverGroup = segments[0] === '(caregiver)'; // --- NEW CONSTANT ---
 
     // DIRECT ROUTING - NO TIMEOUTS
     if (!user) {
-      if (inAuthGroup || inFamilyGroup) {
+      if (inAuthGroup || inFamilyGroup || inCaregiverGroup) {
         router.replace('/');
       }
     } else if (user && userRole) {
       if (userRole === 'family' && !inFamilyGroup) {
         router.replace('/(family)');
-      } else if (userRole === 'patient' && !inAuthGroup) {
+      } 
+      // --- NEW RULE: Allow patients in both (auth) AND (caregiver) ---
+      else if (userRole === 'patient' && !inAuthGroup && !inCaregiverGroup) {
         router.replace('/(auth)');
       }
     }
@@ -87,6 +90,8 @@ export default function RootLayout() {
       <Stack.Screen name="index" /> 
       <Stack.Screen name="(auth)" options={{ headerShown: false }} />
       <Stack.Screen name="(family)" options={{ headerShown: false }} />
+      {/* --- ADDED CAREGIVER TO THE STACK --- */}
+      <Stack.Screen name="(caregiver)" options={{ headerShown: false }} /> 
     </Stack>
   );
 }
