@@ -85,7 +85,51 @@ export default function CareTeamScreen() {
       console.error('Error fetching PIN:', error);
     }
   };
+  const fetchShiftLogs = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
 
+      // 1. Get the patient ID linked to this family member
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('linked_patient_id')
+        .eq('id', user.id)
+        .single();
+
+      if (profile?.linked_patient_id) {
+        // 2. Fetch the shift logs for that patient
+        const { data, error } = await supabase
+          .from('shift_logs')
+          .select('*')
+          .eq('patient_id', profile.linked_patient_id)
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        
+        // 3. Format the data so the UI renders the correct colors
+        if (data) {
+          const formattedLogs = data.map(log => {
+            let color = '#10B981'; // Calm (Green)
+            if (log.vibe === 'Confused') color = '#F59E0B'; // Confused (Yellow)
+            if (log.vibe === 'Agitated') color = '#EF4444'; // Agitated (Red)
+
+            return {
+              id: log.id,
+              date: new Date(log.created_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }),
+              caregiver: log.caregiver_name,
+              vibe: log.vibe,
+              notes: log.notes || 'No additional notes provided.',
+              iconColor: color
+            };
+          });
+          setShiftLogs(formattedLogs);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching shift logs:', error);
+    }
+  };
   const handleSavePin = async () => {
     if (pin.length !== 4) {
       Alert.alert("Invalid PIN", "The Caregiver PIN must be exactly 4 digits.");
