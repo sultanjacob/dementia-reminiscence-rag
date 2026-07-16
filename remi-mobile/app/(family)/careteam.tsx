@@ -47,8 +47,7 @@ export default function CareTeamScreen() {
   ]);
 
   useEffect(() => {
-    // Load both the team members and the PIN when the screen opens
-    Promise.all([fetchCareTeam(), fetchCaregiverPin()]).finally(() => {
+    Promise.all([fetchCareTeam(), fetchCaregiverPin(), fetchShiftLogs()]).finally(() => {
       setIsLoading(false);
     });
   }, []);
