@@ -36,7 +36,7 @@ export default function CaregiverDashboard() {
     ));
   };
 
-  const handleEndShift = () => {
+  const handleEndShift = async () => {
     if (!selectedVibe) {
       Alert.alert("Missing Vibe", "Please select Mary's overall mood for this shift.");
       return;
@@ -44,15 +44,31 @@ export default function CaregiverDashboard() {
 
     setIsSubmitting(true);
     
-    // Simulate network delay for saving to Supabase
-    setTimeout(() => {
-      setIsSubmitting(false);
+    try {
+      // Get the patient's ID (since the caregiver is using the patient's device)
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("No user found");
+
+      // Insert the real data into our new table
+      const { error } = await supabase.from('shift_logs').insert({
+        patient_id: user.id,
+        vibe: selectedVibe,
+        notes: notes,
+        caregiver_name: "Care Team" // We can make this dynamic later!
+      });
+
+      if (error) throw error;
+
       Alert.alert(
         "Shift Logged", 
         "Your update has been beamed to the Family Dashboard.",
         [{ text: "OK", onPress: lockToPatientMode }]
       );
-    }, 800);
+    } catch (err: any) {
+      Alert.alert("Error Saving Log", err.message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   // Instantly unmounts this dashboard and returns to the patient view
