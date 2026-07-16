@@ -27,24 +27,7 @@ export default function CareTeamScreen() {
   const [isSaving, setIsSaving] = useState(false);
 
   // Placeholder Shift Logs for the UI prototype
-  const [shiftLogs, setShiftLogs] = useState([
-    {
-      id: '1',
-      date: 'Today, 2:30 PM',
-      caregiver: 'Nurse Jane',
-      vibe: 'Calm & Happy',
-      notes: 'Mary had a great lunch and enjoyed looking at the new photos in the Vault. Took all afternoon medications without issue.',
-      iconColor: '#34D399'
-    },
-    {
-      id: '2',
-      date: 'Yesterday, 3:00 PM',
-      caregiver: 'Aide Michael',
-      vibe: 'Slightly Confused',
-      notes: 'Asked about her late husband a few times. I used Remi to play her favorite 60s music which helped redirect her mood.',
-      iconColor: '#FBBF24'
-    }
-  ]);
+  const [shiftLogs, setShiftLogs] = useState<any[]>([]);
 
   useEffect(() => {
     Promise.all([fetchCareTeam(), fetchCaregiverPin(), fetchShiftLogs()]).finally(() => {
