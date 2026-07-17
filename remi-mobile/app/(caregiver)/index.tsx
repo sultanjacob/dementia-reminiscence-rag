@@ -14,12 +14,13 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
+// THIS IS THE LINE THAT WAS MISSING:
+import { supabase } from '../../supabase';
 
 export default function CaregiverDashboard() {
   const router = useRouter();
 
   // --- PROTOTYPE STATE ---
-  // In a real setup, we will fetch these from Supabase
   const [routines, setRoutines] = useState([
     { id: '1', time: '1:00 PM', title: 'Afternoon Medication', isCompleted: false },
     { id: '2', time: '2:30 PM', title: 'Lunch (High Protein)', isCompleted: true },
@@ -54,7 +55,7 @@ export default function CaregiverDashboard() {
         patient_id: user.id,
         vibe: selectedVibe,
         notes: notes,
-        caregiver_name: "Care Team" // We can make this dynamic later!
+        caregiver_name: "Care Team" 
       });
 
       if (error) throw error;
