@@ -1,188 +1,222 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { Alert, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { supabase } from '../../supabase'; // Make sure this path points to your supabase file
+import {
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
+} from 'react-native';
+// THIS IS THE LINE THAT WAS MISSING:
+import { supabase } from '../../supabase';
 
-export default function FamilyDashboard() {
+export default function CaregiverDashboard() {
   const router = useRouter();
-  
-  // State to control the visibility of the profile menu
-  const [isMenuVisible, setIsMenuVisible] = useState(false);
 
-  // --- BULLETPROOF SIGN OUT ---
-  const handleSignOut = async () => {
-    setIsMenuVisible(false);
-    
-    setTimeout(async () => {
-      const { error } = await supabase.auth.signOut();
-      
-      if (error) {
-        Alert.alert("Sign Out Error", error.message);
-      } else {
-        router.replace('/login'); 
-      }
-    }, 400);
+  // --- PROTOTYPE STATE ---
+  const [routines, setRoutines] = useState([
+    { id: '1', time: '1:00 PM', title: 'Afternoon Medication', isCompleted: false },
+    { id: '2', time: '2:30 PM', title: 'Lunch (High Protein)', isCompleted: true },
+    { id: '3', time: '4:00 PM', title: 'Short Walk outside', isCompleted: false },
+  ]);
+
+  const [selectedVibe, setSelectedVibe] = useState<string | null>(null);
+  const [notes, setNotes] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const toggleRoutine = (id: string) => {
+    setRoutines(routines.map(r => 
+      r.id === id ? { ...r, isCompleted: !r.isCompleted } : r
+    ));
   };
 
+  const handleEndShift = async () => {
+    if (!selectedVibe) {
+      Alert.alert("Missing Vibe", "Please select Mary's overall mood for this shift.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    
+    try {
+      // Get the patient's ID (since the caregiver is using the patient's device)
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("No user found");
+
+      // Insert the real data into our new table
+      const { error } = await supabase.from('shift_logs').insert({
+        patient_id: user.id,
+        vibe: selectedVibe,
+        notes: notes,
+        caregiver_name: "Care Team" 
+      });
+
+      if (error) throw error;
+
+      Alert.alert(
+        "Shift Logged", 
+        "Your update has been beamed to the Family Dashboard.",
+        [{ text: "OK", onPress: lockToPatientMode }]
+      );
+    } catch (err: any) {
+      Alert.alert("Error Saving Log", err.message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Instantly unmounts this dashboard and returns to the patient view
+  const lockToPatientMode = () => {
+    router.replace('/(auth)');
+  };
+
+  const vibes = [
+    { label: 'Calm', emoji: '🙂', color: '#10B981', bgColor: 'rgba(16, 185, 129, 0.15)' },
+    { label: 'Confused', emoji: '😕', color: '#F59E0B', bgColor: 'rgba(245, 158, 11, 0.15)' },
+    { label: 'Agitated', emoji: '😟', color: '#EF4444', bgColor: 'rgba(239, 68, 68, 0.15)' }
+  ];
+
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* --- 1. HEADER & STATUS CARD --- */}
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.greeting}>Hello, Sarah</Text>
-            <Text style={styles.subtitle}>Family Dashboard</Text>
-          </View>
-          
-          {/* MAKE PROFILE BUTTON CLICKABLE */}
-          <TouchableOpacity style={styles.profileButton} onPress={() => setIsMenuVisible(true)}>
-            <Ionicons name="person-outline" size={24} color="#E5E7EB" />
-          </TouchableOpacity>
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar barStyle="light-content" backgroundColor="#0B0F19" />
+      
+      <View style={styles.header}>
+        <View>
+          <Text style={styles.headerTitle}>Caregiver Actions</Text>
+          <Text style={styles.headerSubtitle}>Logged in securely</Text>
         </View>
-
-        <View style={styles.statusCard}>
-          <View style={styles.statusHeader}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>M</Text>
-            </View>
-            <View style={styles.statusInfo}>
-              <Text style={styles.patientName}>Mary</Text>
-              <Text style={styles.patientStatus}>Doing well today</Text>
-            </View>
-            <View style={styles.onlineBadge}>
-              <View style={styles.onlineDot} />
-              <Text style={styles.onlineText}>Online</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* --- 2. COMPACT ACTION BAR --- */}
-        <View style={styles.actionBar}>
-          <TouchableOpacity style={styles.actionItem} onPress={() => router.push('/(family)/vault')}>
-            <View style={[styles.actionIconBadge, { backgroundColor: 'rgba(139, 92, 246, 0.15)' }]}>
-              <Ionicons name="images" size={24} color="#8B5CF6" />
-            </View>
-            <Text style={styles.actionItemText}>Vault</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.actionItem} onPress={() => router.push('/(family)/careteam')}>
-            <View style={[styles.actionIconBadge, { backgroundColor: 'rgba(52, 211, 153, 0.15)' }]}>
-              <Ionicons name="people" size={24} color="#34D399" />
-            </View>
-            <Text style={styles.actionItemText}>Care Team</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.actionItem}>
-            <View style={[styles.actionIconBadge, { backgroundColor: 'rgba(248, 113, 113, 0.15)' }]}>
-              <Ionicons name="warning" size={24} color="#F87171" />
-            </View>
-            <Text style={styles.actionItemText}>SOS</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* --- 3. DAILY INSIGHTS --- */}
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Daily Insights</Text>
-          <Text style={styles.sectionSubtitle}>Updated 10m ago</Text>
-        </View>
-
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.insightsScroll}>
-          {/* Insight Card 1 */}
-          <View style={styles.insightCard}>
-            <View style={styles.insightHeader}>
-              <Text style={styles.insightEmoji}>🙂</Text>
-              <Text style={styles.insightTitle}>Vibe Check</Text>
-            </View>
-            <Text style={styles.insightHighlight}>Calm & Conversational</Text>
-            <Text style={styles.insightDesc}>Mary sounds relaxed today during 3 chats with Remi.</Text>
-          </View>
-
-          {/* Insight Card 2 */}
-          <View style={styles.insightCard}>
-            <View style={styles.insightHeader}>
-              <Ionicons name="chatbubble" size={16} color="#8B5CF6" style={{ marginRight: 8 }} />
-              <Text style={styles.insightTitle}>Latest Chat</Text>
-            </View>
-            <Text style={styles.insightDesc}>"Remi asked about the amazing 1985 Lake House trip. Mary recalled baking pies with Aunt Susan."</Text>
-            <Text style={styles.insightLink}>Tap to read full report</Text>
-          </View>
-        </ScrollView>
-      </ScrollView>
-
-      {/* --- PROFILE DROPDOWN MODAL --- */}
-      <Modal visible={isMenuVisible} transparent={true} animationType="fade">
-        <TouchableOpacity 
-          style={styles.modalOverlay} 
-          activeOpacity={1} 
-          onPress={() => setIsMenuVisible(false)} // Closes menu if you tap anywhere outside
-        >
-          <View style={styles.menuDropdown}>
-            
-            <TouchableOpacity 
-              style={styles.menuItem} 
-              onPress={() => {
-                setIsMenuVisible(false);
-                router.push('/(family)/settings');
-              }}
-            >
-              <Ionicons name="settings-outline" size={20} color="#E5E7EB" style={styles.menuIcon} />
-              <Text style={styles.menuItemText}>App Settings</Text>
-            </TouchableOpacity>
-            
-            <View style={styles.menuDivider} />
-            
-            <TouchableOpacity style={styles.menuItem} onPress={handleSignOut}>
-              <Ionicons name="log-out-outline" size={20} color="#F87171" style={styles.menuIcon} />
-              <Text style={[styles.menuItemText, { color: '#F87171' }]}>Sign Out</Text>
-            </TouchableOpacity>
-
-          </View>
+        <TouchableOpacity style={styles.lockIconButton} onPress={lockToPatientMode}>
+          <Ionicons name="lock-closed" size={24} color="#EF4444" />
         </TouchableOpacity>
-      </Modal>
+      </View>
 
+      <KeyboardAvoidingView 
+        style={{ flex: 1 }} 
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
+          
+          {/* --- 1. ROUTINE CHECKLIST --- */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Today's Routines</Text>
+            {routines.map((routine) => (
+              <TouchableOpacity 
+                key={routine.id} 
+                style={[styles.routineCard, routine.isCompleted && styles.routineCompleted]}
+                onPress={() => toggleRoutine(routine.id)}
+                activeOpacity={0.7}
+              >
+                <View style={styles.routineInfo}>
+                  <Text style={[styles.routineTime, routine.isCompleted && styles.textCompleted]}>
+                    {routine.time}
+                  </Text>
+                  <Text style={[styles.routineTitle, routine.isCompleted && styles.textCompleted]}>
+                    {routine.title}
+                  </Text>
+                </View>
+                <View style={[styles.checkbox, routine.isCompleted && styles.checkboxCompleted]}>
+                  {routine.isCompleted && <Ionicons name="checkmark" size={18} color="#FFFFFF" />}
+                </View>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {/* --- 2. END OF SHIFT LOG --- */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Shift Report</Text>
+            
+            <Text style={styles.label}>Overall Vibe</Text>
+            <View style={styles.vibeRow}>
+              {vibes.map((v) => {
+                const isSelected = selectedVibe === v.label;
+                return (
+                  <TouchableOpacity
+                    key={v.label}
+                    style={[
+                      styles.vibeButton,
+                      isSelected ? { backgroundColor: v.bgColor, borderColor: v.color } : {}
+                    ]}
+                    onPress={() => setSelectedVibe(v.label)}
+                  >
+                    <Text style={styles.vibeEmoji}>{v.emoji}</Text>
+                    <Text style={[styles.vibeLabel, isSelected ? { color: v.color, fontWeight: 'bold' } : {}]}>
+                      {v.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <Text style={styles.label}>Shift Notes (Optional)</Text>
+            <TextInput
+              style={styles.notesInput}
+              placeholder="e.g., Mary had a great lunch, but asked about her old dog a few times."
+              placeholderTextColor="#6B7280"
+              multiline
+              value={notes}
+              onChangeText={setNotes}
+              textAlignVertical="top"
+            />
+          </View>
+
+        </ScrollView>
+      </KeyboardAvoidingView>
+
+      {/* --- 3. LOCK BUTTON --- */}
+      <View style={styles.footer}>
+        <TouchableOpacity 
+          style={styles.submitButton} 
+          onPress={handleEndShift}
+          disabled={isSubmitting}
+        >
+          <Text style={styles.submitButtonText}>
+            {isSubmitting ? "Sending to Family..." : "Submit Log & Lock Device"}
+          </Text>
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#000000' },
-  scrollContent: { padding: 20, paddingBottom: 40 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 20, marginBottom: 30 },
-  greeting: { color: '#FFFFFF', fontSize: 28, fontWeight: 'bold' },
-  subtitle: { color: '#8B5CF6', fontSize: 16, fontWeight: '600', marginTop: 4 },
-  profileButton: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#110C1D', borderWidth: 1, borderColor: '#231A31', justifyContent: 'center', alignItems: 'center' },
-  statusCard: { backgroundColor: '#110C1D', borderRadius: 20, padding: 20, borderWidth: 1, borderColor: '#231A31' },
-  statusHeader: { flexDirection: 'row', alignItems: 'center' },
-  avatar: { width: 50, height: 50, borderRadius: 25, backgroundColor: '#8B5CF6', justifyContent: 'center', alignItems: 'center', marginRight: 15 },
-  avatarText: { color: '#FFFFFF', fontSize: 24, fontWeight: 'bold' },
-  statusInfo: { flex: 1 },
-  patientName: { color: '#FFFFFF', fontSize: 20, fontWeight: 'bold' },
-  patientStatus: { color: '#9CA3AF', fontSize: 14, marginTop: 4 },
-  onlineBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(52, 211, 153, 0.15)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 12 },
-  onlineDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#34D399', marginRight: 6 },
-  onlineText: { color: '#34D399', fontSize: 12, fontWeight: 'bold' },
-  actionBar: { flexDirection: 'row', justifyContent: 'space-evenly', marginTop: 30, marginBottom: 30, paddingHorizontal: 10 },
-  actionItem: { alignItems: 'center' },
-  actionIconBadge: { width: 60, height: 60, borderRadius: 30, justifyContent: 'center', alignItems: 'center', marginBottom: 8 },
-  actionItemText: { color: '#E5E7EB', fontSize: 14, fontWeight: '500' },
-  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 15 },
-  sectionTitle: { color: '#FFFFFF', fontSize: 22, fontWeight: 'bold' },
-  sectionSubtitle: { color: '#6B7280', fontSize: 12 },
-  insightsScroll: { marginLeft: -20, paddingLeft: 20 },
-  insightCard: { backgroundColor: '#110C1D', borderRadius: 20, padding: 20, width: 260, marginRight: 15, borderWidth: 1, borderColor: '#231A31' },
-  insightHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
-  insightEmoji: { fontSize: 16, marginRight: 8 },
-  insightTitle: { color: '#FFFFFF', fontSize: 16, fontWeight: 'bold' },
-  insightHighlight: { color: '#FFFFFF', fontSize: 22, fontWeight: 'bold', marginBottom: 10 },
-  insightDesc: { color: '#9CA3AF', fontSize: 14, lineHeight: 20 },
-  insightLink: { color: '#8B5CF6', fontSize: 14, marginTop: 15, fontWeight: '500' },
+  safeArea: { flex: 1, backgroundColor: '#0B0F19', paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 20, borderBottomWidth: 1, borderBottomColor: '#1F2937' },
+  headerTitle: { fontSize: 24, fontWeight: '800', color: '#FFFFFF' },
+  headerSubtitle: { fontSize: 14, color: '#10B981', marginTop: 4, fontWeight: '600' },
+  lockIconButton: { backgroundColor: 'rgba(239, 68, 68, 0.1)', padding: 12, borderRadius: 16 },
   
-  // --- MODAL STYLES ---
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.6)' },
-  menuDropdown: { position: 'absolute', top: 80, right: 20, backgroundColor: '#1A1325', borderRadius: 16, borderWidth: 1, borderColor: '#3D2F4F', width: 200, shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.4, shadowRadius: 15, elevation: 10 },
-  menuItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 16, paddingHorizontal: 20 },
-  menuIcon: { marginRight: 12 },
-  menuItemText: { color: '#E5E7EB', fontSize: 16, fontWeight: '600' },
-  menuDivider: { height: 1, backgroundColor: '#231A31' },
+  container: { flex: 1 },
+  scrollContent: { padding: 20, paddingBottom: 40 },
+  section: { marginBottom: 35 },
+  sectionTitle: { fontSize: 18, fontWeight: '700', color: '#FFFFFF', marginBottom: 15, textTransform: 'uppercase', letterSpacing: 1 },
+  
+  // Routines
+  routineCard: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#111827', padding: 18, borderRadius: 16, marginBottom: 10, borderWidth: 1, borderColor: '#1F2937' },
+  routineCompleted: { backgroundColor: 'rgba(16, 185, 129, 0.05)', borderColor: 'rgba(16, 185, 129, 0.3)' },
+  routineInfo: { flex: 1 },
+  routineTime: { color: '#8B5CF6', fontSize: 13, fontWeight: '700', marginBottom: 4 },
+  routineTitle: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
+  textCompleted: { color: '#6B7280', textDecorationLine: 'line-through' },
+  checkbox: { width: 28, height: 28, borderRadius: 14, borderWidth: 2, borderColor: '#4B5563', alignItems: 'center', justifyContent: 'center' },
+  checkboxCompleted: { backgroundColor: '#10B981', borderColor: '#10B981' },
+  
+  // Vibe Check
+  label: { color: '#9CA3AF', fontSize: 14, fontWeight: '600', marginBottom: 10, marginTop: 5 },
+  vibeRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 25 },
+  vibeButton: { flex: 1, alignItems: 'center', backgroundColor: '#111827', paddingVertical: 16, borderRadius: 16, borderWidth: 1, borderColor: '#1F2937', marginHorizontal: 4 },
+  vibeEmoji: { fontSize: 28, marginBottom: 8 },
+  vibeLabel: { color: '#9CA3AF', fontSize: 13, fontWeight: '500' },
+  
+  notesInput: { backgroundColor: '#111827', borderWidth: 1, borderColor: '#1F2937', borderRadius: 16, padding: 16, color: '#FFFFFF', fontSize: 16, minHeight: 120 },
+  
+  footer: { padding: 20, borderTopWidth: 1, borderTopColor: '#1F2937', backgroundColor: '#0B0F19' },
+  submitButton: { backgroundColor: '#8B5CF6', paddingVertical: 18, borderRadius: 16, alignItems: 'center', shadowColor: '#8B5CF6', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 8 },
+  submitButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: 'bold' },
 });
