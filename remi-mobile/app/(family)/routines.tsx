@@ -1,14 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
-import DateTimePicker from '@react-native-community/datetimepicker';
+import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  FlatList,
   KeyboardAvoidingView,
   Modal,
   Platform,
   SafeAreaView,
+  ScrollView,
   StatusBar,
   StyleSheet,
   Text,
@@ -19,302 +19,246 @@ import {
 import { supabase } from '../../supabase';
 
 export default function FamilyRoutinesScreen() {
+  const router = useRouter();
+
   const [routines, setRoutines] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  
-  // Modal & Form State
+  const [loading, setLoading] = useState(true);
+  const [patientId, setPatientId] = useState<string | null>(null);
+
+  // Modal State
   const [isModalVisible, setIsModalVisible] = useState(false);
-  const [editingRoutineId, setEditingRoutineId] = useState<string | null>(null);
-  const [newActivity, setNewActivity] = useState('');
-  const [selectedTime, setSelectedTime] = useState(new Date());
-  const [showAndroidPicker, setShowAndroidPicker] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [newTitle, setNewTitle] = useState('');
+  const [newTime, setNewTime] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    fetchRoutines();
+    fetchPatientAndRoutines();
   }, []);
 
-  const fetchRoutines = async () => {
+  const fetchPatientAndRoutines = async () => {
     try {
-      setIsLoading(true);
-      const { data, error } = await supabase
-        .from('routines')
-        .select('*')
-        .order('time', { ascending: true });
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
 
-      if (error) throw error;
-      if (data) setRoutines(data);
+      // 1. Find which patient belongs to this family member
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('linked_patient_id')
+        .eq('id', user.id)
+        .single();
+
+      if (profile?.linked_patient_id) {
+        setPatientId(profile.linked_patient_id);
+        
+        // 2. Fetch the routines for that specific patient
+        const { data, error } = await supabase
+          .from('routines')
+          .select('*')
+          .eq('patient_id', profile.linked_patient_id)
+          .order('time', { ascending: true });
+
+        if (error) throw error;
+        setRoutines(data || []);
+      }
     } catch (error) {
       console.error("Error fetching routines:", error);
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
-  const onTimeChange = (event: any, date?: Date) => {
-    if (Platform.OS === 'android') {
-      setShowAndroidPicker(false);
+  const handleAddRoutine = async () => {
+    if (!newTitle.trim() || !newTime.trim()) {
+      Alert.alert("Missing Info", "Please provide both a time and a description.");
+      return;
     }
-    if (date) {
-      setSelectedTime(date);
-    }
-  };
-
-  // --- NEW: Open Modal for Editing ---
-  const openEditModal = (routine: any) => {
-    setEditingRoutineId(routine.id);
-    setNewActivity(routine.activity);
-    
-    // Convert the "HH:MM" database string back into a JavaScript Date object for the picker
-    if (routine.time && routine.time.includes(':')) {
-      const [h, m] = routine.time.split(':');
-      const d = new Date();
-      d.setHours(parseInt(h, 10), parseInt(m, 10), 0, 0);
-      setSelectedTime(d);
-    }
-    setIsModalVisible(true);
-  };
-
-  // --- NEW: Open Modal for Adding ---
-  const openAddModal = () => {
-    setEditingRoutineId(null);
-    setNewActivity('');
-    setSelectedTime(new Date());
-    setIsModalVisible(true);
-  };
-
-  // --- UPDATED: Handles both Insert and Update ---
-  const handleSaveRoutine = async () => {
-    if (!newActivity.trim()) {
-      Alert.alert("Missing Info", "Please enter an activity name.");
+    if (!patientId) {
+      Alert.alert("Error", "No linked patient found. Please set up the care team first.");
       return;
     }
 
+    setIsSaving(true);
+
     try {
-      setIsSubmitting(true);
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      const hours = selectedTime.getHours().toString().padStart(2, '0');
-      const minutes = selectedTime.getMinutes().toString().padStart(2, '0');
-      const formattedTime = `${hours}:${minutes}`; 
+      const { error } = await supabase.from('routines').insert({
+        patient_id: patientId,
+        title: newTitle.trim(),
+        time: newTime.trim(),
+        is_completed: false // Always starts false!
+      });
 
-      if (editingRoutineId) {
-        // Update existing routine
-        const { error } = await supabase
-          .from('routines')
-          .update({ activity: newActivity, time: formattedTime })
-          .eq('id', editingRoutineId);
-        
-        if (error) throw error;
-      } else {
-        // Insert new routine
-        const { error } = await supabase
-          .from('routines')
-          .insert([{ 
-            activity: newActivity, 
-            time: formattedTime, 
-            is_completed: false,
-            icon: 'calendar-outline', 
-            user_id: user?.id 
-          }]);
-          
-        if (error) throw error;
-      }
+      if (error) throw error;
 
-      setNewActivity('');
-      setSelectedTime(new Date());
+      // Reset modal and refresh list
+      setNewTitle('');
+      setNewTime('');
       setIsModalVisible(false);
-      setEditingRoutineId(null);
+      fetchPatientAndRoutines(); 
       
-      fetchRoutines();
     } catch (error: any) {
-      Alert.alert("Error", error.message || "Failed to save routine.");
+      Alert.alert("Error adding routine", error.message);
     } finally {
-      setIsSubmitting(false);
+      setIsSaving(false);
     }
   };
 
-  // --- NEW: Safe Delete with Confirmation ---
-  const confirmDelete = (id: string) => {
+  const handleDeleteRoutine = async (id: string) => {
     Alert.alert(
       "Delete Routine",
-      "Are you sure you want to remove this task from the schedule?",
+      "Are you sure you want to remove this from the schedule?",
       [
         { text: "Cancel", style: "cancel" },
         { 
           text: "Delete", 
-          style: "destructive", 
+          style: "destructive",
           onPress: async () => {
-            setIsLoading(true);
-            const { error } = await supabase.from('routines').delete().eq('id', id);
-            if (error) {
-              Alert.alert("Error", "Could not delete routine.");
+            try {
+              const { error } = await supabase.from('routines').delete().eq('id', id);
+              if (error) throw error;
+              
+              // Remove from UI instantly
+              setRoutines(routines.filter(r => r.id !== id));
+            } catch (error: any) {
+              Alert.alert("Error deleting", error.message);
             }
-            fetchRoutines();
-          } 
+          }
         }
       ]
     );
   };
 
-  const renderRoutine = ({ item }: { item: any }) => {
-    const isDone = item.is_completed;
-    
-    // Safer manual AM/PM conversion for Android
-    let displayTime = item.time;
-    if (item.time && item.time.includes(':')) {
-      const parts = item.time.split(':');
-      const h = parseInt(parts[0], 10);
-      const m = parts[1].substring(0, 2); 
-      
-      if (!isNaN(h)) {
-        const ampm = h >= 12 ? 'PM' : 'AM';
-        const displayH = h % 12 || 12; 
-        displayTime = `${displayH}:${m} ${ampm}`;
-      }
-    }
-
-    return (
-      <View style={[styles.routineCard, isDone && styles.routineCardDone]}>
-        <View style={[styles.iconContainer, isDone && styles.iconContainerDone]}>
-          <Ionicons name={item.icon || 'checkmark-circle-outline'} size={24} color={isDone ? '#10B981' : '#8B5CF6'} />
-        </View>
-        
-        <View style={styles.routineInfo}>
-          <Text style={[styles.activityText, isDone && styles.textDone]}>{item.activity}</Text>
-          <Text style={styles.timeText}><Ionicons name="time-outline" size={12} /> {displayTime}</Text>
-        </View>
-
-        {/* --- NEW: Action Buttons --- */}
-        <View style={styles.actionButtonsContainer}>
-          <TouchableOpacity onPress={() => openEditModal(item)} style={styles.actionIcon} hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
-            <Ionicons name="pencil" size={20} color="#9CA3AF" />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => confirmDelete(item.id)} style={styles.actionIcon} hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
-            <Ionicons name="trash" size={20} color="#EF4444" />
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  };
-
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor="#0B0F19" />
+      <StatusBar barStyle="dark-content" backgroundColor="#F3F4F6" />
+      
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Daily Routines</Text>
-        <Text style={styles.headerSubtitle}>Manage the patient's daily schedule</Text>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <Ionicons name="arrow-back" size={24} color="#111827" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Daily Schedule</Text>
+        <View style={{ width: 40 }} /> 
       </View>
 
-      <View style={styles.container}>
-        {isLoading ? (
+      <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
+        <View style={styles.infoCard}>
+          <Ionicons name="information-circle" size={24} color="#8B5CF6" />
+          <Text style={styles.infoText}>
+            These routines sync instantly to the Caregiver Dashboard. When the caregiver checks them off, they will reset the next day.
+          </Text>
+        </View>
+
+        {loading ? (
           <ActivityIndicator size="large" color="#8B5CF6" style={{ marginTop: 40 }} />
+        ) : routines.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Ionicons name="calendar-outline" size={48} color="#D1D5DB" />
+            <Text style={styles.emptyStateTitle}>No routines set</Text>
+            <Text style={styles.emptyStateText}>Tap the button below to add medications, meals, or activities.</Text>
+          </View>
         ) : (
-          <FlatList
-            data={routines}
-            keyExtractor={(item) => item.id.toString()}
-            renderItem={renderRoutine}
-            contentContainerStyle={styles.listContainer}
-            showsVerticalScrollIndicator={false}
-          />
+          routines.map((routine) => (
+            <View key={routine.id} style={styles.routineCard}>
+              <View style={styles.routineInfo}>
+                <Text style={styles.routineTime}>{routine.time}</Text>
+                <Text style={styles.routineTitle}>{routine.title}</Text>
+              </View>
+              <TouchableOpacity 
+                style={styles.deleteButton} 
+                onPress={() => handleDeleteRoutine(routine.id)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Ionicons name="trash-outline" size={20} color="#EF4444" />
+              </TouchableOpacity>
+            </View>
+          ))
         )}
-        <TouchableOpacity style={styles.addButton} activeOpacity={0.8} onPress={openAddModal}>
+      </ScrollView>
+
+      <View style={styles.footer}>
+        <TouchableOpacity style={styles.addButton} onPress={() => setIsModalVisible(true)}>
           <Ionicons name="add" size={24} color="#FFFFFF" />
-          <Text style={styles.addButtonText}>Add Routine</Text>
+          <Text style={styles.addButtonText}>Add New Routine</Text>
         </TouchableOpacity>
       </View>
 
-      <Modal visible={isModalVisible} transparent animationType="slide">
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
+      {/* --- ADD ROUTINE MODAL --- */}
+      <Modal visible={isModalVisible} animationType="slide" transparent={true}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              {/* Dynamic Title based on Editing State */}
-              <Text style={styles.modalTitle}>{editingRoutineId ? 'Edit Routine' : 'New Routine'}</Text>
-              <TouchableOpacity onPress={() => { setIsModalVisible(false); setEditingRoutineId(null); }}>
+              <Text style={styles.modalTitle}>New Routine</Text>
+              <TouchableOpacity onPress={() => setIsModalVisible(false)}>
                 <Ionicons name="close" size={28} color="#9CA3AF" />
               </TouchableOpacity>
             </View>
 
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Activity Name</Text>
-              <TextInput
-                style={styles.textInput}
-                placeholder="e.g. Take morning medication"
-                placeholderTextColor="#6B7280"
-                value={newActivity}
-                onChangeText={setNewActivity}
-              />
-            </View>
+            <Text style={styles.label}>Time (e.g., 9:00 AM)</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="12:30 PM"
+              value={newTime}
+              onChangeText={setNewTime}
+              placeholderTextColor="#9CA3AF"
+            />
 
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Time</Text>
-              {Platform.OS === 'ios' ? (
-                <View style={{ alignItems: 'flex-start' }}>
-                  <DateTimePicker
-                    value={selectedTime}
-                    mode="time"
-                    display="default"
-                    onChange={onTimeChange}
-                    themeVariant="dark" 
-                  />
-                </View>
-              ) : (
-                <TouchableOpacity style={styles.textInput} onPress={() => setShowAndroidPicker(true)}>
-                  <Text style={{ color: '#FFFFFF', fontSize: 16 }}>
-                    {selectedTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </Text>
-                </TouchableOpacity>
-              )}
-              
-              {Platform.OS === 'android' && showAndroidPicker && (
-                <DateTimePicker
-                  value={selectedTime}
-                  mode="time"
-                  display="default"
-                  onChange={onTimeChange}
-                />
-              )}
-            </View>
+            <Text style={styles.label}>Description</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Take with food: 1x Aspirin"
+              value={newTitle}
+              onChangeText={setNewTitle}
+              placeholderTextColor="#9CA3AF"
+            />
 
-            <TouchableOpacity style={[styles.saveButton, isSubmitting && { opacity: 0.7 }]} onPress={handleSaveRoutine} disabled={isSubmitting}>
-              {isSubmitting ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.saveButtonText}>Save Changes</Text>}
+            <TouchableOpacity 
+              style={[styles.saveButton, isSaving && { opacity: 0.7 }]} 
+              onPress={handleAddRoutine}
+              disabled={isSaving}
+            >
+              <Text style={styles.saveButtonText}>
+                {isSaving ? "Saving..." : "Save Routine"}
+              </Text>
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#0B0F19', paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0 },
-  header: { paddingHorizontal: 20, paddingVertical: 20, borderBottomWidth: 1, borderBottomColor: '#1F2937' },
-  headerTitle: { fontSize: 28, fontWeight: '800', color: '#FFFFFF' },
-  headerSubtitle: { fontSize: 14, color: '#9CA3AF', marginTop: 4 },
-  container: { flex: 1, paddingHorizontal: 20 },
-  listContainer: { paddingTop: 20, paddingBottom: 100 },
-  routineCard: { flexDirection: 'row', backgroundColor: '#111827', borderRadius: 20, padding: 16, marginBottom: 12, alignItems: 'center', borderWidth: 1, borderColor: '#1F2937' },
-  routineCardDone: { opacity: 0.7, backgroundColor: '#0B0F19' },
-  iconContainer: { width: 48, height: 48, borderRadius: 16, backgroundColor: 'rgba(139, 92, 246, 0.1)', justifyContent: 'center', alignItems: 'center', marginRight: 15 },
-  iconContainerDone: { backgroundColor: 'rgba(16, 185, 129, 0.1)' },
+  safeArea: { flex: 1, backgroundColor: '#F3F4F6', paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0 },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 15, backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: '#E5E7EB' },
+  backButton: { padding: 8, backgroundColor: '#F3F4F6', borderRadius: 20 },
+  headerTitle: { fontSize: 20, fontWeight: 'bold', color: '#111827' },
+  
+  container: { flex: 1 },
+  scrollContent: { padding: 20 },
+  
+  infoCard: { flexDirection: 'row', backgroundColor: '#EDE9FE', padding: 16, borderRadius: 16, marginBottom: 25, alignItems: 'flex-start' },
+  infoText: { flex: 1, color: '#5B21B6', fontSize: 14, lineHeight: 20, marginLeft: 12, fontWeight: '500' },
+  
+  emptyState: { alignItems: 'center', justifyContent: 'center', paddingVertical: 40 },
+  emptyStateTitle: { fontSize: 18, fontWeight: 'bold', color: '#374151', marginTop: 15 },
+  emptyStateText: { fontSize: 14, color: '#6B7280', textAlign: 'center', marginTop: 8, paddingHorizontal: 20 },
+
+  routineCard: { flexDirection: 'row', backgroundColor: '#FFFFFF', padding: 20, borderRadius: 16, marginBottom: 12, alignItems: 'center', justifyContent: 'space-between', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 5, elevation: 2 },
   routineInfo: { flex: 1 },
-  activityText: { color: '#FFFFFF', fontSize: 18, fontWeight: '600', marginBottom: 4 },
-  textDone: { textDecorationLine: 'line-through', color: '#9CA3AF' },
-  timeText: { color: '#9CA3AF', fontSize: 14, fontWeight: '500' },
-  
-  // NEW: Action Button Styles
-  actionButtonsContainer: { flexDirection: 'row', alignItems: 'center', marginLeft: 10 },
-  actionIcon: { padding: 8, marginLeft: 5, backgroundColor: '#1F2937', borderRadius: 12 },
-  
-  addButton: { flexDirection: 'row', backgroundColor: '#8B5CF6', position: 'absolute', bottom: 30, alignSelf: 'center', paddingVertical: 16, paddingHorizontal: 24, borderRadius: 30, alignItems: 'center', shadowColor: '#8B5CF6', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 8 },
-  addButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: 'bold', marginLeft: 8 },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.7)', justifyContent: 'flex-end' },
-  modalContent: { backgroundColor: '#111827', borderTopLeftRadius: 30, borderTopRightRadius: 30, padding: 25, paddingBottom: Platform.OS === 'ios' ? 40 : 25, borderWidth: 1, borderColor: '#1F2937' },
+  routineTime: { fontSize: 14, fontWeight: '700', color: '#8B5CF6', marginBottom: 4 },
+  routineTitle: { fontSize: 16, fontWeight: '600', color: '#111827' },
+  deleteButton: { padding: 8, backgroundColor: '#FEE2E2', borderRadius: 12 },
+
+  footer: { padding: 20, backgroundColor: '#FFFFFF', borderTopWidth: 1, borderTopColor: '#E5E7EB' },
+  addButton: { backgroundColor: '#8B5CF6', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 16, borderRadius: 16 },
+  addButtonText: { color: '#FFFFFF', fontSize: 18, fontWeight: 'bold', marginLeft: 8 },
+
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.5)', justifyContent: 'flex-end' },
+  modalContent: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: 24, paddingBottom: 40 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 25 },
-  modalTitle: { fontSize: 22, fontWeight: 'bold', color: '#FFFFFF' },
-  inputGroup: { marginBottom: 20 },
-  inputLabel: { color: '#9CA3AF', fontSize: 14, marginBottom: 8, fontWeight: '500' },
-  textInput: { backgroundColor: '#1F2937', borderRadius: 15, padding: 16, color: '#FFFFFF', fontSize: 16, borderWidth: 1, borderColor: '#374151' },
-  saveButton: { backgroundColor: '#8B5CF6', padding: 18, borderRadius: 20, alignItems: 'center', marginTop: 10 },
-  saveButtonText: { color: '#FFFFFF', fontSize: 18, fontWeight: 'bold' }
+  modalTitle: { fontSize: 24, fontWeight: 'bold', color: '#111827' },
+  label: { fontSize: 14, fontWeight: '600', color: '#374151', marginBottom: 8, marginLeft: 4 },
+  input: { backgroundColor: '#F9FAFB', borderWidth: 1, borderColor: '#D1D5DB', borderRadius: 16, padding: 16, fontSize: 16, color: '#111827', marginBottom: 20 },
+  saveButton: { backgroundColor: '#8B5CF6', paddingVertical: 16, borderRadius: 16, alignItems: 'center', marginTop: 10 },
+  saveButtonText: { color: '#FFFFFF', fontSize: 18, fontWeight: 'bold' },
 });
