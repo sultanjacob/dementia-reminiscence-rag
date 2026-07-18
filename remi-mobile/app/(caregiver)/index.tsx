@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
   Platform,
@@ -14,27 +15,62 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
-// THIS IS THE LINE THAT WAS MISSING:
 import { supabase } from '../../supabase';
 
 export default function CaregiverDashboard() {
   const router = useRouter();
 
-  // --- PROTOTYPE STATE ---
-  const [routines, setRoutines] = useState([
-    { id: '1', time: '1:00 PM', title: 'Afternoon Medication', isCompleted: false },
-    { id: '2', time: '2:30 PM', title: 'Lunch (High Protein)', isCompleted: true },
-    { id: '3', time: '4:00 PM', title: 'Short Walk outside', isCompleted: false },
-  ]);
+  const [routines, setRoutines] = useState<any[]>([]);
+  const [isLoadingRoutines, setIsLoadingRoutines] = useState(true);
 
   const [selectedVibe, setSelectedVibe] = useState<string | null>(null);
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const toggleRoutine = (id: string) => {
+  // --- NEW: FETCH REAL ROUTINES ---
+  useEffect(() => {
+    fetchRoutines();
+  }, []);
+
+  const fetchRoutines = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from('routines')
+        .select('*')
+        .eq('patient_id', user.id)
+        .order('time', { ascending: true }); // Orders them chronologically 
+
+      if (error) throw error;
+      if (data) setRoutines(data);
+    } catch (error) {
+      console.error("Error fetching routines:", error);
+    } finally {
+      setIsLoadingRoutines(false);
+    }
+  };
+
+  // --- NEW: TOGGLE ROUTINE IN DATABASE ---
+  const toggleRoutine = async (id: string, currentStatus: boolean) => {
+    // Optimistically update the UI instantly so it feels fast
     setRoutines(routines.map(r => 
-      r.id === id ? { ...r, isCompleted: !r.isCompleted } : r
+      r.id === id ? { ...r, is_completed: !currentStatus } : r
     ));
+
+    try {
+      const { error } = await supabase
+        .from('routines')
+        .update({ is_completed: !currentStatus })
+        .eq('id', id);
+
+      if (error) throw error;
+    } catch (error) {
+      // Revert the UI if the database failed
+      Alert.alert("Error", "Could not update routine.");
+      fetchRoutines(); 
+    }
   };
 
   const handleEndShift = async () => {
@@ -46,11 +82,9 @@ export default function CaregiverDashboard() {
     setIsSubmitting(true);
     
     try {
-      // Get the patient's ID (since the caregiver is using the patient's device)
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("No user found");
 
-      // Insert the real data into our new table
       const { error } = await supabase.from('shift_logs').insert({
         patient_id: user.id,
         vibe: selectedVibe,
@@ -72,7 +106,6 @@ export default function CaregiverDashboard() {
     }
   };
 
-  // Instantly unmounts this dashboard and returns to the patient view
   const lockToPatientMode = () => {
     router.replace('/(auth)');
   };
@@ -97,35 +130,39 @@ export default function CaregiverDashboard() {
         </TouchableOpacity>
       </View>
 
-      <KeyboardAvoidingView 
-        style={{ flex: 1 }} 
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
           
           {/* --- 1. ROUTINE CHECKLIST --- */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Today's Routines</Text>
-            {routines.map((routine) => (
-              <TouchableOpacity 
-                key={routine.id} 
-                style={[styles.routineCard, routine.isCompleted && styles.routineCompleted]}
-                onPress={() => toggleRoutine(routine.id)}
-                activeOpacity={0.7}
-              >
-                <View style={styles.routineInfo}>
-                  <Text style={[styles.routineTime, routine.isCompleted && styles.textCompleted]}>
-                    {routine.time}
-                  </Text>
-                  <Text style={[styles.routineTitle, routine.isCompleted && styles.textCompleted]}>
-                    {routine.title}
-                  </Text>
-                </View>
-                <View style={[styles.checkbox, routine.isCompleted && styles.checkboxCompleted]}>
-                  {routine.isCompleted && <Ionicons name="checkmark" size={18} color="#FFFFFF" />}
-                </View>
-              </TouchableOpacity>
-            ))}
+            
+            {isLoadingRoutines ? (
+              <ActivityIndicator size="large" color="#8B5CF6" style={{ marginVertical: 20 }} />
+            ) : routines.length === 0 ? (
+              <Text style={styles.emptyText}>No routines scheduled for today.</Text>
+            ) : (
+              routines.map((routine) => (
+                <TouchableOpacity 
+                  key={routine.id} 
+                  style={[styles.routineCard, routine.is_completed && styles.routineCompleted]}
+                  onPress={() => toggleRoutine(routine.id, routine.is_completed)}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.routineInfo}>
+                    <Text style={[styles.routineTime, routine.is_completed && styles.textCompleted]}>
+                      {routine.time}
+                    </Text>
+                    <Text style={[styles.routineTitle, routine.is_completed && styles.textCompleted]}>
+                      {routine.title}
+                    </Text>
+                  </View>
+                  <View style={[styles.checkbox, routine.is_completed && styles.checkboxCompleted]}>
+                    {routine.is_completed && <Ionicons name="checkmark" size={18} color="#FFFFFF" />}
+                  </View>
+                </TouchableOpacity>
+              ))
+            )}
           </View>
 
           {/* --- 2. END OF SHIFT LOG --- */}
@@ -139,10 +176,7 @@ export default function CaregiverDashboard() {
                 return (
                   <TouchableOpacity
                     key={v.label}
-                    style={[
-                      styles.vibeButton,
-                      isSelected ? { backgroundColor: v.bgColor, borderColor: v.color } : {}
-                    ]}
+                    style={[styles.vibeButton, isSelected ? { backgroundColor: v.bgColor, borderColor: v.color } : {}]}
                     onPress={() => setSelectedVibe(v.label)}
                   >
                     <Text style={styles.vibeEmoji}>{v.emoji}</Text>
@@ -169,13 +203,8 @@ export default function CaregiverDashboard() {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* --- 3. LOCK BUTTON --- */}
       <View style={styles.footer}>
-        <TouchableOpacity 
-          style={styles.submitButton} 
-          onPress={handleEndShift}
-          disabled={isSubmitting}
-        >
+        <TouchableOpacity style={styles.submitButton} onPress={handleEndShift} disabled={isSubmitting}>
           <Text style={styles.submitButtonText}>
             {isSubmitting ? "Sending to Family..." : "Submit Log & Lock Device"}
           </Text>
@@ -191,13 +220,11 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: 24, fontWeight: '800', color: '#FFFFFF' },
   headerSubtitle: { fontSize: 14, color: '#10B981', marginTop: 4, fontWeight: '600' },
   lockIconButton: { backgroundColor: 'rgba(239, 68, 68, 0.1)', padding: 12, borderRadius: 16 },
-  
   container: { flex: 1 },
   scrollContent: { padding: 20, paddingBottom: 40 },
   section: { marginBottom: 35 },
   sectionTitle: { fontSize: 18, fontWeight: '700', color: '#FFFFFF', marginBottom: 15, textTransform: 'uppercase', letterSpacing: 1 },
-  
-  // Routines
+  emptyText: { color: '#9CA3AF', fontSize: 15, fontStyle: 'italic', marginBottom: 20 },
   routineCard: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#111827', padding: 18, borderRadius: 16, marginBottom: 10, borderWidth: 1, borderColor: '#1F2937' },
   routineCompleted: { backgroundColor: 'rgba(16, 185, 129, 0.05)', borderColor: 'rgba(16, 185, 129, 0.3)' },
   routineInfo: { flex: 1 },
@@ -206,16 +233,12 @@ const styles = StyleSheet.create({
   textCompleted: { color: '#6B7280', textDecorationLine: 'line-through' },
   checkbox: { width: 28, height: 28, borderRadius: 14, borderWidth: 2, borderColor: '#4B5563', alignItems: 'center', justifyContent: 'center' },
   checkboxCompleted: { backgroundColor: '#10B981', borderColor: '#10B981' },
-  
-  // Vibe Check
   label: { color: '#9CA3AF', fontSize: 14, fontWeight: '600', marginBottom: 10, marginTop: 5 },
   vibeRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 25 },
   vibeButton: { flex: 1, alignItems: 'center', backgroundColor: '#111827', paddingVertical: 16, borderRadius: 16, borderWidth: 1, borderColor: '#1F2937', marginHorizontal: 4 },
   vibeEmoji: { fontSize: 28, marginBottom: 8 },
   vibeLabel: { color: '#9CA3AF', fontSize: 13, fontWeight: '500' },
-  
   notesInput: { backgroundColor: '#111827', borderWidth: 1, borderColor: '#1F2937', borderRadius: 16, padding: 16, color: '#FFFFFF', fontSize: 16, minHeight: 120 },
-  
   footer: { padding: 20, borderTopWidth: 1, borderTopColor: '#1F2937', backgroundColor: '#0B0F19' },
   submitButton: { backgroundColor: '#8B5CF6', paddingVertical: 18, borderRadius: 16, alignItems: 'center', shadowColor: '#8B5CF6', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 8 },
   submitButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: 'bold' },
