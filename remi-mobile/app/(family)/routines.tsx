@@ -25,8 +25,9 @@ export default function FamilyRoutinesScreen() {
   const [loading, setLoading] = useState(true);
   const [patientId, setPatientId] = useState<string | null>(null);
 
-  // Modal State
+  // Modal State for Add & Edit
   const [isModalVisible, setIsModalVisible] = useState(false);
+  const [editingRoutineId, setEditingRoutineId] = useState<string | null>(null);
   const [newTitle, setNewTitle] = useState('');
   const [newTime, setNewTime] = useState('');
   const [isSaving, setIsSaving] = useState(false);
@@ -40,7 +41,6 @@ export default function FamilyRoutinesScreen() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // 1. Find which patient belongs to this family member
       const { data: profile } = await supabase
         .from('profiles')
         .select('linked_patient_id')
@@ -50,7 +50,6 @@ export default function FamilyRoutinesScreen() {
       if (profile?.linked_patient_id) {
         setPatientId(profile.linked_patient_id);
         
-        // 2. Fetch the routines for that specific patient
         const { data, error } = await supabase
           .from('routines')
           .select('*')
@@ -67,8 +66,22 @@ export default function FamilyRoutinesScreen() {
     }
   };
 
-  const handleAddRoutine = async () => {
-    if (!newTitle.trim() || !newTime.trim()) {
+  const openAddModal = () => {
+    setEditingRoutineId(null);
+    setNewTitle('');
+    setNewTime('');
+    setIsModalVisible(true);
+  };
+
+  const openEditModal = (routine: any) => {
+    setEditingRoutineId(routine.id);
+    setNewTitle(routine.title || ''); // Load existing title
+    setNewTime(routine.time || '');   // Load existing time
+    setIsModalVisible(true);
+  };
+
+  const handleSaveRoutine = async () => {
+    if (!newTime.trim() || !newTitle.trim()) {
       Alert.alert("Missing Info", "Please provide both a time and a description.");
       return;
     }
@@ -80,23 +93,34 @@ export default function FamilyRoutinesScreen() {
     setIsSaving(true);
 
     try {
-      const { error } = await supabase.from('routines').insert({
-        patient_id: patientId,
-        title: newTitle.trim(),
-        time: newTime.trim(),
-        is_completed: false // Always starts false!
-      });
+      if (editingRoutineId) {
+        // UPDATE EXISTING ROUTINE
+        const { error } = await supabase
+          .from('routines')
+          .update({
+            title: newTitle.trim(),
+            time: newTime.trim()
+          })
+          .eq('id', editingRoutineId);
 
-      if (error) throw error;
+        if (error) throw error;
+      } else {
+        // CREATE NEW ROUTINE
+        const { error } = await supabase.from('routines').insert({
+          patient_id: patientId,
+          title: newTitle.trim(),
+          time: newTime.trim(),
+          is_completed: false 
+        });
 
-      // Reset modal and refresh list
-      setNewTitle('');
-      setNewTime('');
+        if (error) throw error;
+      }
+
       setIsModalVisible(false);
       fetchPatientAndRoutines(); 
       
     } catch (error: any) {
-      Alert.alert("Error adding routine", error.message);
+      Alert.alert("Error saving routine", error.message);
     } finally {
       setIsSaving(false);
     }
@@ -115,8 +139,6 @@ export default function FamilyRoutinesScreen() {
             try {
               const { error } = await supabase.from('routines').delete().eq('id', id);
               if (error) throw error;
-              
-              // Remove from UI instantly
               setRoutines(routines.filter(r => r.id !== id));
             } catch (error: any) {
               Alert.alert("Error deleting", error.message);
@@ -158,35 +180,59 @@ export default function FamilyRoutinesScreen() {
         ) : (
           routines.map((routine) => (
             <View key={routine.id} style={styles.routineCard}>
-              <View style={styles.routineInfo}>
-                <Text style={styles.routineTime}>{routine.time}</Text>
-                <Text style={styles.routineTitle}>{routine.title}</Text>
+              
+              {/* LEFT SIDE: Icon + Info */}
+              <View style={styles.cardLeft}>
+                <View style={styles.iconContainer}>
+                  <Ionicons name="time-outline" size={24} color="#8B5CF6" />
+                </View>
+                <View style={styles.routineInfo}>
+                  <Text style={styles.routineTime}>{routine.time}</Text>
+                  <Text style={styles.routineTitle}>
+                    {routine.title ? routine.title : "No description provided"}
+                  </Text>
+                </View>
               </View>
-              <TouchableOpacity 
-                style={styles.deleteButton} 
-                onPress={() => handleDeleteRoutine(routine.id)}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              >
-                <Ionicons name="trash-outline" size={20} color="#EF4444" />
-              </TouchableOpacity>
+
+              {/* RIGHT SIDE: Action Buttons */}
+              <View style={styles.cardActions}>
+                <TouchableOpacity 
+                  style={styles.editButton} 
+                  onPress={() => openEditModal(routine)}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <Ionicons name="pencil-outline" size={20} color="#3B82F6" />
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={styles.deleteButton} 
+                  onPress={() => handleDeleteRoutine(routine.id)}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <Ionicons name="trash-outline" size={20} color="#EF4444" />
+                </TouchableOpacity>
+              </View>
+
             </View>
           ))
         )}
       </ScrollView>
 
       <View style={styles.footer}>
-        <TouchableOpacity style={styles.addButton} onPress={() => setIsModalVisible(true)}>
+        <TouchableOpacity style={styles.addButton} onPress={openAddModal}>
           <Ionicons name="add" size={24} color="#FFFFFF" />
           <Text style={styles.addButtonText}>Add New Routine</Text>
         </TouchableOpacity>
       </View>
 
-      {/* --- ADD ROUTINE MODAL --- */}
+      {/* --- ADD/EDIT ROUTINE MODAL --- */}
       <Modal visible={isModalVisible} animationType="slide" transparent={true}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>New Routine</Text>
+              <Text style={styles.modalTitle}>
+                {editingRoutineId ? "Edit Routine" : "New Routine"}
+              </Text>
               <TouchableOpacity onPress={() => setIsModalVisible(false)}>
                 <Ionicons name="close" size={28} color="#9CA3AF" />
               </TouchableOpacity>
@@ -212,7 +258,7 @@ export default function FamilyRoutinesScreen() {
 
             <TouchableOpacity 
               style={[styles.saveButton, isSaving && { opacity: 0.7 }]} 
-              onPress={handleAddRoutine}
+              onPress={handleSaveRoutine}
               disabled={isSaving}
             >
               <Text style={styles.saveButtonText}>
@@ -243,11 +289,17 @@ const styles = StyleSheet.create({
   emptyStateTitle: { fontSize: 18, fontWeight: 'bold', color: '#374151', marginTop: 15 },
   emptyStateText: { fontSize: 14, color: '#6B7280', textAlign: 'center', marginTop: 8, paddingHorizontal: 20 },
 
-  routineCard: { flexDirection: 'row', backgroundColor: '#FFFFFF', padding: 20, borderRadius: 16, marginBottom: 12, alignItems: 'center', justifyContent: 'space-between', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 5, elevation: 2 },
+  routineCard: { flexDirection: 'row', backgroundColor: '#FFFFFF', padding: 18, borderRadius: 16, marginBottom: 12, alignItems: 'center', justifyContent: 'space-between', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 5, elevation: 2 },
+  
+  cardLeft: { flexDirection: 'row', alignItems: 'center', flex: 1 },
+  iconContainer: { backgroundColor: '#F5F3FF', padding: 12, borderRadius: 12, marginRight: 15 },
   routineInfo: { flex: 1 },
   routineTime: { fontSize: 14, fontWeight: '700', color: '#8B5CF6', marginBottom: 4 },
-  routineTitle: { fontSize: 16, fontWeight: '600', color: '#111827' },
-  deleteButton: { padding: 8, backgroundColor: '#FEE2E2', borderRadius: 12 },
+  routineTitle: { fontSize: 16, fontWeight: '600', color: '#111827', flexWrap: 'wrap' },
+  
+  cardActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  editButton: { padding: 10, backgroundColor: '#EFF6FF', borderRadius: 12 },
+  deleteButton: { padding: 10, backgroundColor: '#FEE2E2', borderRadius: 12 },
 
   footer: { padding: 20, backgroundColor: '#FFFFFF', borderTopWidth: 1, borderTopColor: '#E5E7EB' },
   addButton: { backgroundColor: '#8B5CF6', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 16, borderRadius: 16 },
