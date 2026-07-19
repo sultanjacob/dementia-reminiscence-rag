@@ -96,12 +96,12 @@ export default function FamilyDashboard() {
             <Text style={styles.actionItemText}>Care Team</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.actionItem}>
-            <View style={[styles.actionIconBadge, { backgroundColor: 'rgba(248, 113, 113, 0.15)' }]}>
-              <Ionicons name="warning" size={24} color="#F87171" />
-            </View>
-            <Text style={styles.actionItemText}>SOS</Text>
-          </TouchableOpacity>
+          <TouchableOpacity style={styles.iconButton} onPress={handleSOS}>
+  <View style={[styles.iconCircle, { backgroundColor: 'rgba(239, 68, 68, 0.15)' }]}>
+    <Ionicons name="warning" size={28} color="#EF4444" />
+  </View>
+  <Text style={styles.iconLabel}>SOS</Text>
+  </TouchableOpacity>
         </View>
 
         {/* --- 3. DAILY INSIGHTS --- */}
