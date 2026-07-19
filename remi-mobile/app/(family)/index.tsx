@@ -1,7 +1,9 @@
+import { Alert } from 'react-native';
+// (Keep your other existing imports like View, Text, TouchableOpacity, etc.)
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { Alert, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Modal, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { supabase } from '../../supabase'; // Make sure this path points to your supabase file
 
 export default function FamilyDashboard() {
