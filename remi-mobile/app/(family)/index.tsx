@@ -26,7 +26,28 @@ export default function FamilyDashboard() {
       }
     }, 400);
   };
+  const handleSOS = () => {
+    // You can change this to a specific doctor or family member's number if preferred
+    const emergencyNumber = '911'; 
 
+    Alert.alert(
+      "⚠️ EMERGENCY SOS",
+      `Are you sure you want to call ${emergencyNumber}?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        { 
+          text: "Call Now", 
+          style: "destructive",
+          onPress: () => {
+            // This triggers the native iOS/Android phone dialer
+            Linking.openURL(`tel:${emergencyNumber}`).catch(() => {
+              Alert.alert("Error", "Could not open the phone dialer.");
+            });
+          }
+        }
+      ]
+    );
+  };
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
