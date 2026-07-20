@@ -316,7 +316,27 @@ export default function HomeScreen() {
     }
     setLastTapTime(now);
   };
-
+  const handlePatientSOS = () => {
+    Alert.alert(
+      "🚨 EMERGENCY 🚨",
+      "Do you need help right now?",
+      [
+        { text: "I'm Okay (Cancel)", style: "cancel" },
+        { 
+          text: "Yes, Call Family", 
+          style: "destructive",
+          onPress: () => {
+            // In a real app, this would trigger a push notification to the Family app
+            // and potentially trigger the tablet's native dialer to call Sarah.
+            Alert.alert(
+              "Help is on the way", 
+              "We have sent an emergency alert to Sarah and the Care Team."
+            );
+          }
+        }
+      ]
+    );
+  };
   const verifyCaregiverPin = async (pinAttempt: string) => {
     setEnteredPin(pinAttempt);
     
