@@ -316,6 +316,7 @@ export default function HomeScreen() {
     }
     setLastTapTime(now);
   };
+  
   const handlePatientSOS = () => {
     Alert.alert(
       "🚨 EMERGENCY 🚨",
@@ -326,8 +327,6 @@ export default function HomeScreen() {
           text: "Yes, Call Family", 
           style: "destructive",
           onPress: () => {
-            // In a real app, this would trigger a push notification to the Family app
-            // and potentially trigger the tablet's native dialer to call Sarah.
             Alert.alert(
               "Help is on the way", 
               "We have sent an emergency alert to Sarah and the Care Team."
@@ -337,6 +336,7 @@ export default function HomeScreen() {
       ]
     );
   };
+
   const verifyCaregiverPin = async (pinAttempt: string) => {
     setEnteredPin(pinAttempt);
     
@@ -512,6 +512,16 @@ export default function HomeScreen() {
               {isRecording ? "Recording your voice..." : "Remi is listening..."}
             </Text>
           </View>
+
+          {/* --- FIXED EMERGENCY SOS BUTTON --- */}
+          <TouchableOpacity 
+            onPress={handlePatientSOS}
+            style={styles.patientSosButton}
+          >
+            <Ionicons name="warning" size={28} color="#FFFFFF" style={{ marginRight: 10 }} />
+            <Text style={styles.patientSosText}>HELP / SOS</Text>
+          </TouchableOpacity>
+
           <View style={styles.dividerLine} />
         </View>
       </View>
@@ -699,9 +709,13 @@ const styles = StyleSheet.create({
   cancelEmergencyButton: { paddingVertical: 15, alignItems: 'center' },
   cancelEmergencyText: { color: '#9CA3AF', fontSize: 18, fontWeight: '700' },
   
-  // NEW CAREGIVER PIN STYLES
+  // CAREGIVER PIN STYLES
   pinModalContent: { backgroundColor: '#1F2937', borderRadius: 24, padding: 30, width: '85%', alignItems: 'center', borderWidth: 1, borderColor: '#374151' },
   pinModalTitle: { color: '#FFFFFF', fontSize: 22, fontWeight: 'bold', marginBottom: 8 },
   pinModalSubtitle: { color: '#9CA3AF', fontSize: 14, textAlign: 'center', marginBottom: 25 },
   pinInputDisplay: { backgroundColor: '#111827', width: '100%', borderWidth: 1, borderColor: '#374151', borderRadius: 16, paddingVertical: 20, color: '#FFFFFF', fontSize: 32, fontWeight: 'bold', textAlign: 'center', letterSpacing: 12, marginBottom: 20 },
+
+  // PATIENT SOS BUTTON
+  patientSosButton: { backgroundColor: '#EF4444', paddingVertical: 18, paddingHorizontal: 30, borderRadius: 30, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 10, marginBottom: 20, shadowColor: '#EF4444', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 8, elevation: 8 },
+  patientSosText: { color: '#FFFFFF', fontSize: 22, fontWeight: 'bold' }
 });
