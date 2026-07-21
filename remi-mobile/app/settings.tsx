@@ -114,7 +114,7 @@ export default function SettingsScreen() {
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Patient Profile</Text>
                 
-                <Text style={styles.label}>Patient's Preferred Name</Text>
+                <Text style={styles.label}>Patient's Preferred Name:</Text>
                 <TextInput
                   style={styles.input}
                   placeholder="e.g., Mary"
@@ -131,7 +131,7 @@ export default function SettingsScreen() {
                   These numbers are dialed instantly when the emergency button is pressed.
                 </Text>
 
-                <Text style={styles.label}>Primary Contact Number</Text>
+                <Text style={styles.label}>Primary Contact Number:</Text>
                 <TextInput
                   style={styles.input}
                   placeholder="+1 (555) 123-4567"
@@ -141,7 +141,7 @@ export default function SettingsScreen() {
                   keyboardType="phone-pad"
                 />
 
-                <Text style={styles.label}>Secondary Contact Number</Text>
+                <Text style={styles.label}>Secondary Contact Number:</Text>
                 <TextInput
                   style={styles.input}
                   placeholder="+1 (555) 987-6543"
@@ -156,7 +156,7 @@ export default function SettingsScreen() {
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Caregiver Security</Text>
                 
-                <Text style={styles.label}>4-Digit Action PIN</Text>
+                <Text style={styles.label}>4-Digit Action PIN:</Text>
                 <TextInput
                   style={styles.input}
                   placeholder="Enter 4 digits"
