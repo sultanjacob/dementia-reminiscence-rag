@@ -1,9 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Alert,
   Linking,
+  Modal,
   Platform,
   SafeAreaView,
   ScrollView,
@@ -13,9 +14,13 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
+import { supabase } from '../../supabase'; // Make sure this path is correct!
 
 export default function FamilyDashboardScreen() {
   const router = useRouter();
+
+  // --- MENU STATE ---
+  const [isMenuVisible, setIsMenuVisible] = useState(false);
 
   // --- SOS EMERGENCY FUNCTION ---
   const handleSOS = () => {
@@ -39,6 +44,21 @@ export default function FamilyDashboardScreen() {
     );
   };
 
+  // --- SECURE SIGN OUT FUNCTION ---
+  const handleSignOut = async () => {
+    setIsMenuVisible(false);
+    
+    // Slight delay to allow the modal to close smoothly
+    setTimeout(async () => {
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        Alert.alert("Sign Out Error", error.message);
+      } else {
+        router.replace('/login'); // Routes back to your login screen
+      }
+    }, 500);
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="light-content" backgroundColor="#050505" />
@@ -51,7 +71,12 @@ export default function FamilyDashboardScreen() {
             <Text style={styles.greeting}>Hello, Sarah</Text>
             <Text style={styles.subtitle}>Family Dashboard</Text>
           </View>
-          <TouchableOpacity style={styles.profileButton} onPress={() => router.push('/settings')}>
+          
+          {/* PROFILE BUTTON THAT OPENS MENU */}
+          <TouchableOpacity 
+            style={styles.profileButton} 
+            onPress={() => setIsMenuVisible(true)}
+          >
             <Ionicons name="person-outline" size={20} color="#D1D5DB" />
           </TouchableOpacity>
         </View>
@@ -78,7 +103,7 @@ export default function FamilyDashboardScreen() {
           {/* Vault Button */}
           <TouchableOpacity 
             style={styles.actionItem} 
-            onPress={() => router.push('/(family)/vault')} // Ready for the Vault screen!
+            onPress={() => router.push('/(family)/vault')} 
           >
             <View style={[styles.actionIconCircle, { backgroundColor: 'rgba(139, 92, 246, 0.15)' }]}>
               <Ionicons name="images" size={28} color="#A78BFA" />
@@ -140,6 +165,40 @@ export default function FamilyDashboardScreen() {
 
         </ScrollView>
       </ScrollView>
+
+      {/* --- TOP RIGHT DROPDOWN MENU MODAL --- */}
+      <Modal visible={isMenuVisible} transparent={true} animationType="fade">
+        <TouchableOpacity 
+          style={styles.modalOverlay} 
+          activeOpacity={1} 
+          onPress={() => setIsMenuVisible(false)} // Closes menu if you tap anywhere else
+        >
+          <View style={styles.dropdownMenu}>
+            
+            {/* Settings Option */}
+            <TouchableOpacity 
+              style={styles.menuItem} 
+              onPress={() => {
+                setIsMenuVisible(false);
+                router.push('/settings');
+              }}
+            >
+              <Ionicons name="settings-outline" size={20} color="#D1D5DB" style={styles.menuIcon} />
+              <Text style={styles.menuText}>App Settings</Text>
+            </TouchableOpacity>
+            
+            <View style={styles.menuDivider} />
+
+            {/* Sign Out Option */}
+            <TouchableOpacity style={styles.menuItem} onPress={handleSignOut}>
+              <Ionicons name="log-out-outline" size={20} color="#EF4444" style={styles.menuIcon} />
+              <Text style={[styles.menuText, { color: '#EF4444' }]}>Sign Out</Text>
+            </TouchableOpacity>
+
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
     </SafeAreaView>
   );
 }
@@ -154,6 +213,14 @@ const styles = StyleSheet.create({
   greeting: { fontSize: 28, fontWeight: 'bold', color: '#FFFFFF' },
   subtitle: { fontSize: 16, color: '#A78BFA', marginTop: 4, fontWeight: '600' },
   profileButton: { width: 44, height: 44, borderRadius: 22, borderWidth: 1, borderColor: '#374151', alignItems: 'center', justifyContent: 'center' },
+
+  // Dropdown Menu Styles
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', alignItems: 'flex-end', paddingTop: Platform.OS === 'ios' ? 70 : 80, paddingRight: 20 },
+  dropdownMenu: { backgroundColor: '#13111C', borderRadius: 16, padding: 8, width: 200, borderWidth: 1, borderColor: '#374151', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 8 },
+  menuItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 12 },
+  menuIcon: { marginRight: 12 },
+  menuText: { color: '#FFFFFF', fontSize: 16, fontWeight: '500' },
+  menuDivider: { height: 1, backgroundColor: '#374151', marginVertical: 4 },
 
   // Patient Card
   patientCard: { flexDirection: 'row', backgroundColor: '#13111C', borderRadius: 20, padding: 20, alignItems: 'center', justifyContent: 'space-between', marginBottom: 35 },
