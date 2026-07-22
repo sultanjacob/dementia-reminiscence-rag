@@ -51,7 +51,7 @@ export default function FamilyDashboardScreen() {
             <Text style={styles.greeting}>Hello, Sarah</Text>
             <Text style={styles.subtitle}>Family Dashboard</Text>
           </View>
-          <TouchableOpacity style={styles.profileButton}>
+          <TouchableOpacity style={styles.profileButton} onPress={() => router.push('/settings')}>
             <Ionicons name="person-outline" size={20} color="#D1D5DB" />
           </TouchableOpacity>
         </View>
