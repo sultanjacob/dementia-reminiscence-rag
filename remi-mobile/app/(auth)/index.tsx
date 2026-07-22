@@ -12,6 +12,7 @@ import {
   Modal,
   Platform,
   SafeAreaView,
+  ScrollView,
   StatusBar,
   StyleSheet,
   Text,
@@ -125,7 +126,7 @@ export default function HomeScreen() {
           setUserName(fetchedName);
         }
         if (profileData.primary_contact) setPrimaryContact(profileData.primary_contact);
-        if (profileData.secondaryContact) setSecondaryContact(profileData.secondary_contact);
+        if (profileData.secondary_contact) setSecondaryContact(profileData.secondary_contact);
       }
 
       const { data: memories } = await supabase.from('memory_vault').select('*');
@@ -317,6 +318,7 @@ export default function HomeScreen() {
     setLastTapTime(now);
   };
   
+  // --- REAL SOS CALL LOGIC ---
   const handlePatientSOS = () => {
     Alert.alert(
       "🚨 EMERGENCY 🚨",
@@ -327,10 +329,16 @@ export default function HomeScreen() {
           text: "Yes, Call Family", 
           style: "destructive",
           onPress: () => {
-            Alert.alert(
-              "Help is on the way", 
-              "We have sent an emergency alert to Sarah and the Care Team."
-            );
+            if (primaryContact) {
+              Linking.openURL(`tel:${primaryContact}`).catch(() => {
+                Alert.alert("Error", "Could not open the phone dialer.");
+              });
+            } else {
+              Alert.alert(
+                "Alert Sent Digitally", 
+                "We couldn't dial a number because no Primary Contact is set in settings, but an alert has been logged."
+              );
+            }
           }
         }
       ]
@@ -361,18 +369,13 @@ export default function HomeScreen() {
           return;
         }
 
-        // Did we find a match?
         if (data && data.caregiver_pin === pinAttempt) {
           setShowPinModal(false);
           setEnteredPin('');
           router.push('/(caregiver)'); 
         } else {
-          // If it fails, tell us exactly what it saw!
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-          Alert.alert(
-            "Incorrect PIN", 
-            `You typed: ${pinAttempt}\nDatabase saw: ${data?.caregiver_pin || 'Nothing'}`
-          );
+          Alert.alert("Incorrect PIN", "The PIN entered is incorrect.");
           setEnteredPin('');
         }
       } catch (error: any) {
@@ -390,7 +393,13 @@ export default function HomeScreen() {
     <SafeAreaView style={[styles.safeArea, { backgroundColor: safeAreaBgColor }]}>
       <StatusBar barStyle="dark-content" backgroundColor={safeAreaBgColor} />
       <View style={[styles.appCapsule, { backgroundColor: appCapsuleBgColor }]}>
-        <View style={styles.internalContent}>
+        
+        {/* NEW: ScrollView ensures the button is never permanently hidden off-screen */}
+        <ScrollView 
+          style={{ flex: 1 }} 
+          contentContainerStyle={styles.internalContent}
+          showsVerticalScrollIndicator={false}
+        >
           
           <Animated.View style={[styles.header, { opacity: uiOpacity }]}>
             <View>
@@ -522,8 +531,7 @@ export default function HomeScreen() {
             <Text style={styles.patientSosText}>HELP / SOS</Text>
           </TouchableOpacity>
 
-          <View style={styles.dividerLine} />
-        </View>
+        </ScrollView>
       </View>
 
       <Modal visible={showEmergencyMenu} transparent={true} animationType="slide">
@@ -654,7 +662,7 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   safeArea: { flex: 1, paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0 },
   appCapsule: { flex: 1, borderRadius: 35, overflow: 'hidden', marginHorizontal: 10, marginBottom: 10, marginTop: 10, borderWidth: 1, borderColor: '#E5E7EB', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 5 },
-  internalContent: { flex: 1, paddingHorizontal: 20, justifyContent: 'space-between', paddingTop: 10 }, 
+  internalContent: { flexGrow: 1, paddingHorizontal: 20, justifyContent: 'space-between', paddingTop: 10, paddingBottom: 30 }, 
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginTop: 5, marginBottom: 0 }, 
   greetingText: { fontSize: 16, color: '#6B7280', fontWeight: '500' }, 
   nameText: { fontSize: 28, fontWeight: '800', color: '#111827', marginTop: 2, letterSpacing: -0.5 },
@@ -682,7 +690,6 @@ const styles = StyleSheet.create({
   bottomStatus: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
   statusDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#8B5CF6', marginRight: 6 },
   statusText: { color: '#6B7280', fontSize: 14, fontWeight: '600' },
-  dividerLine: { height: 4, backgroundColor: '#E5E7EB', width: 40, borderRadius: 2, alignSelf: 'center', marginBottom: 5 },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(17, 24, 39, 0.6)', justifyContent: 'flex-end' },
   modalContent: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 36, borderTopRightRadius: 36, paddingHorizontal: 28, paddingBottom: 50, paddingTop: 16, shadowColor: '#000', shadowOffset: { width: 0, height: -10 }, shadowOpacity: 0.1, shadowRadius: 20, elevation: 20 },
   modalDragIndicator: { width: 50, height: 6, backgroundColor: '#E5E7EB', borderRadius: 3, alignSelf: 'center', marginBottom: 24 },
@@ -716,6 +723,6 @@ const styles = StyleSheet.create({
   pinInputDisplay: { backgroundColor: '#111827', width: '100%', borderWidth: 1, borderColor: '#374151', borderRadius: 16, paddingVertical: 20, color: '#FFFFFF', fontSize: 32, fontWeight: 'bold', textAlign: 'center', letterSpacing: 12, marginBottom: 20 },
 
   // PATIENT SOS BUTTON
-  patientSosButton: { backgroundColor: '#EF4444', paddingVertical: 18, paddingHorizontal: 30, borderRadius: 30, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 10, marginBottom: 20, shadowColor: '#EF4444', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 8, elevation: 8 },
+  patientSosButton: { backgroundColor: '#EF4444', paddingVertical: 18, paddingHorizontal: 30, borderRadius: 30, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 15, marginBottom: 10, shadowColor: '#EF4444', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 8, elevation: 8 },
   patientSosText: { color: '#FFFFFF', fontSize: 22, fontWeight: 'bold' }
 });
