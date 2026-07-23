@@ -30,7 +30,7 @@ export default function HomeScreen() {
   
   const [remiText, setRemiText] = useState("Hello! I am Remi. How can I help you?");
   const [greeting, setGreeting] = useState("Good morning");
-  const [timeIcon, setTimeIcon] = useState("sunny"); // ☀️ or 🌙
+  const [timeIcon, setTimeIcon] = useState("sunny");
   const [userName, setUserName] = useState("Peter");
   const [currentDate, setCurrentDate] = useState("");
   const [isEvening, setIsEvening] = useState(false);
@@ -99,7 +99,6 @@ export default function HomeScreen() {
     const initializeHome = async () => {
       const hour = new Date().getHours();
       
-      // SUNDOWNING LOGIC TRIGGER
       const evening = hour >= 17 || hour < 6;
       setIsEvening(evening);
       setTimeIcon(evening ? "moon" : "sunny");
@@ -134,17 +133,21 @@ export default function HomeScreen() {
 
       const { data: memories } = await supabase.from('memory_vault').select('*');
       
-      if (memories && memories.length > 0 && !evening) {
-        // Daytime: Show an active memory
+      if (memories && memories.length > 0) {
         const randomMem = memories[Math.floor(Math.random() * memories.length)];
         setDailyMemory(randomMem);
-        const memoryCaption = randomMem.caption ? randomMem.caption : "";
-        const memoryGreeting = `I was just admiring this photo. ${memoryCaption}`.trim();
-        setRemiText(memoryGreeting);
-        speak(memoryGreeting); 
+        
+        if (!evening) {
+          const memoryCaption = randomMem.caption ? randomMem.caption : "";
+          const memoryGreeting = `I was just admiring this photo. ${memoryCaption}`.trim();
+          setRemiText(memoryGreeting);
+          speak(memoryGreeting); 
+        } else {
+          const defaultGreeting = `Good evening, ${fetchedName}. It's getting late. I am here to help you relax.`;
+          setRemiText(defaultGreeting);
+          speak(defaultGreeting);
+        }
       } else {
-        // SUNDOWNING CALM GREETING: Don't force them to look at a complex photo if it's late.
-        setDailyMemory(null);
         const defaultGreeting = evening 
           ? `Good evening, ${fetchedName}. It's getting late. I am here to help you relax.`
           : `Hello ${fetchedName}! I am Remi. How can I help you today?`;
@@ -167,6 +170,31 @@ export default function HomeScreen() {
       setRemiText(`I was just admiring this photo. ${memoryCaption}`.trim());
     } else {
       setRemiText(isEvening ? `I am here to help you relax, ${userName}.` : `Hello ${userName}! I am Remi. How can I help you today?`);
+    }
+  };
+
+  // --- MANUAL OVERRIDE LOGIC ---
+  const toggleSundowningOverride = () => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    const newIsEvening = !isEvening;
+    setIsEvening(newIsEvening);
+    setTimeIcon(newIsEvening ? "moon" : "sunny");
+
+    if (newIsEvening) {
+      const calmGreeting = `Good evening, ${userName}. It's getting late. I am here to help you relax.`;
+      setRemiText(calmGreeting);
+      speak(calmGreeting);
+    } else {
+      if (dailyMemory) {
+        const memoryCaption = dailyMemory.caption ? dailyMemory.caption : "";
+        const memoryGreeting = `I was just admiring this photo. ${memoryCaption}`.trim();
+        setRemiText(memoryGreeting);
+        speak(memoryGreeting);
+      } else {
+        const defaultGreeting = `Hello ${userName}! I am Remi. How can I help you today?`;
+        setRemiText(defaultGreeting);
+        speak(defaultGreeting);
+      }
     }
   };
 
@@ -342,7 +370,6 @@ export default function HomeScreen() {
     }
   };
 
-  // SUNDOWNING UI COLORS: Deeper, warmer amber in the evening to reduce blue light glare.
   const safeAreaBgColor = isEvening ? '#FDE68A' : '#F3F4F6'; 
   const appCapsuleBgColor = isEvening ? '#FEF3C7' : '#FFFFFF'; 
   const bubbleBgColor = isEvening ? '#FDE68A' : '#F9FAFB';
@@ -356,11 +383,16 @@ export default function HomeScreen() {
           
           <Animated.View style={[styles.header, { opacity: uiOpacity }]}>
             <View>
-              {/* REALITY ORIENTATION: Sun or Moon icon next to greeting */}
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              {/* INTERACTIVE OVERRIDE: Long press toggles daytime/evening */}
+              <TouchableOpacity 
+                activeOpacity={0.7} 
+                onLongPress={toggleSundowningOverride} 
+                delayLongPress={800}
+                style={{ flexDirection: 'row', alignItems: 'center' }}
+              >
                 <Ionicons name={timeIcon as any} size={20} color={isEvening ? '#D97706' : '#F59E0B'} style={{ marginRight: 6 }} />
                 <Text style={styles.greetingText}>{greeting},</Text>
-              </View>
+              </TouchableOpacity>
               <Text style={styles.nameText}>{userName}</Text>
               <Text style={styles.dateText}>{currentDate}</Text>
             </View>
@@ -420,7 +452,6 @@ export default function HomeScreen() {
              <Animated.View style={[styles.nudgesContainer, { opacity: uiOpacity }]}>
                 <Text style={styles.nudgeTitle}>{isEvening ? "Relaxing suggestions:" : "Not sure what to say? Try asking:"}</Text>
                 
-                {/* SUNDOWNING NUDGES: Different buttons based on time of day */}
                 <View style={styles.nudgeRow}>
                   {isEvening ? (
                     <>
