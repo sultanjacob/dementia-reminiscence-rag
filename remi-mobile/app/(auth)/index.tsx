@@ -131,28 +131,31 @@ export default function HomeScreen() {
         if (profileData.secondary_contact) setSecondaryContact(profileData.secondary_contact);
       }
 
+      // FETCH MEMORY UNCONDITIONALLY
       const { data: memories } = await supabase.from('memory_vault').select('*');
+      let loadedMemory = null;
       
       if (memories && memories.length > 0) {
-        const randomMem = memories[Math.floor(Math.random() * memories.length)];
-        setDailyMemory(randomMem);
-        
-        if (!evening) {
-          const memoryCaption = randomMem.caption ? randomMem.caption : "";
+        loadedMemory = memories[Math.floor(Math.random() * memories.length)];
+        setDailyMemory(loadedMemory); // Save it so it's ready if caregiver overrides!
+      }
+
+      // DECIDE WHAT TO SAY BASED ON TIME
+      if (evening) {
+        const defaultGreeting = `Good evening, ${fetchedName}. It's getting late. I am here to help you relax.`;
+        setRemiText(defaultGreeting);
+        speak(defaultGreeting);
+      } else {
+        if (loadedMemory) {
+          const memoryCaption = loadedMemory.caption ? loadedMemory.caption : "";
           const memoryGreeting = `I was just admiring this photo. ${memoryCaption}`.trim();
           setRemiText(memoryGreeting);
           speak(memoryGreeting); 
         } else {
-          const defaultGreeting = `Good evening, ${fetchedName}. It's getting late. I am here to help you relax.`;
+          const defaultGreeting = `Hello ${fetchedName}! I am Remi. How can I help you today?`;
           setRemiText(defaultGreeting);
           speak(defaultGreeting);
         }
-      } else {
-        const defaultGreeting = evening 
-          ? `Good evening, ${fetchedName}. It's getting late. I am here to help you relax.`
-          : `Hello ${fetchedName}! I am Remi. How can I help you today?`;
-        setRemiText(defaultGreeting);
-        speak(defaultGreeting);
       }
     };
     
@@ -181,10 +184,12 @@ export default function HomeScreen() {
     setTimeIcon(newIsEvening ? "moon" : "sunny");
 
     if (newIsEvening) {
+      // Switched to evening
       const calmGreeting = `Good evening, ${userName}. It's getting late. I am here to help you relax.`;
       setRemiText(calmGreeting);
       speak(calmGreeting);
     } else {
+      // Switched to daytime! Check if we have that memory loaded.
       if (dailyMemory) {
         const memoryCaption = dailyMemory.caption ? dailyMemory.caption : "";
         const memoryGreeting = `I was just admiring this photo. ${memoryCaption}`.trim();
@@ -383,7 +388,7 @@ export default function HomeScreen() {
           
           <Animated.View style={[styles.header, { opacity: uiOpacity }]}>
             <View>
-              {/* INTERACTIVE OVERRIDE: Long press toggles daytime/evening */}
+              {/* INTERACTIVE OVERRIDE */}
               <TouchableOpacity 
                 activeOpacity={0.7} 
                 onLongPress={toggleSundowningOverride} 
@@ -424,6 +429,7 @@ export default function HomeScreen() {
               <Text style={[styles.repeatVoiceText, isEvening && { color: '#92400E' }]}>Hear again</Text>
             </TouchableOpacity>
             
+            {/* The photo only hides if it's evening, but the data is safely loaded! */}
             {dailyMemory && !isNudgeActive && !isEvening && (
               <Animated.View style={{ width: '100%', opacity: uiOpacity, marginTop: 15 }}>
                 <TouchableOpacity activeOpacity={0.8} onPress={() => setIsMemoryExpanded(true)} style={styles.memoryDropContainer}>
