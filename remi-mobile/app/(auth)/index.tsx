@@ -30,6 +30,7 @@ export default function HomeScreen() {
   
   const [remiText, setRemiText] = useState("Hello! I am Remi. How can I help you?");
   const [greeting, setGreeting] = useState("Good morning");
+  const [timeIcon, setTimeIcon] = useState("sunny"); // ☀️ or 🌙
   const [userName, setUserName] = useState("Peter");
   const [currentDate, setCurrentDate] = useState("");
   const [isEvening, setIsEvening] = useState(false);
@@ -49,7 +50,6 @@ export default function HomeScreen() {
   const [isDistressed, setIsDistressed] = useState(false);
   const [showEmergencyMenu, setShowEmergencyMenu] = useState(false);
 
-  // --- STEALTH UNLOCK STATES ---
   const [tapCount, setTapCount] = useState(0);
   const [lastTapTime, setLastTapTime] = useState(0);
   const [showPinModal, setShowPinModal] = useState(false);
@@ -99,10 +99,13 @@ export default function HomeScreen() {
     const initializeHome = async () => {
       const hour = new Date().getHours();
       
-      setIsEvening(hour >= 17 || hour < 6);
+      // SUNDOWNING LOGIC TRIGGER
+      const evening = hour >= 17 || hour < 6;
+      setIsEvening(evening);
+      setTimeIcon(evening ? "moon" : "sunny");
 
       if (hour < 12) setGreeting("Good morning");
-      else if (hour < 18) setGreeting("Good afternoon");
+      else if (hour < 17) setGreeting("Good afternoon");
       else setGreeting("Good evening");
 
       const today = new Date();
@@ -131,17 +134,20 @@ export default function HomeScreen() {
 
       const { data: memories } = await supabase.from('memory_vault').select('*');
       
-      if (memories && memories.length > 0) {
+      if (memories && memories.length > 0 && !evening) {
+        // Daytime: Show an active memory
         const randomMem = memories[Math.floor(Math.random() * memories.length)];
         setDailyMemory(randomMem);
-        
         const memoryCaption = randomMem.caption ? randomMem.caption : "";
         const memoryGreeting = `I was just admiring this photo. ${memoryCaption}`.trim();
-        
         setRemiText(memoryGreeting);
         speak(memoryGreeting); 
       } else {
-        const defaultGreeting = `Hello ${fetchedName}! I am Remi. How can I help you today?`;
+        // SUNDOWNING CALM GREETING: Don't force them to look at a complex photo if it's late.
+        setDailyMemory(null);
+        const defaultGreeting = evening 
+          ? `Good evening, ${fetchedName}. It's getting late. I am here to help you relax.`
+          : `Hello ${fetchedName}! I am Remi. How can I help you today?`;
         setRemiText(defaultGreeting);
         speak(defaultGreeting);
       }
@@ -156,11 +162,11 @@ export default function HomeScreen() {
     setIsProcessing(false);
     setIsNudgeActive(false);
     
-    if (dailyMemory) {
+    if (dailyMemory && !isEvening) {
       const memoryCaption = dailyMemory.caption ? dailyMemory.caption : "";
       setRemiText(`I was just admiring this photo. ${memoryCaption}`.trim());
     } else {
-      setRemiText(`Hello ${userName}! I am Remi. How can I help you today?`);
+      setRemiText(isEvening ? `I am here to help you relax, ${userName}.` : `Hello ${userName}! I am Remi. How can I help you today?`);
     }
   };
 
@@ -169,7 +175,7 @@ export default function HomeScreen() {
       resetRemi();
     });
     return unsubscribe;
-  }, [navigation, dailyMemory, userName]);
+  }, [navigation, dailyMemory, userName, isEvening]);
 
   const startRecording = async () => {
     try {
@@ -206,54 +212,36 @@ export default function HomeScreen() {
     }
   };
 
-  // --- DIAGNOSTIC BACKEND FUNCTION ---
   const sendAudioToBackend = async (fileUri: string) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      
       const formData = new FormData();
-      formData.append('file', { 
-        uri: fileUri, 
-        name: 'recording.m4a', 
-        type: 'audio/m4a' 
-      } as any);
-      
+      formData.append('file', { uri: fileUri, name: 'recording.m4a', type: 'audio/m4a' } as any);
       if (user) formData.append('user_id', user.id);
 
       const response = await fetch(`${API_URL}/voice-chat`, {
         method: 'POST',
         body: formData,
-        headers: { 
-          'Content-Type': 'multipart/form-data',
-          'Accept': 'application/json'
-        },
+        headers: { 'Content-Type': 'multipart/form-data', 'Accept': 'application/json' },
       });
 
       const responseText = await response.text();
       let responseData;
-      try {
-        responseData = JSON.parse(responseText);
-      } catch (parseError) {
-        throw new Error(`Server returned invalid JSON: ${responseText.substring(0, 100)}`);
-      }
+      try { responseData = JSON.parse(responseText); } 
+      catch (parseError) { throw new Error(`Server returned invalid JSON`); }
 
       if (response.ok) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         const aiText = responseData.message || "I didn't quite catch that.";
         setRemiText(aiText);
         speak(aiText);
-
         if (aiText.toLowerCase().includes("call family")) setIsDistressed(true);
         else setIsDistressed(false); 
       } else {
-        const errorMessage = responseData.detail || responseData.error || responseData.message || "Unknown Server Error";
-        throw new Error(`[HTTP ${response.status}] ${JSON.stringify(errorMessage)}`);
+        throw new Error(`[HTTP ${response.status}]`);
       }
-
     } catch (error: any) {
-      console.error("Backend Error Details:", error.message || error);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      
       const fallbackMessage = "I'm having a little trouble connecting to the internet right now. Let's try again in a minute.";
       setRemiText(fallbackMessage);
       speak(fallbackMessage); 
@@ -267,17 +255,12 @@ export default function HomeScreen() {
     setIsMenuVisible(true);
   };
 
-  // --- BULLETPROOF SIGN OUT ---
   const handleSignOut = async () => {
     setIsMenuVisible(false);
-    
     setTimeout(async () => {
       const { error } = await supabase.auth.signOut();
-      if (error) {
-        Alert.alert("Sign Out Error", error.message);
-      } else {
-        router.replace('/login'); 
-      }
+      if (error) Alert.alert("Sign Out Error", error.message);
+      else router.replace('/login'); 
     }, 500);
   };
 
@@ -299,26 +282,22 @@ export default function HomeScreen() {
     speak(`Tap the purple microphone and ask me: ${suggestion}`);
   };
 
-  // --- CAREGIVER UNLOCK LOGIC ---
   const handleSecretTap = () => {
     const now = Date.now();
-    // If taps are less than 800ms apart, count them
     if (now - lastTapTime < 800) {
       if (tapCount + 1 >= 3) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         setShowPinModal(true);
-        setTapCount(0); // Reset for next time
+        setTapCount(0); 
       } else {
         setTapCount(tapCount + 1);
       }
     } else {
-      // Waited too long, reset to 1 tap
       setTapCount(1);
     }
     setLastTapTime(now);
   };
   
-  // --- REAL SOS CALL LOGIC ---
   const handlePatientSOS = () => {
     Alert.alert(
       "🚨 EMERGENCY 🚨",
@@ -330,14 +309,9 @@ export default function HomeScreen() {
           style: "destructive",
           onPress: () => {
             if (primaryContact) {
-              Linking.openURL(`tel:${primaryContact}`).catch(() => {
-                Alert.alert("Error", "Could not open the phone dialer.");
-              });
+              Linking.openURL(`tel:${primaryContact}`).catch(() => Alert.alert("Error", "Could not open the phone dialer."));
             } else {
-              Alert.alert(
-                "Alert Sent Digitally", 
-                "We couldn't dial a number because no Primary Contact is set in settings, but an alert has been logged."
-              );
+              Alert.alert("Alert Sent Digitally", "No Primary Contact is set, but an alert has been logged.");
             }
           }
         }
@@ -347,28 +321,12 @@ export default function HomeScreen() {
 
   const verifyCaregiverPin = async (pinAttempt: string) => {
     setEnteredPin(pinAttempt);
-    
-    // Auto-submit when they hit 4 digits
     if (pinAttempt.length === 4) {
       try {
         const { data: { user } } = await supabase.auth.getUser();
-        if (!user) {
-          Alert.alert("Error", "No user is logged in.");
-          return;
-        }
-
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('caregiver_pin')
-          .eq('id', user.id)
-          .single();
-
-        if (error) {
-          Alert.alert("Database Error", error.message);
-          setEnteredPin('');
-          return;
-        }
-
+        if (!user) return;
+        const { data, error } = await supabase.from('profiles').select('caregiver_pin').eq('id', user.id).single();
+        
         if (data && data.caregiver_pin === pinAttempt) {
           setShowPinModal(false);
           setEnteredPin('');
@@ -379,58 +337,44 @@ export default function HomeScreen() {
           setEnteredPin('');
         }
       } catch (error: any) {
-        Alert.alert("Code Error", error.message);
         setEnteredPin('');
       }
     }
   };
 
-  const safeAreaBgColor = isEvening ? '#FEF3C7' : '#F3F4F6'; 
-  const appCapsuleBgColor = isEvening ? '#FFFBEB' : '#FFFFFF'; 
-  const bubbleBgColor = isEvening ? '#FEF3C7' : '#F9FAFB';
+  // SUNDOWNING UI COLORS: Deeper, warmer amber in the evening to reduce blue light glare.
+  const safeAreaBgColor = isEvening ? '#FDE68A' : '#F3F4F6'; 
+  const appCapsuleBgColor = isEvening ? '#FEF3C7' : '#FFFFFF'; 
+  const bubbleBgColor = isEvening ? '#FDE68A' : '#F9FAFB';
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: safeAreaBgColor }]}>
       <StatusBar barStyle="dark-content" backgroundColor={safeAreaBgColor} />
       <View style={[styles.appCapsule, { backgroundColor: appCapsuleBgColor }]}>
         
-        {/* NEW: ScrollView ensures the button is never permanently hidden off-screen */}
-        <ScrollView 
-          style={{ flex: 1 }} 
-          contentContainerStyle={styles.internalContent}
-          showsVerticalScrollIndicator={false}
-        >
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.internalContent} showsVerticalScrollIndicator={false}>
           
           <Animated.View style={[styles.header, { opacity: uiOpacity }]}>
             <View>
-              <Text style={styles.greetingText}>{greeting},</Text>
+              {/* REALITY ORIENTATION: Sun or Moon icon next to greeting */}
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Ionicons name={timeIcon as any} size={20} color={isEvening ? '#D97706' : '#F59E0B'} style={{ marginRight: 6 }} />
+                <Text style={styles.greetingText}>{greeting},</Text>
+              </View>
               <Text style={styles.nameText}>{userName}</Text>
               <Text style={styles.dateText}>{currentDate}</Text>
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <TouchableOpacity 
-                onPress={resetRemi} 
-                style={[styles.menuIconButton, { marginRight: 10 }]}
-                hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
-              >
+              <TouchableOpacity onPress={resetRemi} style={[styles.menuIconButton, { marginRight: 10 }]} hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
                 <Ionicons name="refresh" size={26} color="#8B5CF6" />
               </TouchableOpacity>
-              <TouchableOpacity 
-                onPress={handleMenuOpen} 
-                style={styles.menuIconButton}
-                hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
-              >
+              <TouchableOpacity onPress={handleMenuOpen} style={styles.menuIconButton} hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
                 <Ionicons name="menu" size={32} color="#111827" />
               </TouchableOpacity>
             </View>
           </Animated.View>
 
-          {/* CAREGIVER SECRET BUTTON */}
-          <TouchableOpacity 
-            activeOpacity={1} 
-            onPress={handleSecretTap} 
-            style={styles.orbContainer}
-          >
+          <TouchableOpacity activeOpacity={1} onPress={handleSecretTap} style={styles.orbContainer}>
             <Animated.View style={[styles.orb, { transform: [{ scale: pulseAnim }] }]} />
           </TouchableOpacity>
 
@@ -438,27 +382,19 @@ export default function HomeScreen() {
             <Text style={styles.remiSpeechText}>{remiText}</Text>
             
             <TouchableOpacity 
-              style={[styles.repeatVoiceButton, { backgroundColor: isEvening ? '#FDE68A' : '#F5F3FF' }]}
+              style={[styles.repeatVoiceButton, { backgroundColor: isEvening ? '#FBBF24' : '#F5F3FF' }]}
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 speak(remiText);
               }}
-              hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
             >
-              <Ionicons name="volume-high" size={20} color="#8B5CF6" />
-              <Text style={styles.repeatVoiceText}>Hear again</Text>
+              <Ionicons name="volume-high" size={20} color={isEvening ? '#92400E' : '#8B5CF6'} />
+              <Text style={[styles.repeatVoiceText, isEvening && { color: '#92400E' }]}>Hear again</Text>
             </TouchableOpacity>
             
-            {dailyMemory && !isNudgeActive && (
+            {dailyMemory && !isNudgeActive && !isEvening && (
               <Animated.View style={{ width: '100%', opacity: uiOpacity, marginTop: 15 }}>
-                <TouchableOpacity 
-                  activeOpacity={0.8} 
-                  onPress={() => {
-                    Haptics.selectionAsync();
-                    setIsMemoryExpanded(true);
-                  }}
-                  style={styles.memoryDropContainer}
-                >
+                <TouchableOpacity activeOpacity={0.8} onPress={() => setIsMemoryExpanded(true)} style={styles.memoryDropContainer}>
                   <Image source={{ uri: dailyMemory.image_url }} style={styles.memoryImage} resizeMode="cover" />
                   <View style={styles.memoryOverlay}>
                     <Ionicons name="scan-circle-outline" size={18} color="#FFFFFF" style={{marginRight: 6}} />
@@ -473,10 +409,7 @@ export default function HomeScreen() {
 
           {isDistressed && (
             <Animated.View style={{ opacity: flashAnim }}>
-              <TouchableOpacity 
-                style={styles.flashingEmergencyButton} 
-                onPress={() => setShowEmergencyMenu(true)}
-              >
+              <TouchableOpacity style={styles.flashingEmergencyButton} onPress={() => setShowEmergencyMenu(true)}>
                 <Ionicons name="warning" size={24} color="#FFFFFF" style={{ marginRight: 8 }} />
                 <Text style={styles.flashingEmergencyText}>TAP HERE FOR HELP</Text>
               </TouchableOpacity>
@@ -485,20 +418,29 @@ export default function HomeScreen() {
 
           {(!isRecording && !isProcessing && !isDistressed && !isNudgeActive) && (
              <Animated.View style={[styles.nudgesContainer, { opacity: uiOpacity }]}>
-                <Text style={styles.nudgeTitle}>Not sure what to say? Try asking:</Text>
+                <Text style={styles.nudgeTitle}>{isEvening ? "Relaxing suggestions:" : "Not sure what to say? Try asking:"}</Text>
+                
+                {/* SUNDOWNING NUDGES: Different buttons based on time of day */}
                 <View style={styles.nudgeRow}>
-                  <TouchableOpacity 
-                    style={[styles.nudgePill, { backgroundColor: isEvening ? '#FDE68A' : '#F3F4F6' }]} 
-                    onPress={() => handleNudgePress("What are your plans today?")}
-                  >
-                    <Text style={styles.nudgeText}>My plans today</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity 
-                    style={[styles.nudgePill, { backgroundColor: isEvening ? '#FDE68A' : '#F3F4F6' }]} 
-                    onPress={() => handleNudgePress("Tell me a story about your past.")}
-                  >
-                    <Text style={styles.nudgeText}>Tell me a story</Text>
-                  </TouchableOpacity>
+                  {isEvening ? (
+                    <>
+                      <TouchableOpacity style={[styles.nudgePill, { backgroundColor: '#FDE68A', borderColor: '#F59E0B' }]} onPress={() => handleNudgePress("Play some calming music for me.")}>
+                        <Text style={[styles.nudgeText, { color: '#92400E' }]}>Play calming music</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={[styles.nudgePill, { backgroundColor: '#FDE68A', borderColor: '#F59E0B' }]} onPress={() => handleNudgePress("Remind me what time it is and that I am safe.")}>
+                        <Text style={[styles.nudgeText, { color: '#92400E' }]}>What time is it?</Text>
+                      </TouchableOpacity>
+                    </>
+                  ) : (
+                    <>
+                      <TouchableOpacity style={styles.nudgePill} onPress={() => handleNudgePress("What are your plans today?")}>
+                        <Text style={styles.nudgeText}>My plans today</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={styles.nudgePill} onPress={() => handleNudgePress("Tell me a story about your past.")}>
+                        <Text style={styles.nudgeText}>Tell me a story</Text>
+                      </TouchableOpacity>
+                    </>
+                  )}
                 </View>
              </Animated.View>
           )}
@@ -522,11 +464,7 @@ export default function HomeScreen() {
             </Text>
           </View>
 
-          {/* --- FIXED EMERGENCY SOS BUTTON --- */}
-          <TouchableOpacity 
-            onPress={handlePatientSOS}
-            style={styles.patientSosButton}
-          >
+          <TouchableOpacity onPress={handlePatientSOS} style={styles.patientSosButton}>
             <Ionicons name="warning" size={28} color="#FFFFFF" style={{ marginRight: 10 }} />
             <Text style={styles.patientSosText}>HELP / SOS</Text>
           </TouchableOpacity>
@@ -577,11 +515,7 @@ export default function HomeScreen() {
                   {dailyMemory?.created_at ? new Date(dailyMemory.created_at).toLocaleDateString() : "Shared by family"}
                 </Text>
               </View>
-              <TouchableOpacity 
-                onPress={() => setIsMemoryExpanded(false)} 
-                style={styles.closeImageButton}
-                hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
-              >
+              <TouchableOpacity onPress={() => setIsMemoryExpanded(false)} style={styles.closeImageButton} hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
                 <Ionicons name="close" size={28} color="#111827" />
               </TouchableOpacity>
             </View>
@@ -596,10 +530,7 @@ export default function HomeScreen() {
             <View style={styles.modalDragIndicator} />
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Settings</Text>
-              <TouchableOpacity 
-                onPress={() => setIsMenuVisible(false)}
-                hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
-              >
+              <TouchableOpacity onPress={() => setIsMenuVisible(false)} hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
                 <Ionicons name="close" size={32} color="#111827" />
               </TouchableOpacity>
             </View>
@@ -626,7 +557,6 @@ export default function HomeScreen() {
         </View>
       </Modal>
 
-      {/* --- CAREGIVER PIN MODAL --- */}
       <Modal visible={showPinModal} transparent={true} animationType="fade">
         <View style={[styles.modalOverlay, { justifyContent: 'center', alignItems: 'center' }]}>
           <View style={styles.pinModalContent}>
@@ -664,20 +594,20 @@ const styles = StyleSheet.create({
   appCapsule: { flex: 1, borderRadius: 35, overflow: 'hidden', marginHorizontal: 10, marginBottom: 10, marginTop: 10, borderWidth: 1, borderColor: '#E5E7EB', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 5 },
   internalContent: { flexGrow: 1, paddingHorizontal: 20, justifyContent: 'space-between', paddingTop: 10, paddingBottom: 30 }, 
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginTop: 5, marginBottom: 0 }, 
-  greetingText: { fontSize: 16, color: '#6B7280', fontWeight: '500' }, 
+  greetingText: { fontSize: 16, color: '#6B7280', fontWeight: '600' }, 
   nameText: { fontSize: 28, fontWeight: '800', color: '#111827', marginTop: 2, letterSpacing: -0.5 },
   dateText: { fontSize: 12, color: '#8B5CF6', fontWeight: '700', marginTop: 4, textTransform: 'uppercase', letterSpacing: 1 },
   menuIconButton: { padding: 8, backgroundColor: '#F3F4F6', borderRadius: 20 },
   orbContainer: { alignItems: 'center', justifyContent: 'center', marginVertical: 10 }, 
   orb: { width: 86, height: 86, borderRadius: 43, backgroundColor: '#8B5CF6', shadowColor: '#8B5CF6', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.6, shadowRadius: 25, elevation: 15 }, 
-  speechBubble: { padding: 18, borderRadius: 24, alignItems: 'center', marginBottom: 10, borderWidth: 1, borderColor: '#F3F4F6' }, 
+  speechBubble: { padding: 18, borderRadius: 24, alignItems: 'center', marginBottom: 10, borderWidth: 1, borderColor: '#E5E7EB' }, 
   remiSpeechText: { fontSize: 18, color: '#1F2937', textAlign: 'center', lineHeight: 26, fontWeight: '600', marginBottom: 5 }, 
   repeatVoiceButton: { flexDirection: 'row', alignItems: 'center', paddingVertical: 6, paddingHorizontal: 14, borderRadius: 20, marginBottom: 5 },
-  repeatVoiceText: { color: '#8B5CF6', fontSize: 14, fontWeight: '700', marginLeft: 6 },
+  repeatVoiceText: { fontSize: 14, fontWeight: '700', marginLeft: 6 },
   nudgesContainer: { alignItems: 'center', marginBottom: 10 },
   nudgeTitle: { fontSize: 13, color: '#6B7280', marginBottom: 6, fontWeight: '600' },
   nudgeRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 8 },
-  nudgePill: { paddingVertical: 8, paddingHorizontal: 14, borderRadius: 20, borderWidth: 1, borderColor: '#E5E7EB' },
+  nudgePill: { paddingVertical: 8, paddingHorizontal: 14, borderRadius: 20, borderWidth: 1, borderColor: '#E5E7EB', backgroundColor: '#F3F4F6' },
   nudgeText: { color: '#4B5563', fontSize: 14, fontWeight: '700' },
   memoryDropContainer: { width: '100%', borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: '#E5E7EB', backgroundColor: '#FFF' },
   memoryImage: { width: '100%', height: 110 }, 
@@ -716,13 +646,11 @@ const styles = StyleSheet.create({
   cancelEmergencyButton: { paddingVertical: 15, alignItems: 'center' },
   cancelEmergencyText: { color: '#9CA3AF', fontSize: 18, fontWeight: '700' },
   
-  // CAREGIVER PIN STYLES
   pinModalContent: { backgroundColor: '#1F2937', borderRadius: 24, padding: 30, width: '85%', alignItems: 'center', borderWidth: 1, borderColor: '#374151' },
   pinModalTitle: { color: '#FFFFFF', fontSize: 22, fontWeight: 'bold', marginBottom: 8 },
   pinModalSubtitle: { color: '#9CA3AF', fontSize: 14, textAlign: 'center', marginBottom: 25 },
   pinInputDisplay: { backgroundColor: '#111827', width: '100%', borderWidth: 1, borderColor: '#374151', borderRadius: 16, paddingVertical: 20, color: '#FFFFFF', fontSize: 32, fontWeight: 'bold', textAlign: 'center', letterSpacing: 12, marginBottom: 20 },
 
-  // PATIENT SOS BUTTON
   patientSosButton: { backgroundColor: '#EF4444', paddingVertical: 18, paddingHorizontal: 30, borderRadius: 30, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 15, marginBottom: 10, shadowColor: '#EF4444', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 8, elevation: 8 },
   patientSosText: { color: '#FFFFFF', fontSize: 22, fontWeight: 'bold' }
 });
