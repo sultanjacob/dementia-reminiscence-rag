@@ -30,7 +30,6 @@ export default function MemoryVaultScreen() {
   const [pendingImage, setPendingImage] = useState<any>(null);
   
   const [captionText, setCaptionText] = useState('');
-  // NEW: State to hold the audio URL
   const [audioUrl, setAudioUrl] = useState('');
 
   useEffect(() => {
@@ -97,12 +96,11 @@ export default function MemoryVaultScreen() {
         .from('memory_vault')
         .getPublicUrl(fileName);
 
-      // UPDATED: Now inserts the audio_url into the database!
       const { error: dbError } = await supabase
         .from('memory_vault')
         .insert({
           uploader_id: user.id,
-          patient_code: user.id, // In a real app, this would be the linked patient ID
+          patient_code: user.id, 
           image_url: publicUrl,
           caption: captionText,
           audio_url: audioUrl.trim() !== '' ? audioUrl.trim() : null,
@@ -118,7 +116,7 @@ export default function MemoryVaultScreen() {
       setUploading(false);
       setPendingImage(null);
       setCaptionText('');
-      setAudioUrl(''); // Reset audio URL
+      setAudioUrl(''); 
     }
   };
 
@@ -203,7 +201,6 @@ export default function MemoryVaultScreen() {
               <View key={img.id} style={styles.imageContainer}>
                 <Image source={{ uri: img.image_url }} style={styles.image} />
                 
-                {/* NEW: Audio indicator badge on the photo */}
                 {img.audio_url && (
                   <View style={styles.audioBadge}>
                     <Ionicons name="mic" size={14} color="#FFFFFF" />
@@ -235,53 +232,55 @@ export default function MemoryVaultScreen() {
         </ScrollView>
       )}
 
-      {/* --- UPDATED CAPTION MODAL WITH IMAGE PREVIEW --- */}
+      {/* --- SCROLLABLE CAPTION MODAL --- */}
       <Modal visible={isCaptionModalVisible} transparent={true} animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Add a Memory</Text>
-            
-            {pendingImage && (
-              <Image source={{ uri: pendingImage.uri }} style={styles.previewImage} />
-            )}
-            
-            <Text style={styles.inputLabel}>Caption (for Remi to read)</Text>
-            <TextInput
-              style={styles.captionInput}
-              placeholder="Who is in this photo? Where was it taken?"
-              placeholderTextColor="#9CA3AF"
-              value={captionText}
-              onChangeText={setCaptionText}
-              multiline
-            />
-
-            {/* NEW: Audio URL Input */}
-            <Text style={styles.inputLabel}>Voice Note Link (Optional)</Text>
-            <TextInput
-              style={styles.audioInput}
-              placeholder="e.g., https://example.com/voicenote.mp3"
-              placeholderTextColor="#9CA3AF"
-              value={audioUrl}
-              onChangeText={setAudioUrl}
-              autoCapitalize="none"
-            />
-            
-            <View style={styles.modalButtons}>
-              <TouchableOpacity 
-                style={styles.cancelButton} 
-                onPress={() => {
-                  setCaptionModalVisible(false);
-                  setPendingImage(null);
-                  setCaptionText('');
-                  setAudioUrl(''); // Reset audio
-                }}>
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
+            {/* Added ScrollView so the inputs never get pushed off-screen */}
+            <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
+              <Text style={styles.modalTitle}>Add a Memory</Text>
               
-              <TouchableOpacity style={styles.saveButton} onPress={uploadWithCaption}>
-                <Text style={styles.saveButtonText}>Save & Upload</Text>
-              </TouchableOpacity>
-            </View>
+              {pendingImage && (
+                <Image source={{ uri: pendingImage.uri }} style={styles.previewImage} />
+              )}
+              
+              <Text style={styles.inputLabel}>Caption (for Remi to read)</Text>
+              <TextInput
+                style={styles.captionInput}
+                placeholder="Who is in this photo? Where was it taken?"
+                placeholderTextColor="#9CA3AF"
+                value={captionText}
+                onChangeText={setCaptionText}
+                multiline
+              />
+
+              <Text style={styles.inputLabel}>Voice Note Link (Optional)</Text>
+              <TextInput
+                style={styles.audioInput}
+                placeholder="e.g., https://example.com/voicenote.mp3"
+                placeholderTextColor="#9CA3AF"
+                value={audioUrl}
+                onChangeText={setAudioUrl}
+                autoCapitalize="none"
+              />
+              
+              <View style={styles.modalButtons}>
+                <TouchableOpacity 
+                  style={styles.cancelButton} 
+                  onPress={() => {
+                    setCaptionModalVisible(false);
+                    setPendingImage(null);
+                    setCaptionText('');
+                    setAudioUrl(''); 
+                  }}>
+                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity style={styles.saveButton} onPress={uploadWithCaption}>
+                  <Text style={styles.saveButtonText}>Save & Upload</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -296,7 +295,10 @@ const styles = StyleSheet.create({
   backButton: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#110C1D', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#231A31' },
   headerTitle: { fontSize: 20, fontWeight: 'bold', color: '#FFFFFF' },
   centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  scrollContent: { paddingHorizontal: 20, paddingBottom: 40 },
+  
+  // FIXED: Increased paddingBottom from 40 to 120 to clear the bottom tabs
+  scrollContent: { paddingHorizontal: 20, paddingBottom: 120 },
+  
   subtitle: { color: '#9CA3AF', fontSize: 14, marginBottom: 25, lineHeight: 20, textAlign: 'center' },
   uploadCard: { backgroundColor: '#110C1D', borderRadius: 24, padding: 30, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#231A31', borderStyle: 'dashed', marginBottom: 30 },
   uploadCardDisabled: { opacity: 0.5 },
@@ -311,18 +313,19 @@ const styles = StyleSheet.create({
   emptyText: { color: '#6B7280', width: '100%', textAlign: 'center', marginTop: 20 },
   deleteButton: { position: 'absolute', top: 8, right: 8, backgroundColor: 'rgba(239, 68, 68, 0.85)', width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   
-  // Audio Badge Style
   audioBadge: { position: 'absolute', top: 8, left: 8, backgroundColor: '#8B5CF6', width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.5, shadowRadius: 3 },
 
-  // Modal Styles
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.7)', justifyContent: 'center', alignItems: 'center', padding: 20 },
-  modalContent: { backgroundColor: '#110C1D', borderRadius: 20, padding: 20, width: '100%', borderWidth: 1, borderColor: '#231A31' },
+  
+  // FIXED: Added maxHeight so the modal never pushes off the screen
+  modalContent: { backgroundColor: '#110C1D', borderRadius: 20, padding: 20, width: '100%', maxHeight: '90%', borderWidth: 1, borderColor: '#231A31' },
+  
   modalTitle: { color: '#FFFFFF', fontSize: 20, fontWeight: 'bold', marginBottom: 15 },
   previewImage: { width: '100%', height: 200, borderRadius: 12, marginBottom: 15, resizeMode: 'cover' },
   inputLabel: { color: '#D1D5DB', fontSize: 14, fontWeight: '600', marginBottom: 6, marginLeft: 2 },
   captionInput: { backgroundColor: '#000000', color: '#FFFFFF', borderRadius: 10, padding: 15, minHeight: 80, borderWidth: 1, borderColor: '#231A31', textAlignVertical: 'top', marginBottom: 15, fontSize: 16 },
   audioInput: { backgroundColor: '#000000', color: '#FFFFFF', borderRadius: 10, padding: 15, borderWidth: 1, borderColor: '#231A31', marginBottom: 20, fontSize: 16 },
-  modalButtons: { flexDirection: 'row', justifyContent: 'flex-end', gap: 15 },
+  modalButtons: { flexDirection: 'row', justifyContent: 'flex-end', gap: 15, marginBottom: 10 },
   cancelButton: { paddingVertical: 10, paddingHorizontal: 15, justifyContent: 'center' },
   cancelButtonText: { color: '#9CA3AF', fontSize: 16, fontWeight: 'bold' },
   saveButton: { backgroundColor: '#8B5CF6', paddingVertical: 10, paddingHorizontal: 15, borderRadius: 10 },
