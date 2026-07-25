@@ -277,7 +277,7 @@ export default function MemoryVaultScreen() {
               <Text style={styles.inputLabel}>Caption (for Remi to read)</Text>
               <TextInput
                 style={styles.captionInput}
-                placeholder="Who is in this photo? Where was it taken?"
+                placeholder="What can you say about this photo? Where was it taken?"
                 placeholderTextColor="#9CA3AF"
                 value={captionText}
                 onChangeText={setCaptionText}
