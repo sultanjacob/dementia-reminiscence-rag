@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { decode } from 'base64-arraybuffer';
+import { Audio } from 'expo-av';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
@@ -31,10 +32,19 @@ export default function MemoryVaultScreen() {
   
   const [captionText, setCaptionText] = useState('');
   const [audioUrl, setAudioUrl] = useState('');
+  
+  // NEW: State for audio playback preview
+  const [sound, setSound] = useState<Audio.Sound | null>(null);
 
   useEffect(() => {
     fetchVaultImages();
-  }, []);
+    // Cleanup audio when leaving the screen
+    return () => {
+      if (sound) {
+        sound.unloadAsync();
+      }
+    };
+  }, [sound]);
 
   const fetchVaultImages = async () => {
     try {
@@ -53,6 +63,20 @@ export default function MemoryVaultScreen() {
       console.error('Error fetching images:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // NEW: Play audio preview function
+  const playAudioPreview = async (url: string) => {
+    try {
+      if (sound) {
+        await sound.unloadAsync();
+      }
+      const { sound: newSound } = await Audio.Sound.createAsync({ uri: url });
+      setSound(newSound);
+      await newSound.playAsync();
+    } catch (err) {
+      Alert.alert("Playback Error", "Could not play this audio link. Please check the URL.");
     }
   };
 
@@ -131,18 +155,22 @@ export default function MemoryVaultScreen() {
     );
   };
 
+  // FIXED: Delete function now updates UI instantly and handles external images safely
   const deleteImage = async (img: any) => {
-    setLoading(true);
+    // 1. Optimistic UI update: instantly hide it from the user
+    setImages(prevImages => prevImages.filter(item => item.id !== img.id));
+
     try {
-      const filePath = img.image_url.split('/memory_vault/')[1];
-      
-      if (filePath) {
-        const { error: storageError } = await supabase.storage
-          .from('memory_vault')
-          .remove([filePath]);
-        if (storageError) throw storageError;
+      // 2. Only try to delete from Supabase storage if it's actually hosted there
+      if (img.image_url && img.image_url.includes('supabase.co')) {
+        const pathParts = img.image_url.split('/memory_vault/');
+        if (pathParts.length > 1) {
+          const filePath = pathParts[1];
+          await supabase.storage.from('memory_vault').remove([filePath]);
+        }
       }
 
+      // 3. Delete from the database
       const { error: dbError } = await supabase
         .from('memory_vault')
         .delete()
@@ -150,11 +178,10 @@ export default function MemoryVaultScreen() {
         
       if (dbError) throw dbError;
 
-      fetchVaultImages();
-
     } catch (error: any) {
-      Alert.alert("Delete Failed", error.message);
-      setLoading(false); 
+      Alert.alert("Delete Failed", "Something went wrong in the background.");
+      // If it failed on the server, refresh to put the image back on the screen
+      fetchVaultImages();
     }
   };
 
@@ -201,10 +228,14 @@ export default function MemoryVaultScreen() {
               <View key={img.id} style={styles.imageContainer}>
                 <Image source={{ uri: img.image_url }} style={styles.image} />
                 
+                {/* FIXED: Audio Badge is now a playable button */}
                 {img.audio_url && (
-                  <View style={styles.audioBadge}>
-                    <Ionicons name="mic" size={14} color="#FFFFFF" />
-                  </View>
+                  <TouchableOpacity 
+                    style={styles.audioBadge}
+                    onPress={() => playAudioPreview(img.audio_url)}
+                  >
+                    <Ionicons name="play" size={14} color="#FFFFFF" style={{ marginLeft: 2 }} />
+                  </TouchableOpacity>
                 )}
 
                 {img.caption ? (
@@ -236,7 +267,6 @@ export default function MemoryVaultScreen() {
       <Modal visible={isCaptionModalVisible} transparent={true} animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            {/* Added ScrollView so the inputs never get pushed off-screen */}
             <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
               <Text style={styles.modalTitle}>Add a Memory</Text>
               
@@ -247,7 +277,7 @@ export default function MemoryVaultScreen() {
               <Text style={styles.inputLabel}>Caption (for Remi to read)</Text>
               <TextInput
                 style={styles.captionInput}
-                placeholder="Who is in this photo? Where was it taken? Any brief history?"
+                placeholder="Who is in this photo? Where was it taken?"
                 placeholderTextColor="#9CA3AF"
                 value={captionText}
                 onChangeText={setCaptionText}
@@ -296,7 +326,6 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: 20, fontWeight: 'bold', color: '#FFFFFF' },
   centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   
-  // FIXED: Increased paddingBottom from 40 to 120 to clear the bottom tabs
   scrollContent: { paddingHorizontal: 20, paddingBottom: 120 },
   
   subtitle: { color: '#9CA3AF', fontSize: 14, marginBottom: 25, lineHeight: 20, textAlign: 'center' },
@@ -313,11 +342,9 @@ const styles = StyleSheet.create({
   emptyText: { color: '#6B7280', width: '100%', textAlign: 'center', marginTop: 20 },
   deleteButton: { position: 'absolute', top: 8, right: 8, backgroundColor: 'rgba(239, 68, 68, 0.85)', width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   
-  audioBadge: { position: 'absolute', top: 8, left: 8, backgroundColor: '#8B5CF6', width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.5, shadowRadius: 3 },
+  audioBadge: { position: 'absolute', top: 8, left: 8, backgroundColor: '#8B5CF6', width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.5, shadowRadius: 3 },
 
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.7)', justifyContent: 'center', alignItems: 'center', padding: 20 },
-  
-  // FIXED: Added maxHeight so the modal never pushes off the screen
   modalContent: { backgroundColor: '#110C1D', borderRadius: 20, padding: 20, width: '100%', maxHeight: '90%', borderWidth: 1, borderColor: '#231A31' },
   
   modalTitle: { color: '#FFFFFF', fontSize: 20, fontWeight: 'bold', marginBottom: 15 },
