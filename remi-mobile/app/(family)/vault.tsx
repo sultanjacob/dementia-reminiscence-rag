@@ -60,7 +60,7 @@ export default function MemoryVaultScreen() {
       if (error) throw error;
       setImages(data || []);
     } catch (error) {
-      console.error('Error fetching images:', error);
+      console.error('Error fetching images:!', error);
     } finally {
       setLoading(false);
     }
@@ -147,7 +147,7 @@ export default function MemoryVaultScreen() {
   const confirmDelete = (img: any) => {
     Alert.alert(
       "Delete Memory",
-      "Are you sure you want to remove this photo from the vault?",
+      "Are you sure you want to remove this photo from the vault permanently?",
       [
         { text: "Cancel", style: "cancel" },
         { text: "Delete", style: "destructive", onPress: () => deleteImage(img) }
