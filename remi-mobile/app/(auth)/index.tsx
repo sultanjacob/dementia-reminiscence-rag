@@ -309,7 +309,7 @@ export default function HomeScreen() {
     try {
       await recording?.stopAndUnloadAsync();
       const uri = recording?.getURI();
-      if (!uri) throw new Error("No audio file found.");
+      if (!uri) throw new Error("No audio file found!");
       await sendAudioToBackend(uri);
     } catch (err) {
       console.error("Failed to stop", err);
@@ -337,7 +337,7 @@ export default function HomeScreen() {
 
       if (response.ok) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        const aiText = responseData.message || "I didn't quite catch that.";
+        const aiText = responseData.message || "I didn't quite catch that!";
         setRemiText(aiText);
         speak(aiText);
         if (aiText.toLowerCase().includes("call family")) setIsDistressed(true);
