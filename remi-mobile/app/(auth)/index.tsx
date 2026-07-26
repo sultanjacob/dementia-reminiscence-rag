@@ -1,4 +1,3 @@
-
 import { Ionicons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
 import * as Haptics from 'expo-haptics';
@@ -56,21 +55,23 @@ export default function HomeScreen() {
   const [showPinModal, setShowPinModal] = useState(false);
   const [enteredPin, setEnteredPin] = useState('');
   
-  // NEW: State to hold the playing memory audio
   const [memorySound, setMemorySound] = useState<Audio.Sound | null>(null);
+  
+  // --- NEW: MUSIC THERAPY STATE ---
+  const [bgMusic, setBgMusic] = useState<Audio.Sound | null>(null);
+  const [isPlayingMusic, setIsPlayingMusic] = useState(false);
 
   const flashAnim = useRef(new Animated.Value(1)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const uiOpacity = useRef(new Animated.Value(1)).current;
 
-  // Cleanup audio when component unmounts
+  // Cleanup all audio engines when unmounting
   useEffect(() => {
     return () => {
-      if (memorySound) {
-        memorySound.unloadAsync();
-      }
+      if (memorySound) memorySound.unloadAsync();
+      if (bgMusic) bgMusic.unloadAsync();
     };
-  }, [memorySound]);
+  }, [memorySound, bgMusic]);
 
   const speak = (text: string) => {
     if (!text) return;
@@ -78,7 +79,6 @@ export default function HomeScreen() {
     Speech.speak(cleanText, { language: 'en-GB', pitch: 0.9, rate: 0.8 });
   };
 
-  // NEW: Play custom audio URL
   const playCustomAudio = async (url: string) => {
     try {
       if (memorySound) {
@@ -92,12 +92,39 @@ export default function HomeScreen() {
     }
   };
 
-  // NEW: Helper to decide whether to speak TTS or play the custom voice note
   const announceMemory = (text: string, memoryObj: any) => {
     if (memoryObj && memoryObj.audio_url) {
       playCustomAudio(memoryObj.audio_url);
     } else {
       speak(text);
+    }
+  };
+
+  // --- NEW: MUSIC THERAPY CONTROLLER ---
+  const toggleMusic = async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    try {
+      if (isPlayingMusic && bgMusic) {
+        await bgMusic.pauseAsync();
+        setIsPlayingMusic(false);
+      } else {
+        if (bgMusic) {
+          await bgMusic.playAsync();
+          setIsPlayingMusic(true);
+        } else {
+          // Loads a royalty-free calming piano track
+          const musicUrl = 'https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3?filename=calm-piano-music-111826.mp3';
+          const { sound } = await Audio.Sound.createAsync(
+            { uri: musicUrl },
+            { shouldPlay: true, isLooping: true }
+          );
+          setBgMusic(sound);
+          setIsPlayingMusic(true);
+        }
+      }
+    } catch (error) {
+      console.error("Music error:", error);
+      Alert.alert("Music Error", "Could not play the relaxing music right now.");
     }
   };
 
@@ -184,7 +211,7 @@ export default function HomeScreen() {
           const memoryCaption = loadedMemory.caption ? loadedMemory.caption : "";
           const memoryGreeting = `I was just admiring this photo. ${memoryCaption}`.trim();
           setRemiText(memoryGreeting);
-          announceMemory(memoryGreeting, loadedMemory); // Plays the voice note if it exists!
+          announceMemory(memoryGreeting, loadedMemory); 
         } else {
           const defaultGreeting = `Hello ${fetchedName}! I am Remi. How can I help you today?`;
           setRemiText(defaultGreeting);
@@ -250,9 +277,15 @@ export default function HomeScreen() {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       setIsNudgeActive(false); 
 
-      // NEW: Stop any playing audio or TTS before listening
+      // Mute AI TTS and Voice Notes
       Speech.stop();
       if (memorySound) await memorySound.stopAsync();
+
+      // AUTO-PAUSE BACKGROUND MUSIC SO REMI CAN HEAR
+      if (isPlayingMusic && bgMusic) {
+        await bgMusic.pauseAsync();
+        setIsPlayingMusic(false);
+      }
 
       const permission = await Audio.requestPermissionsAsync();
       if (permission.status !== 'granted') return Alert.alert("Permission Denied", "Remi needs microphone access.");
@@ -377,7 +410,7 @@ export default function HomeScreen() {
       [
         { text: "I'm Okay (Cancel)", style: "cancel" },
         { 
-          text: "Yes, Call Family", 
+          text: "Yes, Call Family please!", 
           style: "destructive",
           onPress: () => {
             if (primaryContact) {
@@ -460,7 +493,6 @@ export default function HomeScreen() {
               style={[styles.repeatVoiceButton, { backgroundColor: isEvening ? '#FBBF24' : '#F5F3FF' }]}
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                // NEW: Decide whether to play the family's MP3 or the TTS!
                 if (dailyMemory && !isEvening && dailyMemory.audio_url) {
                   playCustomAudio(dailyMemory.audio_url);
                 } else {
@@ -487,6 +519,22 @@ export default function HomeScreen() {
             )}
           </View>
 
+          {/* --- NEW: DEDICATED MUSIC THERAPY BUTTON --- */}
+          {(!isRecording && !isProcessing && !isDistressed) && (
+            <Animated.View style={{ opacity: uiOpacity, width: '100%' }}>
+              <TouchableOpacity 
+                style={[styles.musicButton, isPlayingMusic && styles.musicButtonActive]} 
+                onPress={toggleMusic}
+                activeOpacity={0.8}
+              >
+                <Ionicons name={isPlayingMusic ? "pause" : "musical-notes"} size={22} color={isPlayingMusic ? "#FFFFFF" : "#8B5CF6"} />
+                <Text style={[styles.musicButtonText, isPlayingMusic && { color: '#FFFFFF' }]}>
+                  {isPlayingMusic ? "Pause Music" : "Play Relaxing Music"}
+                </Text>
+              </TouchableOpacity>
+            </Animated.View>
+          )}
+
           {isDistressed && (
             <Animated.View style={{ opacity: flashAnim }}>
               <TouchableOpacity style={styles.flashingEmergencyButton} onPress={() => setShowEmergencyMenu(true)}>
@@ -503,8 +551,9 @@ export default function HomeScreen() {
                 <View style={styles.nudgeRow}>
                   {isEvening ? (
                     <>
-                      <TouchableOpacity style={[styles.nudgePill, { backgroundColor: '#FDE68A', borderColor: '#F59E0B' }]} onPress={() => handleNudgePress("Play some calming music for me.")}>
-                        <Text style={[styles.nudgeText, { color: '#92400E' }]}>Play calming music</Text>
+                      {/* CONNECTED NUDGE TO MUSIC PLAYER */}
+                      <TouchableOpacity style={[styles.nudgePill, { backgroundColor: '#FDE68A', borderColor: '#F59E0B' }]} onPress={toggleMusic}>
+                        <Text style={[styles.nudgeText, { color: '#92400E' }]}>{isPlayingMusic ? "Pause music" : "Play calming music"}</Text>
                       </TouchableOpacity>
                       <TouchableOpacity style={[styles.nudgePill, { backgroundColor: '#FDE68A', borderColor: '#F59E0B' }]} onPress={() => handleNudgePress("Remind me what time it is and that I am safe.")}>
                         <Text style={[styles.nudgeText, { color: '#92400E' }]}>What time is it?</Text>
@@ -683,6 +732,12 @@ const styles = StyleSheet.create({
   remiSpeechText: { fontSize: 18, color: '#1F2937', textAlign: 'center', lineHeight: 26, fontWeight: '600', marginBottom: 5 }, 
   repeatVoiceButton: { flexDirection: 'row', alignItems: 'center', paddingVertical: 6, paddingHorizontal: 14, borderRadius: 20, marginBottom: 5 },
   repeatVoiceText: { fontSize: 14, fontWeight: '700', marginLeft: 6 },
+  
+  // --- MUSIC THERAPY STYLES ---
+  musicButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F5F3FF', paddingVertical: 12, paddingHorizontal: 24, borderRadius: 25, marginBottom: 15, alignSelf: 'center', borderWidth: 1, borderColor: '#DDD6FE' },
+  musicButtonActive: { backgroundColor: '#8B5CF6', borderColor: '#8B5CF6' },
+  musicButtonText: { fontSize: 16, fontWeight: '700', color: '#8B5CF6', marginLeft: 8 },
+
   nudgesContainer: { alignItems: 'center', marginBottom: 10 },
   nudgeTitle: { fontSize: 13, color: '#6B7280', marginBottom: 6, fontWeight: '600' },
   nudgeRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 8 },
