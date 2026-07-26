@@ -1,3 +1,4 @@
+
 import { Ionicons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
 import * as Haptics from 'expo-haptics';
@@ -55,14 +56,49 @@ export default function HomeScreen() {
   const [showPinModal, setShowPinModal] = useState(false);
   const [enteredPin, setEnteredPin] = useState('');
   
+  // NEW: State to hold the playing memory audio
+  const [memorySound, setMemorySound] = useState<Audio.Sound | null>(null);
+
   const flashAnim = useRef(new Animated.Value(1)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const uiOpacity = useRef(new Animated.Value(1)).current;
+
+  // Cleanup audio when component unmounts
+  useEffect(() => {
+    return () => {
+      if (memorySound) {
+        memorySound.unloadAsync();
+      }
+    };
+  }, [memorySound]);
 
   const speak = (text: string) => {
     if (!text) return;
     const cleanText = text.replace(/\*/g, ''); 
     Speech.speak(cleanText, { language: 'en-GB', pitch: 0.9, rate: 0.8 });
+  };
+
+  // NEW: Play custom audio URL
+  const playCustomAudio = async (url: string) => {
+    try {
+      if (memorySound) {
+        await memorySound.unloadAsync();
+      }
+      const { sound } = await Audio.Sound.createAsync({ uri: url });
+      setMemorySound(sound);
+      await sound.playAsync();
+    } catch (error) {
+      console.error("Memory playback error:", error);
+    }
+  };
+
+  // NEW: Helper to decide whether to speak TTS or play the custom voice note
+  const announceMemory = (text: string, memoryObj: any) => {
+    if (memoryObj && memoryObj.audio_url) {
+      playCustomAudio(memoryObj.audio_url);
+    } else {
+      speak(text);
+    }
   };
 
   useEffect(() => {
@@ -131,16 +167,14 @@ export default function HomeScreen() {
         if (profileData.secondary_contact) setSecondaryContact(profileData.secondary_contact);
       }
 
-      // FETCH MEMORY UNCONDITIONALLY
       const { data: memories } = await supabase.from('memory_vault').select('*');
       let loadedMemory = null;
       
       if (memories && memories.length > 0) {
         loadedMemory = memories[Math.floor(Math.random() * memories.length)];
-        setDailyMemory(loadedMemory); // Save it so it's ready if caregiver overrides!
+        setDailyMemory(loadedMemory); 
       }
 
-      // DECIDE WHAT TO SAY BASED ON TIME
       if (evening) {
         const defaultGreeting = `Good evening, ${fetchedName}. It's getting late. I am here to help you relax.`;
         setRemiText(defaultGreeting);
@@ -150,7 +184,7 @@ export default function HomeScreen() {
           const memoryCaption = loadedMemory.caption ? loadedMemory.caption : "";
           const memoryGreeting = `I was just admiring this photo. ${memoryCaption}`.trim();
           setRemiText(memoryGreeting);
-          speak(memoryGreeting); 
+          announceMemory(memoryGreeting, loadedMemory); // Plays the voice note if it exists!
         } else {
           const defaultGreeting = `Hello ${fetchedName}! I am Remi. How can I help you today?`;
           setRemiText(defaultGreeting);
@@ -170,13 +204,16 @@ export default function HomeScreen() {
     
     if (dailyMemory && !isEvening) {
       const memoryCaption = dailyMemory.caption ? dailyMemory.caption : "";
-      setRemiText(`I was just admiring this photo. ${memoryCaption}`.trim());
+      const memoryGreeting = `I was just admiring this photo. ${memoryCaption}`.trim();
+      setRemiText(memoryGreeting);
+      announceMemory(memoryGreeting, dailyMemory);
     } else {
-      setRemiText(isEvening ? `I am here to help you relax, ${userName}.` : `Hello ${userName}! I am Remi. How can I help you today?`);
+      const text = isEvening ? `I am here to help you relax, ${userName}.` : `Hello ${userName}! I am Remi. How can I help you today?`;
+      setRemiText(text);
+      speak(text);
     }
   };
 
-  // --- MANUAL OVERRIDE LOGIC ---
   const toggleSundowningOverride = () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     const newIsEvening = !isEvening;
@@ -184,17 +221,15 @@ export default function HomeScreen() {
     setTimeIcon(newIsEvening ? "moon" : "sunny");
 
     if (newIsEvening) {
-      // Switched to evening
       const calmGreeting = `Good evening, ${userName}. It's getting late. I am here to help you relax.`;
       setRemiText(calmGreeting);
       speak(calmGreeting);
     } else {
-      // Switched to daytime! Check if we have that memory loaded.
       if (dailyMemory) {
         const memoryCaption = dailyMemory.caption ? dailyMemory.caption : "";
         const memoryGreeting = `I was just admiring this photo. ${memoryCaption}`.trim();
         setRemiText(memoryGreeting);
-        speak(memoryGreeting);
+        announceMemory(memoryGreeting, dailyMemory);
       } else {
         const defaultGreeting = `Hello ${userName}! I am Remi. How can I help you today?`;
         setRemiText(defaultGreeting);
@@ -214,6 +249,10 @@ export default function HomeScreen() {
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       setIsNudgeActive(false); 
+
+      // NEW: Stop any playing audio or TTS before listening
+      Speech.stop();
+      if (memorySound) await memorySound.stopAsync();
 
       const permission = await Audio.requestPermissionsAsync();
       if (permission.status !== 'granted') return Alert.alert("Permission Denied", "Remi needs microphone access.");
@@ -388,7 +427,6 @@ export default function HomeScreen() {
           
           <Animated.View style={[styles.header, { opacity: uiOpacity }]}>
             <View>
-              {/* INTERACTIVE OVERRIDE */}
               <TouchableOpacity 
                 activeOpacity={0.7} 
                 onLongPress={toggleSundowningOverride} 
@@ -422,14 +460,18 @@ export default function HomeScreen() {
               style={[styles.repeatVoiceButton, { backgroundColor: isEvening ? '#FBBF24' : '#F5F3FF' }]}
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                speak(remiText);
+                // NEW: Decide whether to play the family's MP3 or the TTS!
+                if (dailyMemory && !isEvening && dailyMemory.audio_url) {
+                  playCustomAudio(dailyMemory.audio_url);
+                } else {
+                  speak(remiText);
+                }
               }}
             >
               <Ionicons name="volume-high" size={20} color={isEvening ? '#92400E' : '#8B5CF6'} />
               <Text style={[styles.repeatVoiceText, isEvening && { color: '#92400E' }]}>Hear again</Text>
             </TouchableOpacity>
             
-            {/* The photo only hides if it's evening, but the data is safely loaded! */}
             {dailyMemory && !isNudgeActive && !isEvening && (
               <Animated.View style={{ width: '100%', opacity: uiOpacity, marginTop: 15 }}>
                 <TouchableOpacity activeOpacity={0.8} onPress={() => setIsMemoryExpanded(true)} style={styles.memoryDropContainer}>
