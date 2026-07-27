@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { decode } from 'base64-arraybuffer';
 import { Audio } from 'expo-av';
+import * as FileSystem from 'expo-file-system';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
@@ -24,29 +25,37 @@ import { supabase } from '../../supabase';
 export default function MemoryVaultScreen() {
   const router = useRouter();
   
+  // --- ROUTING STATE ---
+  // 'menu' | 'photos' | 'audio'
+  const [currentView, setCurrentView] = useState<'menu' | 'photos' | 'audio'>('menu');
+
   const [images, setImages] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [audioNotes, setAudioNotes] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
+  
+  // Photo States
   const [isCaptionModalVisible, setCaptionModalVisible] = useState(false);
   const [pendingImage, setPendingImage] = useState<any>(null);
-  
   const [captionText, setCaptionText] = useState('');
-  const [audioUrl, setAudioUrl] = useState('');
   
-  // NEW: State for audio playback preview
+  // Audio Playback & Recording States
   const [sound, setSound] = useState<Audio.Sound | null>(null);
+  const [recording, setRecording] = useState<Audio.Recording | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
 
   useEffect(() => {
-    fetchVaultImages();
-    // Cleanup audio when leaving the screen
+    if (currentView !== 'menu') {
+      fetchVaultItems();
+    }
     return () => {
-      if (sound) {
-        sound.unloadAsync();
-      }
+      if (sound) sound.unloadAsync();
+      if (recording) recording.stopAndUnloadAsync();
     };
-  }, [sound]);
+  }, [currentView, sound, recording]);
 
-  const fetchVaultImages = async () => {
+  const fetchVaultItems = async () => {
+    setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
@@ -58,27 +67,102 @@ export default function MemoryVaultScreen() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setImages(data || []);
+      
+      // Filter items so photos and audio notes stay in their respective vaults
+      const fetchedPhotos = data.filter(item => item.image_url !== null);
+      const fetchedAudio = data.filter(item => item.image_url === null && item.audio_url !== null);
+      
+      setImages(fetchedPhotos);
+      setAudioNotes(fetchedAudio);
     } catch (error) {
-      console.error('Error fetching images:!', error);
+      console.error('Error fetching vault items:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  // NEW: Play audio preview function
+  // ==========================================
+  // --- AUDIO VAULT LOGIC (NATIVE RECORDING) ---
+  // ==========================================
+
+  const startRecording = async () => {
+    try {
+      const permission = await Audio.requestPermissionsAsync();
+      if (permission.status !== 'granted') {
+        Alert.alert("Permission Denied", "We need microphone access to record voice notes.");
+        return;
+      }
+      await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
+      const { recording } = await Audio.Recording.createAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
+      setRecording(recording);
+      setIsRecording(true);
+    } catch (err) {
+      console.error("Failed to start recording", err);
+    }
+  };
+
+  const stopRecordingAndUpload = async () => {
+    if (!recording) return;
+    setIsRecording(false);
+    setUploading(true);
+
+    try {
+      await recording.stopAndUnloadAsync();
+      const uri = recording.getURI();
+      if (!uri) throw new Error("No audio file found.");
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      // Read audio file as Base64 for Supabase
+      const base64Audio = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
+      const ext = Platform.OS === 'ios' ? 'm4a' : 'm4a'; // enforce m4a for consistency
+      const fileName = `${user.id}/audio_${Date.now()}.${ext}`;
+
+      // Upload to Storage
+      const { error: uploadError } = await supabase.storage
+        .from('memory_vault')
+        .upload(fileName, decode(base64Audio), { contentType: `audio/${ext}` });
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage.from('memory_vault').getPublicUrl(fileName);
+
+      // Save to Database (No image_url, only audio_url)
+      const { error: dbError } = await supabase
+        .from('memory_vault')
+        .insert({
+          uploader_id: user.id,
+          patient_code: user.id, 
+          audio_url: publicUrl,
+          caption: "A voice note from family" // Fallback text for Remi
+        });
+
+      if (dbError) throw dbError;
+      fetchVaultItems();
+      setRecording(null);
+
+    } catch (error: any) {
+      Alert.alert("Upload Failed", error.message);
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const playAudioPreview = async (url: string) => {
     try {
-      if (sound) {
-        await sound.unloadAsync();
-      }
+      if (sound) await sound.unloadAsync();
       const { sound: newSound } = await Audio.Sound.createAsync({ uri: url });
       setSound(newSound);
       await newSound.playAsync();
     } catch (err) {
-      Alert.alert("Playback Error", "Could not play this audio link. Please check the URL.");
+      Alert.alert("Playback Error", "Could not play this audio link.");
     }
   };
+
+  // ==========================================
+  // --- PHOTO VAULT LOGIC ---
+  // ==========================================
 
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -94,12 +178,11 @@ export default function MemoryVaultScreen() {
     }
   };
 
-  const uploadWithCaption = async () => {
+  const uploadPhotoWithCaption = async () => {
     setCaptionModalVisible(false);
     if (!pendingImage) return;
 
     setUploading(true);
-
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
@@ -110,15 +193,11 @@ export default function MemoryVaultScreen() {
 
       const { error: uploadError } = await supabase.storage
         .from('memory_vault')
-        .upload(fileName, decode(base64FileData), {
-          contentType: `image/${ext}`
-        });
+        .upload(fileName, decode(base64FileData), { contentType: `image/${ext}` });
 
       if (uploadError) throw uploadError;
 
-      const { data: { publicUrl } } = supabase.storage
-        .from('memory_vault')
-        .getPublicUrl(fileName);
+      const { data: { publicUrl } } = supabase.storage.from('memory_vault').getPublicUrl(fileName);
 
       const { error: dbError } = await supabase
         .from('memory_vault')
@@ -126,13 +205,11 @@ export default function MemoryVaultScreen() {
           uploader_id: user.id,
           patient_code: user.id, 
           image_url: publicUrl,
-          caption: captionText,
-          audio_url: audioUrl.trim() !== '' ? audioUrl.trim() : null,
+          caption: captionText
         });
 
       if (dbError) throw dbError;
-
-      fetchVaultImages();
+      fetchVaultItems();
 
     } catch (error: any) {
       Alert.alert("Upload Failed", error.message);
@@ -140,60 +217,166 @@ export default function MemoryVaultScreen() {
       setUploading(false);
       setPendingImage(null);
       setCaptionText('');
-      setAudioUrl(''); 
     }
   };
 
-  const confirmDelete = (img: any) => {
+  // ==========================================
+  // --- SHARED LOGIC ---
+  // ==========================================
+
+  const confirmDelete = (item: any) => {
     Alert.alert(
       "Delete Memory",
-      "Are you sure you want to remove this photo from the vault permanently?",
+      "Are you sure you want to remove this from the vault?",
       [
         { text: "Cancel", style: "cancel" },
-        { text: "Delete", style: "destructive", onPress: () => deleteImage(img) }
+        { text: "Delete", style: "destructive", onPress: () => deleteItem(item) }
       ]
     );
   };
 
-  // FIXED: Delete function now updates UI instantly and handles external images safely
-  const deleteImage = async (img: any) => {
-    // 1. Optimistic UI update: instantly hide it from the user
-    setImages(prevImages => prevImages.filter(item => item.id !== img.id));
+  const deleteItem = async (item: any) => {
+    const isPhoto = item.image_url !== null;
+    
+    // Optimistic UI Update
+    if (isPhoto) {
+      setImages(prev => prev.filter(img => img.id !== item.id));
+    } else {
+      setAudioNotes(prev => prev.filter(audio => audio.id !== item.id));
+    }
 
     try {
-      // 2. Only try to delete from Supabase storage if it's actually hosted there
-      if (img.image_url && img.image_url.includes('supabase.co')) {
-        const pathParts = img.image_url.split('/memory_vault/');
+      const urlTarget = isPhoto ? item.image_url : item.audio_url;
+      if (urlTarget && urlTarget.includes('supabase.co')) {
+        const pathParts = urlTarget.split('/memory_vault/');
         if (pathParts.length > 1) {
-          const filePath = pathParts[1];
-          await supabase.storage.from('memory_vault').remove([filePath]);
+          await supabase.storage.from('memory_vault').remove([pathParts[1]]);
         }
       }
-
-      // 3. Delete from the database
-      const { error: dbError } = await supabase
-        .from('memory_vault')
-        .delete()
-        .eq('id', img.id);
-        
+      const { error: dbError } = await supabase.from('memory_vault').delete().eq('id', item.id);
       if (dbError) throw dbError;
-
     } catch (error: any) {
       Alert.alert("Delete Failed", "Something went wrong in the background.");
-      // If it failed on the server, refresh to put the image back on the screen
-      fetchVaultImages();
+      fetchVaultItems(); // Revert on failure
     }
   };
 
+
+  // ==========================================
+  // --- RENDERERS ---
+  // ==========================================
+
+  // 1. MENU RENDERER
+  if (currentView === 'menu') {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <StatusBar barStyle="light-content" backgroundColor="#000000" />
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Select Vault</Text>
+          <View style={{ width: 44 }} /> 
+        </View>
+
+        <View style={styles.menuContainer}>
+          <Text style={styles.menuSubtitle}>What would you like to share with Mary today?</Text>
+          
+          <TouchableOpacity style={styles.bigMenuCard} onPress={() => setCurrentView('photos')} activeOpacity={0.8}>
+            <View style={[styles.cardIconBox, { backgroundColor: 'rgba(52, 211, 153, 0.2)' }]}>
+              <Ionicons name="images" size={40} color="#34D399" />
+            </View>
+            <View style={styles.cardTextBox}>
+              <Text style={styles.cardTitle}>Photo Vault</Text>
+              <Text style={styles.cardDescription}>Upload pictures and add text captions for Remi to read.</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={24} color="#374151" />
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.bigMenuCard} onPress={() => setCurrentView('audio')} activeOpacity={0.8}>
+            <View style={[styles.cardIconBox, { backgroundColor: 'rgba(139, 92, 246, 0.2)' }]}>
+              <Ionicons name="mic" size={40} color="#8B5CF6" />
+            </View>
+            <View style={styles.cardTextBox}>
+              <Text style={styles.cardTitle}>Audio Vault</Text>
+              <Text style={styles.cardDescription}>Record your own voice messages for Mary to listen to.</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={24} color="#374151" />
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // 2. AUDIO VAULT RENDERER
+  if (currentView === 'audio') {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => setCurrentView('menu')} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Audio Vault</Text>
+          <View style={{ width: 44 }} /> 
+        </View>
+
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          <View style={styles.recorderContainer}>
+            <TouchableOpacity 
+              style={[styles.recordButton, isRecording && styles.recordButtonActive]}
+              onPressIn={startRecording}
+              onPressOut={stopRecordingAndUpload}
+              disabled={uploading}
+              activeOpacity={0.7}
+            >
+              {uploading ? (
+                <ActivityIndicator color="#FFFFFF" size="large" />
+              ) : (
+                <Ionicons name={isRecording ? "radio" : "mic"} size={48} color="#FFFFFF" />
+              )}
+            </TouchableOpacity>
+            <Text style={styles.recordInstruction}>
+              {uploading ? "Saving your voice..." : isRecording ? "Recording... Release to save" : "Hold button to record a message"}
+            </Text>
+          </View>
+
+          <Text style={styles.sectionTitle}>Your Voice Notes</Text>
+          {loading ? (
+            <ActivityIndicator color="#8B5CF6" style={{ marginTop: 20 }} />
+          ) : (
+            audioNotes.map((audio) => (
+              <View key={audio.id} style={styles.audioRow}>
+                <TouchableOpacity style={styles.audioPlayBtn} onPress={() => playAudioPreview(audio.audio_url)}>
+                  <Ionicons name="play" size={24} color="#FFFFFF" style={{ marginLeft: 3 }} />
+                </TouchableOpacity>
+                <View style={{ flex: 1, marginLeft: 15 }}>
+                  <Text style={styles.audioRowTitle}>Voice Note</Text>
+                  <Text style={styles.audioRowDate}>{new Date(audio.created_at).toLocaleDateString()}</Text>
+                </View>
+                <TouchableOpacity onPress={() => confirmDelete(audio)} style={styles.audioDeleteBtn}>
+                  <Ionicons name="trash" size={20} color="#EF4444" />
+                </TouchableOpacity>
+              </View>
+            ))
+          )}
+          {audioNotes.length === 0 && !loading && (
+             <Text style={styles.emptyText}>No voice notes recorded yet.</Text>
+          )}
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
+  // 3. PHOTO VAULT RENDERER
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="light-content" backgroundColor="#000000" />
       
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+        <TouchableOpacity onPress={() => setCurrentView('menu')} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Memory Vault</Text>
+        <Text style={styles.headerTitle}>Photo Vault</Text>
         <View style={{ width: 44 }} /> 
       </View>
 
@@ -203,13 +386,7 @@ export default function MemoryVaultScreen() {
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.scrollContent}>
-          <Text style={styles.subtitle}>Photos uploaded here will be visible to Mary in her Remi app.</Text>
-
-          <TouchableOpacity 
-            style={[styles.uploadCard, uploading && styles.uploadCardDisabled]} 
-            onPress={pickImage}
-            disabled={uploading}
-          >
+          <TouchableOpacity style={[styles.uploadCard, uploading && styles.uploadCardDisabled]} onPress={pickImage} disabled={uploading}>
             {uploading ? (
               <ActivityIndicator color="#8B5CF6" />
             ) : (
@@ -227,48 +404,30 @@ export default function MemoryVaultScreen() {
             {images.map((img) => (
               <View key={img.id} style={styles.imageContainer}>
                 <Image source={{ uri: img.image_url }} style={styles.image} />
-                
-                {/* FIXED: Audio Badge is now a playable button */}
-                {img.audio_url && (
-                  <TouchableOpacity 
-                    style={styles.audioBadge}
-                    onPress={() => playAudioPreview(img.audio_url)}
-                  >
-                    <Ionicons name="play" size={14} color="#FFFFFF" style={{ marginLeft: 2 }} />
-                  </TouchableOpacity>
-                )}
-
                 {img.caption ? (
                   <View style={styles.captionOverlay}>
-                    <Text style={styles.captionText} numberOfLines={2}>
-                      {img.caption}
-                    </Text>
+                    <Text style={styles.captionText} numberOfLines={2}>{img.caption}</Text>
                   </View>
                 ) : null}
-
-                <TouchableOpacity 
-                  style={styles.deleteButton} 
-                  onPress={() => confirmDelete(img)}
-                  activeOpacity={0.8}
-                >
+                <TouchableOpacity style={styles.deleteButton} onPress={() => confirmDelete(img)} activeOpacity={0.8}>
                   <Ionicons name="trash-outline" size={16} color="#FFFFFF" />
                 </TouchableOpacity>
               </View>
             ))}
             
             {images.length === 0 && !uploading && (
-              <Text style={styles.emptyText}>No memories uploaded yet. Add the first one!</Text>
+              <Text style={styles.emptyText}>No photos uploaded yet.</Text>
             )}
           </View>
         </ScrollView>
       )}
 
-      {/* --- SCROLLABLE CAPTION MODAL --- */}
+      {/* PHOTO CAPTION MODAL */}
       <Modal visible={isCaptionModalVisible} transparent={true} animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
-              <Text style={styles.modalTitle}>Add a Memory</Text>
+              <Text style={styles.modalTitle}>Add a Photo Caption</Text>
               
               {pendingImage && (
                 <Image source={{ uri: pendingImage.uri }} style={styles.previewImage} />
@@ -277,21 +436,11 @@ export default function MemoryVaultScreen() {
               <Text style={styles.inputLabel}>Caption (for Remi to read)</Text>
               <TextInput
                 style={styles.captionInput}
-                placeholder="What can you say about this photo? Where was it taken?"
+                placeholder="Who is in this photo? Where was it taken?"
                 placeholderTextColor="#9CA3AF"
                 value={captionText}
                 onChangeText={setCaptionText}
                 multiline
-              />
-
-              <Text style={styles.inputLabel}>Voice Note Link (Optional)</Text>
-              <TextInput
-                style={styles.audioInput}
-                placeholder="e.g., https://example.com/voicenote.mp3"
-                placeholderTextColor="#9CA3AF"
-                value={audioUrl}
-                onChangeText={setAudioUrl}
-                autoCapitalize="none"
               />
               
               <View style={styles.modalButtons}>
@@ -301,12 +450,10 @@ export default function MemoryVaultScreen() {
                     setCaptionModalVisible(false);
                     setPendingImage(null);
                     setCaptionText('');
-                    setAudioUrl(''); 
                   }}>
                   <Text style={styles.cancelButtonText}>Cancel</Text>
                 </TouchableOpacity>
-                
-                <TouchableOpacity style={styles.saveButton} onPress={uploadWithCaption}>
+                <TouchableOpacity style={styles.saveButton} onPress={uploadPhotoWithCaption}>
                   <Text style={styles.saveButtonText}>Save & Upload</Text>
                 </TouchableOpacity>
               </View>
@@ -325,10 +472,30 @@ const styles = StyleSheet.create({
   backButton: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#110C1D', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#231A31' },
   headerTitle: { fontSize: 20, fontWeight: 'bold', color: '#FFFFFF' },
   centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  
   scrollContent: { paddingHorizontal: 20, paddingBottom: 120 },
   
-  subtitle: { color: '#9CA3AF', fontSize: 14, marginBottom: 25, lineHeight: 20, textAlign: 'center' },
+  // --- MENU STYLES ---
+  menuContainer: { paddingHorizontal: 20, paddingTop: 20 },
+  menuSubtitle: { color: '#9CA3AF', fontSize: 16, marginBottom: 30 },
+  bigMenuCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#110C1D', borderRadius: 24, padding: 20, marginBottom: 20, borderWidth: 1, borderColor: '#231A31' },
+  cardIconBox: { width: 70, height: 70, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginRight: 15 },
+  cardTextBox: { flex: 1 },
+  cardTitle: { color: '#FFFFFF', fontSize: 20, fontWeight: 'bold', marginBottom: 4 },
+  cardDescription: { color: '#6B7280', fontSize: 14, lineHeight: 20 },
+
+  // --- AUDIO STYLES ---
+  recorderContainer: { backgroundColor: '#110C1D', borderRadius: 24, padding: 40, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#231A31', marginBottom: 40 },
+  recordButton: { width: 100, height: 100, borderRadius: 50, backgroundColor: '#8B5CF6', alignItems: 'center', justifyContent: 'center', shadowColor: '#8B5CF6', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.5, shadowRadius: 15, elevation: 10 },
+  recordButtonActive: { backgroundColor: '#EF4444', transform: [{ scale: 1.1 }] },
+  recordInstruction: { color: '#D1D5DB', fontSize: 16, marginTop: 25, fontWeight: '600' },
+  sectionTitle: { color: '#FFFFFF', fontSize: 20, fontWeight: 'bold', marginBottom: 15 },
+  audioRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#110C1D', padding: 15, borderRadius: 16, marginBottom: 12, borderWidth: 1, borderColor: '#231A31' },
+  audioPlayBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#8B5CF6', alignItems: 'center', justifyContent: 'center' },
+  audioRowTitle: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
+  audioRowDate: { color: '#6B7280', fontSize: 13, marginTop: 4 },
+  audioDeleteBtn: { padding: 10 },
+
+  // --- PHOTO STYLES ---
   uploadCard: { backgroundColor: '#110C1D', borderRadius: 24, padding: 30, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#231A31', borderStyle: 'dashed', marginBottom: 30 },
   uploadCardDisabled: { opacity: 0.5 },
   uploadIconBadge: { width: 60, height: 60, borderRadius: 30, backgroundColor: 'rgba(139, 92, 246, 0.15)', alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
@@ -342,16 +509,12 @@ const styles = StyleSheet.create({
   emptyText: { color: '#6B7280', width: '100%', textAlign: 'center', marginTop: 20 },
   deleteButton: { position: 'absolute', top: 8, right: 8, backgroundColor: 'rgba(239, 68, 68, 0.85)', width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   
-  audioBadge: { position: 'absolute', top: 8, left: 8, backgroundColor: '#8B5CF6', width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.5, shadowRadius: 3 },
-
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.7)', justifyContent: 'center', alignItems: 'center', padding: 20 },
   modalContent: { backgroundColor: '#110C1D', borderRadius: 20, padding: 20, width: '100%', maxHeight: '90%', borderWidth: 1, borderColor: '#231A31' },
-  
   modalTitle: { color: '#FFFFFF', fontSize: 20, fontWeight: 'bold', marginBottom: 15 },
   previewImage: { width: '100%', height: 200, borderRadius: 12, marginBottom: 15, resizeMode: 'cover' },
   inputLabel: { color: '#D1D5DB', fontSize: 14, fontWeight: '600', marginBottom: 6, marginLeft: 2 },
   captionInput: { backgroundColor: '#000000', color: '#FFFFFF', borderRadius: 10, padding: 15, minHeight: 80, borderWidth: 1, borderColor: '#231A31', textAlignVertical: 'top', marginBottom: 15, fontSize: 16 },
-  audioInput: { backgroundColor: '#000000', color: '#FFFFFF', borderRadius: 10, padding: 15, borderWidth: 1, borderColor: '#231A31', marginBottom: 20, fontSize: 16 },
   modalButtons: { flexDirection: 'row', justifyContent: 'flex-end', gap: 15, marginBottom: 10 },
   cancelButton: { paddingVertical: 10, paddingHorizontal: 15, justifyContent: 'center' },
   cancelButtonText: { color: '#9CA3AF', fontSize: 16, fontWeight: 'bold' },
