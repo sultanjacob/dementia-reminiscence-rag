@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { decode } from 'base64-arraybuffer';
 import { Audio } from 'expo-av';
+import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
@@ -15,6 +16,7 @@ import {
   ScrollView,
   StatusBar,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   TouchableOpacity,
@@ -26,11 +28,11 @@ export default function MemoryVaultScreen() {
   const router = useRouter();
   
   // --- ROUTING STATE ---
-  // 'menu' | 'photos' | 'audio'
-  const [currentView, setCurrentView] = useState<'menu' | 'photos' | 'audio'>('menu');
+  const [currentView, setCurrentView] = useState<'menu' | 'photos' | 'audio' | 'music'>('menu');
 
   const [images, setImages] = useState<any[]>([]);
   const [audioNotes, setAudioNotes] = useState<any[]>([]);
+  const [musicTracks, setMusicTracks] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   
@@ -39,18 +41,28 @@ export default function MemoryVaultScreen() {
   const [pendingImage, setPendingImage] = useState<any>(null);
   const [captionText, setCaptionText] = useState('');
   
-  // Audio Playback & Recording States
+  // Audio & Music Shared State
   const [sound, setSound] = useState<Audio.Sound | null>(null);
+  
+  // Voice Recording State
   const [recording, setRecording] = useState<Audio.Recording | null>(null);
   const [isRecording, setIsRecording] = useState(false);
+
+  // Music Upload State
+  const [isMusicModalVisible, setMusicModalVisible] = useState(false);
+  const [pendingMusic, setPendingMusic] = useState<any>(null);
+  const [songName, setSongName] = useState('');
+  const [isImportant, setIsImportant] = useState(false);
 
   useEffect(() => {
     if (currentView !== 'menu') {
       fetchVaultItems();
     }
+    
+    // FIXED BUG: Added .catch(() => {}) so double-unloads are ignored quietly
     return () => {
-      if (sound) sound.unloadAsync();
-      if (recording) recording.stopAndUnloadAsync();
+      if (sound) sound.unloadAsync().catch(() => {});
+      if (recording) recording.stopAndUnloadAsync().catch(() => {});
     };
   }, [currentView, sound, recording]);
 
@@ -68,12 +80,18 @@ export default function MemoryVaultScreen() {
 
       if (error) throw error;
       
-      // Filter items so photos and audio notes stay in their respective vaults
+      // Filter items so they stay in their respective vaults based on tags
       const fetchedPhotos = data.filter(item => item.image_url !== null);
-      const fetchedAudio = data.filter(item => item.image_url === null && item.audio_url !== null);
       
+      // Voice notes don't have [MUSIC] tags
+      const fetchedAudio = data.filter(item => item.image_url === null && item.audio_url !== null && !item.caption?.includes('[MUSIC'));
+      
+      // Music tracks are identified by our special backend tag
+      const fetchedMusic = data.filter(item => item.audio_url !== null && item.caption?.includes('[MUSIC'));
+
       setImages(fetchedPhotos);
       setAudioNotes(fetchedAudio);
+      setMusicTracks(fetchedMusic);
     } catch (error) {
       console.error('Error fetching vault items:', error);
     } finally {
@@ -81,8 +99,19 @@ export default function MemoryVaultScreen() {
     }
   };
 
+  const playAudioPreview = async (url: string) => {
+    try {
+      if (sound) await sound.unloadAsync().catch(() => {});
+      const { sound: newSound } = await Audio.Sound.createAsync({ uri: url });
+      setSound(newSound);
+      await newSound.playAsync();
+    } catch (err) {
+      Alert.alert("Playback Error", "Could not play this audio file.");
+    }
+  };
+
   // ==========================================
-  // --- AUDIO VAULT LOGIC (NATIVE RECORDING) ---
+  // --- VOICE VAULT LOGIC (NATIVE RECORDING) ---
   // ==========================================
 
   const startRecording = async () => {
@@ -93,8 +122,8 @@ export default function MemoryVaultScreen() {
         return;
       }
       await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
-      const { recording } = await Audio.Recording.createAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
-      setRecording(recording);
+      const { recording: newRec } = await Audio.Recording.createAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
+      setRecording(newRec);
       setIsRecording(true);
     } catch (err) {
       console.error("Failed to start recording", err);
@@ -107,19 +136,18 @@ export default function MemoryVaultScreen() {
     setUploading(true);
 
     try {
-      await recording.stopAndUnloadAsync();
+      // FIXED BUG: Catch the error here as well
+      await recording.stopAndUnloadAsync().catch(() => {});
       const uri = recording.getURI();
       if (!uri) throw new Error("No audio file found.");
 
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-      // Read audio file as Base64 for Supabase
       const base64Audio = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
-      const ext = Platform.OS === 'ios' ? 'm4a' : 'm4a'; // enforce m4a for consistency
+      const ext = Platform.OS === 'ios' ? 'm4a' : 'm4a'; 
       const fileName = `${user.id}/audio_${Date.now()}.${ext}`;
 
-      // Upload to Storage
       const { error: uploadError } = await supabase.storage
         .from('memory_vault')
         .upload(fileName, decode(base64Audio), { contentType: `audio/${ext}` });
@@ -128,14 +156,13 @@ export default function MemoryVaultScreen() {
 
       const { data: { publicUrl } } = supabase.storage.from('memory_vault').getPublicUrl(fileName);
 
-      // Save to Database (No image_url, only audio_url)
       const { error: dbError } = await supabase
         .from('memory_vault')
         .insert({
           uploader_id: user.id,
           patient_code: user.id, 
           audio_url: publicUrl,
-          caption: "A voice note from family" // Fallback text for Remi
+          caption: "A voice note from family" 
         });
 
       if (dbError) throw dbError;
@@ -149,16 +176,76 @@ export default function MemoryVaultScreen() {
     }
   };
 
-  const playAudioPreview = async (url: string) => {
+  // ==========================================
+  // --- MUSIC VAULT LOGIC ---
+  // ==========================================
+
+  const pickMusicFile = async () => {
     try {
-      if (sound) await sound.unloadAsync();
-      const { sound: newSound } = await Audio.Sound.createAsync({ uri: url });
-      setSound(newSound);
-      await newSound.playAsync();
-    } catch (err) {
-      Alert.alert("Playback Error", "Could not play this audio link.");
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['audio/mpeg', 'audio/mp3', 'audio/m4a', 'audio/wav'],
+        copyToCacheDirectory: true,
+      });
+
+      if (!result.canceled && result.assets.length > 0) {
+        setPendingMusic(result.assets[0]);
+        setMusicModalVisible(true);
+      }
+    } catch (error) {
+      Alert.alert("Error", "Could not select the music file.");
     }
   };
+
+  const uploadMusicFile = async () => {
+    if (!songName.trim()) {
+      Alert.alert("Missing Info", "Please enter a title for this song.");
+      return;
+    }
+    setMusicModalVisible(false);
+    setUploading(true);
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      const base64Audio = await FileSystem.readAsStringAsync(pendingMusic.uri, { encoding: FileSystem.EncodingType.Base64 });
+      const ext = pendingMusic.name.split('.').pop()?.toLowerCase() || 'mp3';
+      const fileName = `${user.id}/music_${Date.now()}.${ext}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('memory_vault')
+        .upload(fileName, decode(base64Audio), { contentType: `audio/${ext}` });
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage.from('memory_vault').getPublicUrl(fileName);
+
+      // Secretly tag the caption so the Patient Screen knows how to handle it
+      const tag = isImportant ? '[MUSIC-IMPORTANT]' : '[MUSIC]';
+      const finalCaption = `${tag} ${songName.trim()}`;
+
+      const { error: dbError } = await supabase
+        .from('memory_vault')
+        .insert({
+          uploader_id: user.id,
+          patient_code: user.id, 
+          audio_url: publicUrl,
+          caption: finalCaption 
+        });
+
+      if (dbError) throw dbError;
+      fetchVaultItems();
+
+    } catch (error: any) {
+      Alert.alert("Upload Failed", error.message);
+    } finally {
+      setUploading(false);
+      setPendingMusic(null);
+      setSongName('');
+      setIsImportant(false);
+    }
+  };
+
 
   // ==========================================
   // --- PHOTO VAULT LOGIC ---
@@ -221,13 +308,13 @@ export default function MemoryVaultScreen() {
   };
 
   // ==========================================
-  // --- SHARED LOGIC ---
+  // --- SHARED DELETION LOGIC ---
   // ==========================================
 
   const confirmDelete = (item: any) => {
     Alert.alert(
-      "Delete Memory",
-      "Are you sure you want to remove this from the vault?",
+      "Delete Item",
+      "Are you sure you want to remove this from Mary's device?",
       [
         { text: "Cancel", style: "cancel" },
         { text: "Delete", style: "destructive", onPress: () => deleteItem(item) }
@@ -237,10 +324,13 @@ export default function MemoryVaultScreen() {
 
   const deleteItem = async (item: any) => {
     const isPhoto = item.image_url !== null;
+    const isMusic = item.caption?.includes('[MUSIC');
     
     // Optimistic UI Update
     if (isPhoto) {
       setImages(prev => prev.filter(img => img.id !== item.id));
+    } else if (isMusic) {
+      setMusicTracks(prev => prev.filter(music => music.id !== item.id));
     } else {
       setAudioNotes(prev => prev.filter(audio => audio.id !== item.id));
     }
@@ -256,8 +346,7 @@ export default function MemoryVaultScreen() {
       const { error: dbError } = await supabase.from('memory_vault').delete().eq('id', item.id);
       if (dbError) throw dbError;
     } catch (error: any) {
-      Alert.alert("Delete Failed", "Something went wrong in the background.");
-      fetchVaultItems(); // Revert on failure
+      fetchVaultItems(); 
     }
   };
 
@@ -275,7 +364,7 @@ export default function MemoryVaultScreen() {
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
             <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Select Vault</Text>
+          <Text style={styles.headerTitle}>Family Vaults</Text>
           <View style={{ width: 44 }} /> 
         </View>
 
@@ -284,22 +373,33 @@ export default function MemoryVaultScreen() {
           
           <TouchableOpacity style={styles.bigMenuCard} onPress={() => setCurrentView('photos')} activeOpacity={0.8}>
             <View style={[styles.cardIconBox, { backgroundColor: 'rgba(52, 211, 153, 0.2)' }]}>
-              <Ionicons name="images" size={40} color="#34D399" />
+              <Ionicons name="images" size={32} color="#34D399" />
             </View>
             <View style={styles.cardTextBox}>
               <Text style={styles.cardTitle}>Photo Vault</Text>
-              <Text style={styles.cardDescription}>Upload pictures and add text captions for Remi to read.</Text>
+              <Text style={styles.cardDescription}>Upload pictures for Remi to show and talk about.</Text>
             </View>
             <Ionicons name="chevron-forward" size={24} color="#374151" />
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.bigMenuCard} onPress={() => setCurrentView('audio')} activeOpacity={0.8}>
             <View style={[styles.cardIconBox, { backgroundColor: 'rgba(139, 92, 246, 0.2)' }]}>
-              <Ionicons name="mic" size={40} color="#8B5CF6" />
+              <Ionicons name="mic" size={32} color="#8B5CF6" />
             </View>
             <View style={styles.cardTextBox}>
-              <Text style={styles.cardTitle}>Audio Vault</Text>
-              <Text style={styles.cardDescription}>Record your own voice messages for Mary to listen to.</Text>
+              <Text style={styles.cardTitle}>Voice Notes</Text>
+              <Text style={styles.cardDescription}>Record your voice for Mary to listen to.</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={24} color="#374151" />
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.bigMenuCard} onPress={() => setCurrentView('music')} activeOpacity={0.8}>
+            <View style={[styles.cardIconBox, { backgroundColor: 'rgba(245, 158, 11, 0.2)' }]}>
+              <Ionicons name="musical-notes" size={32} color="#F59E0B" />
+            </View>
+            <View style={styles.cardTextBox}>
+              <Text style={styles.cardTitle}>Music Therapy</Text>
+              <Text style={styles.cardDescription}>Upload Mary's favorite songs and flag them as important.</Text>
             </View>
             <Ionicons name="chevron-forward" size={24} color="#374151" />
           </TouchableOpacity>
@@ -308,7 +408,118 @@ export default function MemoryVaultScreen() {
     );
   }
 
-  // 2. AUDIO VAULT RENDERER
+  // 2. MUSIC VAULT RENDERER (NEW)
+  if (currentView === 'music') {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => setCurrentView('menu')} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Music Therapy</Text>
+          <View style={{ width: 44 }} /> 
+        </View>
+
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          
+          <TouchableOpacity style={[styles.uploadCard, uploading && styles.uploadCardDisabled]} onPress={pickMusicFile} disabled={uploading}>
+            {uploading ? (
+              <ActivityIndicator color="#F59E0B" />
+            ) : (
+              <>
+                <View style={[styles.uploadIconBadge, { backgroundColor: 'rgba(245, 158, 11, 0.15)' }]}>
+                  <Ionicons name="musical-notes" size={28} color="#F59E0B" />
+                </View>
+                <Text style={styles.uploadTitle}>Upload a Song</Text>
+                <Text style={styles.uploadSubtitle}>Select an MP3 file</Text>
+              </>
+            )}
+          </TouchableOpacity>
+
+          <Text style={styles.sectionTitle}>Mary's Playlist</Text>
+          {loading ? (
+            <ActivityIndicator color="#F59E0B" style={{ marginTop: 20 }} />
+          ) : (
+            musicTracks.map((music) => {
+              const isSongImportant = music.caption.includes('[MUSIC-IMPORTANT]');
+              const cleanTitle = music.caption.replace('[MUSIC-IMPORTANT]', '').replace('[MUSIC]', '').trim();
+
+              return (
+                <View key={music.id} style={styles.audioRow}>
+                  <TouchableOpacity style={[styles.audioPlayBtn, { backgroundColor: '#F59E0B' }]} onPress={() => playAudioPreview(music.audio_url)}>
+                    <Ionicons name="play" size={24} color="#FFFFFF" style={{ marginLeft: 3 }} />
+                  </TouchableOpacity>
+                  <View style={{ flex: 1, marginLeft: 15 }}>
+                    <Text style={styles.audioRowTitle} numberOfLines={1}>{cleanTitle}</Text>
+                    {isSongImportant ? (
+                      <Text style={[styles.audioRowDate, { color: '#EF4444', fontWeight: 'bold' }]}>⭐ Important Notification</Text>
+                    ) : (
+                      <Text style={styles.audioRowDate}>Standard Playlist</Text>
+                    )}
+                  </View>
+                  <TouchableOpacity onPress={() => confirmDelete(music)} style={styles.audioDeleteBtn}>
+                    <Ionicons name="trash" size={20} color="#EF4444" />
+                  </TouchableOpacity>
+                </View>
+              )
+            })
+          )}
+          {musicTracks.length === 0 && !loading && (
+             <Text style={styles.emptyText}>No music uploaded yet.</Text>
+          )}
+        </ScrollView>
+
+        {/* MUSIC UPLOAD MODAL */}
+        <Modal visible={isMusicModalVisible} transparent={true} animationType="slide">
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>Song Details</Text>
+              
+              <Text style={styles.inputLabel}>Song Title</Text>
+              <TextInput
+                style={[styles.captionInput, { minHeight: 50, textAlignVertical: 'center' }]}
+                placeholder="e.g., Frank Sinatra - Fly Me To The Moon"
+                placeholderTextColor="#9CA3AF"
+                value={songName}
+                onChangeText={setSongName}
+              />
+
+              <View style={styles.switchRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.switchTitle}>Mark as Important</Text>
+                  <Text style={styles.switchSubtitle}>This will trigger an immediate notification on Mary's screen.</Text>
+                </View>
+                <Switch
+                  value={isImportant}
+                  onValueChange={setIsImportant}
+                  trackColor={{ false: '#374151', true: '#F59E0B' }}
+                  thumbColor={'#FFFFFF'}
+                />
+              </View>
+              
+              <View style={styles.modalButtons}>
+                <TouchableOpacity 
+                  style={styles.cancelButton} 
+                  onPress={() => {
+                    setMusicModalVisible(false);
+                    setPendingMusic(null);
+                    setSongName('');
+                    setIsImportant(false);
+                  }}>
+                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.saveButton, { backgroundColor: '#F59E0B' }]} onPress={uploadMusicFile}>
+                  <Text style={styles.saveButtonText}>Upload Song</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      </SafeAreaView>
+    );
+  }
+
+  // 3. VOICE VAULT RENDERER
   if (currentView === 'audio') {
     return (
       <SafeAreaView style={styles.safeArea}>
@@ -316,7 +527,7 @@ export default function MemoryVaultScreen() {
           <TouchableOpacity onPress={() => setCurrentView('menu')} style={styles.backButton}>
             <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Audio Vault</Text>
+          <Text style={styles.headerTitle}>Voice Notes</Text>
           <View style={{ width: 44 }} /> 
         </View>
 
@@ -367,7 +578,7 @@ export default function MemoryVaultScreen() {
     );
   }
 
-  // 3. PHOTO VAULT RENDERER
+  // 4. PHOTO VAULT RENDERER
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="light-content" backgroundColor="#000000" />
@@ -478,7 +689,7 @@ const styles = StyleSheet.create({
   menuContainer: { paddingHorizontal: 20, paddingTop: 20 },
   menuSubtitle: { color: '#9CA3AF', fontSize: 16, marginBottom: 30 },
   bigMenuCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#110C1D', borderRadius: 24, padding: 20, marginBottom: 20, borderWidth: 1, borderColor: '#231A31' },
-  cardIconBox: { width: 70, height: 70, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginRight: 15 },
+  cardIconBox: { width: 60, height: 60, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginRight: 15 },
   cardTextBox: { flex: 1 },
   cardTitle: { color: '#FFFFFF', fontSize: 20, fontWeight: 'bold', marginBottom: 4 },
   cardDescription: { color: '#6B7280', fontSize: 14, lineHeight: 20 },
@@ -495,7 +706,7 @@ const styles = StyleSheet.create({
   audioRowDate: { color: '#6B7280', fontSize: 13, marginTop: 4 },
   audioDeleteBtn: { padding: 10 },
 
-  // --- PHOTO STYLES ---
+  // --- PHOTO & SHARED STYLES ---
   uploadCard: { backgroundColor: '#110C1D', borderRadius: 24, padding: 30, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#231A31', borderStyle: 'dashed', marginBottom: 30 },
   uploadCardDisabled: { opacity: 0.5 },
   uploadIconBadge: { width: 60, height: 60, borderRadius: 30, backgroundColor: 'rgba(139, 92, 246, 0.15)', alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
@@ -509,15 +720,21 @@ const styles = StyleSheet.create({
   emptyText: { color: '#6B7280', width: '100%', textAlign: 'center', marginTop: 20 },
   deleteButton: { position: 'absolute', top: 8, right: 8, backgroundColor: 'rgba(239, 68, 68, 0.85)', width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   
+  // --- MODAL STYLES ---
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.7)', justifyContent: 'center', alignItems: 'center', padding: 20 },
   modalContent: { backgroundColor: '#110C1D', borderRadius: 20, padding: 20, width: '100%', maxHeight: '90%', borderWidth: 1, borderColor: '#231A31' },
-  modalTitle: { color: '#FFFFFF', fontSize: 20, fontWeight: 'bold', marginBottom: 15 },
+  modalTitle: { color: '#FFFFFF', fontSize: 20, fontWeight: 'bold', marginBottom: 20 },
   previewImage: { width: '100%', height: 200, borderRadius: 12, marginBottom: 15, resizeMode: 'cover' },
   inputLabel: { color: '#D1D5DB', fontSize: 14, fontWeight: '600', marginBottom: 6, marginLeft: 2 },
-  captionInput: { backgroundColor: '#000000', color: '#FFFFFF', borderRadius: 10, padding: 15, minHeight: 80, borderWidth: 1, borderColor: '#231A31', textAlignVertical: 'top', marginBottom: 15, fontSize: 16 },
+  captionInput: { backgroundColor: '#000000', color: '#FFFFFF', borderRadius: 10, padding: 15, minHeight: 80, borderWidth: 1, borderColor: '#231A31', textAlignVertical: 'top', marginBottom: 20, fontSize: 16 },
+  
+  switchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#000000', padding: 15, borderRadius: 12, borderWidth: 1, borderColor: '#231A31', marginBottom: 25 },
+  switchTitle: { color: '#FFFFFF', fontSize: 16, fontWeight: 'bold', marginBottom: 4 },
+  switchSubtitle: { color: '#9CA3AF', fontSize: 12, paddingRight: 10 },
+
   modalButtons: { flexDirection: 'row', justifyContent: 'flex-end', gap: 15, marginBottom: 10 },
   cancelButton: { paddingVertical: 10, paddingHorizontal: 15, justifyContent: 'center' },
   cancelButtonText: { color: '#9CA3AF', fontSize: 16, fontWeight: 'bold' },
-  saveButton: { backgroundColor: '#8B5CF6', paddingVertical: 10, paddingHorizontal: 15, borderRadius: 10 },
+  saveButton: { backgroundColor: '#8B5CF6', paddingVertical: 12, paddingHorizontal: 20, borderRadius: 12 },
   saveButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: 'bold' },
 });
