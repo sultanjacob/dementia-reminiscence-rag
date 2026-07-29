@@ -314,7 +314,7 @@ export default function MemoryVaultScreen() {
   const confirmDelete = (item: any) => {
     Alert.alert(
       "Delete Item",
-      "Are you sure you want to remove this from Mary's device?",
+      "Are you sure you want to remove this from Mary's device Permanently?",
       [
         { text: "Cancel", style: "cancel" },
         { text: "Delete", style: "destructive", onPress: () => deleteItem(item) }
