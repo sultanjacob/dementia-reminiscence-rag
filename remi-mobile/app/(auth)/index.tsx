@@ -8,7 +8,6 @@ import {
   Alert,
   Animated,
   Image,
-  Linking,
   Modal,
   Platform,
   SafeAreaView,
@@ -41,7 +40,10 @@ export default function HomeScreen() {
 
   const [isMenuVisible, setIsMenuVisible] = useState(false);
   const [isMemoryExpanded, setIsMemoryExpanded] = useState(false);
+  
+  // Vault States
   const [dailyMemory, setDailyMemory] = useState<any>(null);
+  const [importantMusic, setImportantMusic] = useState<any>(null);
 
   const [recording, setRecording] = useState<Audio.Recording | null>(null);
   const [isRecording, setIsRecording] = useState(false);
@@ -57,7 +59,6 @@ export default function HomeScreen() {
   
   const [memorySound, setMemorySound] = useState<Audio.Sound | null>(null);
   
-  // --- NEW: MUSIC THERAPY STATE ---
   const [bgMusic, setBgMusic] = useState<Audio.Sound | null>(null);
   const [isPlayingMusic, setIsPlayingMusic] = useState(false);
 
@@ -65,11 +66,10 @@ export default function HomeScreen() {
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const uiOpacity = useRef(new Animated.Value(1)).current;
 
-  // Cleanup all audio engines when unmounting
   useEffect(() => {
     return () => {
-      if (memorySound) memorySound.unloadAsync();
-      if (bgMusic) bgMusic.unloadAsync();
+      if (memorySound) memorySound.unloadAsync().catch(()=>{});
+      if (bgMusic) bgMusic.unloadAsync().catch(()=>{});
     };
   }, [memorySound, bgMusic]);
 
@@ -82,7 +82,7 @@ export default function HomeScreen() {
   const playCustomAudio = async (url: string) => {
     try {
       if (memorySound) {
-        await memorySound.unloadAsync();
+        await memorySound.unloadAsync().catch(()=>{});
       }
       const { sound } = await Audio.Sound.createAsync({ uri: url });
       setMemorySound(sound);
@@ -100,7 +100,6 @@ export default function HomeScreen() {
     }
   };
 
-  // --- NEW: MUSIC THERAPY CONTROLLER ---
   const toggleMusic = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     try {
@@ -108,11 +107,13 @@ export default function HomeScreen() {
         await bgMusic.pauseAsync();
         setIsPlayingMusic(false);
       } else {
+        // Pause any memory/family audio if they play background music
+        if (memorySound) await memorySound.stopAsync();
+
         if (bgMusic) {
           await bgMusic.playAsync();
           setIsPlayingMusic(true);
         } else {
-          // Loads a royalty-free calming piano track
           const musicUrl = 'https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3?filename=calm-piano-music-111826.mp3';
           const { sound } = await Audio.Sound.createAsync(
             { uri: musicUrl },
@@ -123,8 +124,25 @@ export default function HomeScreen() {
         }
       }
     } catch (error) {
-      console.error("Music error:", error);
       Alert.alert("Music Error", "Could not play the relaxing music right now.");
+    }
+  };
+
+  // --- NEW: PLAY IMPORTANT MUSIC LOGIC ---
+  const playImportantMusic = async () => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    
+    // Auto-pause background music
+    if (isPlayingMusic && bgMusic) {
+      await bgMusic.pauseAsync();
+      setIsPlayingMusic(false);
+    }
+
+    if (importantMusic?.audio_url) {
+      const cleanTitle = importantMusic.caption.replace('[MUSIC-IMPORTANT]', '').replace('[MUSIC]', '').trim();
+      const message = `Playing ${cleanTitle}`;
+      setRemiText(message);
+      playCustomAudio(importantMusic.audio_url);
     }
   };
 
@@ -194,12 +212,19 @@ export default function HomeScreen() {
         if (profileData.secondary_contact) setSecondaryContact(profileData.secondary_contact);
       }
 
+      // --- SMART VAULT FILTERING ---
       const { data: memories } = await supabase.from('memory_vault').select('*');
-      let loadedMemory = null;
       
       if (memories && memories.length > 0) {
-        loadedMemory = memories[Math.floor(Math.random() * memories.length)];
-        setDailyMemory(loadedMemory); 
+        // Find important music
+        const impMusic = memories.find(m => m.caption?.includes('[MUSIC-IMPORTANT]'));
+        if (impMusic) setImportantMusic(impMusic);
+
+        // Find standard photos/voices (ignoring all music tags)
+        const standardMemories = memories.filter(m => !m.caption?.includes('[MUSIC'));
+        if (standardMemories.length > 0) {
+          setDailyMemory(standardMemories[Math.floor(Math.random() * standardMemories.length)]); 
+        }
       }
 
       if (evening) {
@@ -207,16 +232,9 @@ export default function HomeScreen() {
         setRemiText(defaultGreeting);
         speak(defaultGreeting);
       } else {
-        if (loadedMemory) {
-          const memoryCaption = loadedMemory.caption ? loadedMemory.caption : "";
-          const memoryGreeting = `I was just admiring this photo. ${memoryCaption}`.trim();
-          setRemiText(memoryGreeting);
-          announceMemory(memoryGreeting, loadedMemory); 
-        } else {
-          const defaultGreeting = `Hello ${fetchedName}! I am Remi. How can I help you today?`;
-          setRemiText(defaultGreeting);
-          speak(defaultGreeting);
-        }
+        const defaultGreeting = `Hello ${fetchedName}! I am Remi. How can I help you today?`;
+        setRemiText(defaultGreeting);
+        speak(defaultGreeting);
       }
     };
     
@@ -229,7 +247,7 @@ export default function HomeScreen() {
     setIsProcessing(false);
     setIsNudgeActive(false);
     
-    if (dailyMemory && !isEvening) {
+    if (dailyMemory && !isEvening && !importantMusic) {
       const memoryCaption = dailyMemory.caption ? dailyMemory.caption : "";
       const memoryGreeting = `I was just admiring this photo. ${memoryCaption}`.trim();
       setRemiText(memoryGreeting);
@@ -246,23 +264,7 @@ export default function HomeScreen() {
     const newIsEvening = !isEvening;
     setIsEvening(newIsEvening);
     setTimeIcon(newIsEvening ? "moon" : "sunny");
-
-    if (newIsEvening) {
-      const calmGreeting = `Good evening, ${userName}. It's getting late. I am here to help you relax.`;
-      setRemiText(calmGreeting);
-      speak(calmGreeting);
-    } else {
-      if (dailyMemory) {
-        const memoryCaption = dailyMemory.caption ? dailyMemory.caption : "";
-        const memoryGreeting = `I was just admiring this photo. ${memoryCaption}`.trim();
-        setRemiText(memoryGreeting);
-        announceMemory(memoryGreeting, dailyMemory);
-      } else {
-        const defaultGreeting = `Hello ${userName}! I am Remi. How can I help you today?`;
-        setRemiText(defaultGreeting);
-        speak(defaultGreeting);
-      }
-    }
+    resetRemi();
   };
 
   useEffect(() => {
@@ -270,18 +272,16 @@ export default function HomeScreen() {
       resetRemi();
     });
     return unsubscribe;
-  }, [navigation, dailyMemory, userName, isEvening]);
+  }, [navigation, dailyMemory, userName, isEvening, importantMusic]);
 
   const startRecording = async () => {
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       setIsNudgeActive(false); 
 
-      // Mute AI TTS and Voice Notes
       Speech.stop();
       if (memorySound) await memorySound.stopAsync();
 
-      // AUTO-PAUSE BACKGROUND MUSIC SO REMI CAN HEAR
       if (isPlayingMusic && bgMusic) {
         await bgMusic.pauseAsync();
         setIsPlayingMusic(false);
@@ -307,12 +307,11 @@ export default function HomeScreen() {
     setIsProcessing(true);
     setRemiText("Thinking...");
     try {
-      await recording?.stopAndUnloadAsync();
+      await recording?.stopAndUnloadAsync().catch(()=>{});
       const uri = recording?.getURI();
-      if (!uri) throw new Error("No audio file found!");
+      if (!uri) throw new Error("No audio file found.");
       await sendAudioToBackend(uri);
     } catch (err) {
-      console.error("Failed to stop", err);
       setIsProcessing(false);
     }
   };
@@ -337,7 +336,7 @@ export default function HomeScreen() {
 
       if (response.ok) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        const aiText = responseData.message || "I didn't quite catch that!";
+        const aiText = responseData.message || "I didn't quite catch that.";
         setRemiText(aiText);
         speak(aiText);
         if (aiText.toLowerCase().includes("call family")) setIsDistressed(true);
@@ -369,16 +368,6 @@ export default function HomeScreen() {
     }, 500);
   };
 
-  const handlePrimaryCall = () => {
-    if (primaryContact) Linking.openURL(`tel:${primaryContact}`);
-    else Alert.alert("Not Setup", "Please ask your family to add a Primary Contact in settings.");
-  };
-
-  const handleSecondaryCall = () => {
-    if (secondaryContact) Linking.openURL(`tel:${secondaryContact}`);
-    else Alert.alert("Not Setup", "Please ask your family to add a Secondary Contact in settings.");
-  };
-
   const handleNudgePress = (suggestion: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setIsNudgeActive(true); 
@@ -403,34 +392,13 @@ export default function HomeScreen() {
     setLastTapTime(now);
   };
   
-  const handlePatientSOS = () => {
-    Alert.alert(
-      "🚨 EMERGENCY 🚨",
-      "Do you need help right now?",
-      [
-        { text: "I'm Okay (Cancel)", style: "cancel" },
-        { 
-          text: "Yes, Call Family please!", 
-          style: "destructive",
-          onPress: () => {
-            if (primaryContact) {
-              Linking.openURL(`tel:${primaryContact}`).catch(() => Alert.alert("Error", "Could not open the phone dialer."));
-            } else {
-              Alert.alert("Alert Sent Digitally", "No Primary Contact is set, but an alert has been logged.");
-            }
-          }
-        }
-      ]
-    );
-  };
-
   const verifyCaregiverPin = async (pinAttempt: string) => {
     setEnteredPin(pinAttempt);
     if (pinAttempt.length === 4) {
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
-        const { data, error } = await supabase.from('profiles').select('caregiver_pin').eq('id', user.id).single();
+        const { data } = await supabase.from('profiles').select('caregiver_pin').eq('id', user.id).single();
         
         if (data && data.caregiver_pin === pinAttempt) {
           setShowPinModal(false);
@@ -493,18 +461,32 @@ export default function HomeScreen() {
               style={[styles.repeatVoiceButton, { backgroundColor: isEvening ? '#FBBF24' : '#F5F3FF' }]}
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                if (dailyMemory && !isEvening && dailyMemory.audio_url) {
-                  playCustomAudio(dailyMemory.audio_url);
-                } else {
-                  speak(remiText);
-                }
+                speak(remiText);
               }}
             >
               <Ionicons name="volume-high" size={20} color={isEvening ? '#92400E' : '#8B5CF6'} />
               <Text style={[styles.repeatVoiceText, isEvening && { color: '#92400E' }]}>Hear again</Text>
             </TouchableOpacity>
             
-            {dailyMemory && !isNudgeActive && !isEvening && (
+            {/* IMPORTANT MUSIC OVERRIDE */}
+            {importantMusic && !isNudgeActive && !isEvening && (
+              <Animated.View style={{ width: '100%', opacity: uiOpacity, marginTop: 15 }}>
+                <View style={styles.musicBannerCard}>
+                  <Ionicons name="musical-notes" size={36} color="#FFFFFF" style={{ marginBottom: 10 }} />
+                  <Text style={styles.musicBannerTitle}>Your family sent you a song!</Text>
+                  <Text style={styles.musicBannerSubtitle}>
+                    {importantMusic.caption.replace('[MUSIC-IMPORTANT]', '').replace('[MUSIC]', '').trim()}
+                  </Text>
+                  <TouchableOpacity style={styles.musicBannerBtn} onPress={playImportantMusic}>
+                    <Ionicons name="play" size={20} color="#8B5CF6" style={{ marginRight: 8 }} />
+                    <Text style={styles.musicBannerBtnText}>Listen Now</Text>
+                  </TouchableOpacity>
+                </View>
+              </Animated.View>
+            )}
+
+            {/* FALLBACK TO DAILY PHOTO MEMORY IF NO IMPORTANT MUSIC */}
+            {dailyMemory && !importantMusic && !isNudgeActive && !isEvening && dailyMemory.image_url && (
               <Animated.View style={{ width: '100%', opacity: uiOpacity, marginTop: 15 }}>
                 <TouchableOpacity activeOpacity={0.8} onPress={() => setIsMemoryExpanded(true)} style={styles.memoryDropContainer}>
                   <Image source={{ uri: dailyMemory.image_url }} style={styles.memoryImage} resizeMode="cover" />
@@ -519,7 +501,6 @@ export default function HomeScreen() {
             )}
           </View>
 
-          {/* --- NEW: DEDICATED MUSIC THERAPY BUTTON --- */}
           {(!isRecording && !isProcessing && !isDistressed) && (
             <Animated.View style={{ opacity: uiOpacity, width: '100%' }}>
               <TouchableOpacity 
@@ -551,7 +532,6 @@ export default function HomeScreen() {
                 <View style={styles.nudgeRow}>
                   {isEvening ? (
                     <>
-                      {/* CONNECTED NUDGE TO MUSIC PLAYER */}
                       <TouchableOpacity style={[styles.nudgePill, { backgroundColor: '#FDE68A', borderColor: '#F59E0B' }]} onPress={toggleMusic}>
                         <Text style={[styles.nudgeText, { color: '#92400E' }]}>{isPlayingMusic ? "Pause music" : "Play calming music"}</Text>
                       </TouchableOpacity>
@@ -592,46 +572,8 @@ export default function HomeScreen() {
             </Text>
           </View>
 
-          <TouchableOpacity onPress={handlePatientSOS} style={styles.patientSosButton}>
-            <Ionicons name="warning" size={28} color="#FFFFFF" style={{ marginRight: 10 }} />
-            <Text style={styles.patientSosText}>HELP / SOS</Text>
-          </TouchableOpacity>
-
         </ScrollView>
       </View>
-
-      <Modal visible={showEmergencyMenu} transparent={true} animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.emergencyModalContent}>
-            <Text style={styles.emergencyModalTitle}>Who do you want to call?</Text>
-            
-            <TouchableOpacity style={styles.contactRow} onPress={handlePrimaryCall}>
-              <Ionicons name="person" size={24} color="#8B5CF6" />
-              <View style={{ marginLeft: 15 }}>
-                <Text style={styles.contactText}>Primary Contact</Text>
-                <Text style={styles.numberText}>{primaryContact || "Not Setup!"}</Text>
-              </View>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.contactRow} onPress={handleSecondaryCall}>
-              <Ionicons name="person" size={24} color="#8B5CF6" />
-              <View style={{ marginLeft: 15 }}>
-                <Text style={styles.contactText}>Secondary Contact</Text>
-                <Text style={styles.numberText}>{secondaryContact || "Not Setup"}</Text>
-              </View>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.policeRow} onPress={() => Linking.openURL('tel:999')}>
-              <Ionicons name="medical" size={24} color="#FFFFFF" />
-              <Text style={styles.policeText}>Call Emergency (999)</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.cancelEmergencyButton} onPress={() => setShowEmergencyMenu(false)}>
-              <Text style={styles.cancelEmergencyText}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
 
       <Modal visible={isMemoryExpanded} transparent={true} animationType="fade">
         <View style={styles.modalOverlay}>
@@ -639,9 +581,6 @@ export default function HomeScreen() {
             <View style={styles.imageModalHeader}>
               <View style={{ flex: 1, paddingRight: 15 }}>
                 <Text style={styles.imageModalTitle}>{dailyMemory?.caption || "A beautiful memory"}</Text>
-                <Text style={styles.imageModalDate}>
-                  {dailyMemory?.created_at ? new Date(dailyMemory.created_at).toLocaleDateString() : "Shared by family"}
-                </Text>
               </View>
               <TouchableOpacity onPress={() => setIsMemoryExpanded(false)} style={styles.closeImageButton} hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
                 <Ionicons name="close" size={28} color="#111827" />
@@ -663,10 +602,7 @@ export default function HomeScreen() {
               </TouchableOpacity>
             </View>
             
-            <TouchableOpacity style={styles.menuRow} onPress={() => {
-              setIsMenuVisible(false);
-              router.push('/settings');
-              }}>
+            <TouchableOpacity style={styles.menuRow} onPress={() => { setIsMenuVisible(false); router.push('/settings'); }}>
               <View style={styles.menuIconContainer}>
                 <Ionicons name="settings" size={24} color="#8B5CF6" />
               </View>
@@ -680,7 +616,6 @@ export default function HomeScreen() {
               </View>
               <Text style={[styles.menuRowText, { color: '#EF4444' }]}>Sign Out</Text>
             </TouchableOpacity>
-            
           </View>
         </View>
       </Modal>
@@ -689,8 +624,7 @@ export default function HomeScreen() {
         <View style={[styles.modalOverlay, { justifyContent: 'center', alignItems: 'center' }]}>
           <View style={styles.pinModalContent}>
             <Text style={styles.pinModalTitle}>Caregiver Access</Text>
-            <Text style={styles.pinModalSubtitle}>Enter 4-digit PIN to unlock Action Dashboard</Text>
-            
+            <Text style={styles.pinModalSubtitle}>Enter 4-digit PIN</Text>
             <TextInput
               style={styles.pinInputDisplay}
               value={enteredPin}
@@ -702,12 +636,8 @@ export default function HomeScreen() {
               placeholder="••••"
               placeholderTextColor="#6B7280"
             />
-
-            <TouchableOpacity style={styles.cancelEmergencyButton} onPress={() => {
-              setShowPinModal(false);
-              setEnteredPin('');
-            }}>
-              <Text style={styles.cancelEmergencyText}>Cancel</Text>
+            <TouchableOpacity style={{ paddingVertical: 15 }} onPress={() => { setShowPinModal(false); setEnteredPin(''); }}>
+              <Text style={{ color: '#9CA3AF', fontSize: 18, fontWeight: '700' }}>Cancel</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -733,11 +663,16 @@ const styles = StyleSheet.create({
   repeatVoiceButton: { flexDirection: 'row', alignItems: 'center', paddingVertical: 6, paddingHorizontal: 14, borderRadius: 20, marginBottom: 5 },
   repeatVoiceText: { fontSize: 14, fontWeight: '700', marginLeft: 6 },
   
-  // --- MUSIC THERAPY STYLES ---
+  // MUSIC BANNER UI
+  musicBannerCard: { backgroundColor: '#8B5CF6', borderRadius: 20, padding: 25, alignItems: 'center', shadowColor: '#8B5CF6', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.4, shadowRadius: 10, elevation: 8 },
+  musicBannerTitle: { color: '#FFFFFF', fontSize: 18, fontWeight: 'bold', marginBottom: 4 },
+  musicBannerSubtitle: { color: '#E0E7FF', fontSize: 14, marginBottom: 15, textAlign: 'center' },
+  musicBannerBtn: { backgroundColor: '#FFFFFF', flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 20, borderRadius: 20 },
+  musicBannerBtnText: { color: '#8B5CF6', fontSize: 16, fontWeight: 'bold' },
+
   musicButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F5F3FF', paddingVertical: 12, paddingHorizontal: 24, borderRadius: 25, marginBottom: 15, alignSelf: 'center', borderWidth: 1, borderColor: '#DDD6FE' },
   musicButtonActive: { backgroundColor: '#8B5CF6', borderColor: '#8B5CF6' },
   musicButtonText: { fontSize: 16, fontWeight: '700', color: '#8B5CF6', marginLeft: 8 },
-
   nudgesContainer: { alignItems: 'center', marginBottom: 10 },
   nudgeTitle: { fontSize: 13, color: '#6B7280', marginBottom: 6, fontWeight: '600' },
   nudgeRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 8 },
@@ -755,36 +690,23 @@ const styles = StyleSheet.create({
   statusDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#8B5CF6', marginRight: 6 },
   statusText: { color: '#6B7280', fontSize: 14, fontWeight: '600' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(17, 24, 39, 0.6)', justifyContent: 'flex-end' },
-  modalContent: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 36, borderTopRightRadius: 36, paddingHorizontal: 28, paddingBottom: 50, paddingTop: 16, shadowColor: '#000', shadowOffset: { width: 0, height: -10 }, shadowOpacity: 0.1, shadowRadius: 20, elevation: 20 },
+  modalContent: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 36, borderTopRightRadius: 36, paddingHorizontal: 28, paddingBottom: 50, paddingTop: 16 },
   modalDragIndicator: { width: 50, height: 6, backgroundColor: '#E5E7EB', borderRadius: 3, alignSelf: 'center', marginBottom: 24 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 30 },
   modalTitle: { fontSize: 28, fontWeight: '800', color: '#111827' },
   menuRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 20, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
   menuIconContainer: { backgroundColor: '#F5F3FF', padding: 12, borderRadius: 16, marginRight: 16 },
   menuRowText: { flex: 1, fontSize: 18, fontWeight: '600', color: '#374151' },
-  imageCapsule: { backgroundColor: '#FFFFFF', borderRadius: 35, padding: 24, alignSelf: 'center', width: '90%', marginBottom: '40%', shadowColor: '#000', shadowOffset: { width: 0, height: 20 }, shadowOpacity: 0.15, shadowRadius: 30, elevation: 20 },
+  imageCapsule: { backgroundColor: '#FFFFFF', borderRadius: 35, padding: 24, alignSelf: 'center', width: '90%', marginBottom: '40%' },
   imageModalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 },
   imageModalTitle: { fontSize: 20, fontWeight: '800', color: '#111827' },
-  imageModalDate: { fontSize: 16, color: '#8B5CF6', marginTop: 4, fontWeight: '600' },
   closeImageButton: { backgroundColor: '#F3F4F6', padding: 10, borderRadius: 20 },
   largeExpandedImage: { width: '100%', height: 350, borderRadius: 24 },
-  flashingEmergencyButton: { backgroundColor: '#EF4444', flexDirection: 'row', paddingVertical: 16, paddingHorizontal: 20, borderRadius: 30, marginVertical: 10, alignItems: 'center', justifyContent: 'center', shadowColor: '#EF4444', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.5, shadowRadius: 15, elevation: 12 },
+  flashingEmergencyButton: { backgroundColor: '#EF4444', flexDirection: 'row', paddingVertical: 16, paddingHorizontal: 20, borderRadius: 30, marginVertical: 10, alignItems: 'center', justifyContent: 'center' },
   flashingEmergencyText: { color: '#FFFFFF', fontSize: 18, fontWeight: '800', letterSpacing: 1 },
-  emergencyModalContent: { backgroundColor: '#1F2937', borderTopLeftRadius: 36, borderTopRightRadius: 36, paddingHorizontal: 28, paddingBottom: 50, paddingTop: 30 },
-  emergencyModalTitle: { fontSize: 24, fontWeight: '800', color: '#FFFFFF', textAlign: 'center', marginBottom: 30 },
-  contactRow: { backgroundColor: '#374151', flexDirection: 'row', alignItems: 'center', padding: 18, borderRadius: 20, marginBottom: 16 },
-  contactText: { color: '#FFFFFF', fontSize: 18, fontWeight: '700' },
-  numberText: { color: '#9CA3AF', fontSize: 15, marginTop: 4 },
-  policeRow: { backgroundColor: '#EF4444', flexDirection: 'row', alignItems: 'center', padding: 20, borderRadius: 20, marginBottom: 30 },
-  policeText: { color: '#FFFFFF', fontSize: 20, fontWeight: '800', marginLeft: 15 },
-  cancelEmergencyButton: { paddingVertical: 15, alignItems: 'center' },
-  cancelEmergencyText: { color: '#9CA3AF', fontSize: 18, fontWeight: '700' },
   
   pinModalContent: { backgroundColor: '#1F2937', borderRadius: 24, padding: 30, width: '85%', alignItems: 'center', borderWidth: 1, borderColor: '#374151' },
   pinModalTitle: { color: '#FFFFFF', fontSize: 22, fontWeight: 'bold', marginBottom: 8 },
   pinModalSubtitle: { color: '#9CA3AF', fontSize: 14, textAlign: 'center', marginBottom: 25 },
   pinInputDisplay: { backgroundColor: '#111827', width: '100%', borderWidth: 1, borderColor: '#374151', borderRadius: 16, paddingVertical: 20, color: '#FFFFFF', fontSize: 32, fontWeight: 'bold', textAlign: 'center', letterSpacing: 12, marginBottom: 20 },
-
-  patientSosButton: { backgroundColor: '#EF4444', paddingVertical: 18, paddingHorizontal: 30, borderRadius: 30, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 15, marginBottom: 10, shadowColor: '#EF4444', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 8, elevation: 8 },
-  patientSosText: { color: '#FFFFFF', fontSize: 22, fontWeight: 'bold' }
 });
