@@ -144,7 +144,7 @@ export default function MemoryVaultScreen() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-      const base64Audio = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
+      const base64Audio = await FileSystem.readAsStringAsync(uri, { encoding: 'base64' });
       const ext = Platform.OS === 'ios' ? 'm4a' : 'm4a'; 
       const fileName = `${user.id}/audio_${Date.now()}.${ext}`;
 
