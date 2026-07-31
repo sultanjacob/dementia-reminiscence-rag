@@ -53,6 +53,7 @@ export default function HomeScreen() {
   const [showEmergencyMenu, setShowEmergencyMenu] = useState(false);
 
   const [tapCount, setTapCount] = useState(0);
+  const [isImportantMusicPlaying, setIsImportantMusicPlaying] = useState(false);
   const [lastTapTime, setLastTapTime] = useState(0);
   const [showPinModal, setShowPinModal] = useState(false);
   const [enteredPin, setEnteredPin] = useState('');
