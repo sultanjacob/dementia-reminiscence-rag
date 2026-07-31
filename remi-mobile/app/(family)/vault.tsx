@@ -536,10 +536,18 @@ export default function HomeScreen() {
                   <Text style={styles.musicBannerSubtitle}>
                     {importantMusic.caption.replace('[MUSIC-IMPORTANT]', '').replace('[MUSIC]', '').trim()}
                   </Text>
-                  <TouchableOpacity style={styles.musicBannerBtn} onPress={playImportantMusic}>
-                    <Ionicons name="play" size={20} color="#8B5CF6" style={{ marginRight: 8 }} />
-                    <Text style={styles.musicBannerBtnText}>Listen Now</Text>
-                  </TouchableOpacity>
+                  
+                  {!isImportantMusicPlaying ? (
+                    <TouchableOpacity style={styles.musicBannerBtn} onPress={playImportantMusic}>
+                      <Ionicons name="play" size={20} color="#8B5CF6" style={{ marginRight: 8 }} />
+                      <Text style={styles.musicBannerBtnText}>Listen Now</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <TouchableOpacity style={[styles.musicBannerBtn, { backgroundColor: '#EF4444' }]} onPress={dismissImportantMusic}>
+                      <Ionicons name="checkmark-circle" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
+                      <Text style={[styles.musicBannerBtnText, { color: '#FFFFFF' }]}>Finished Listening</Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
               </Animated.View>
             )}
