@@ -139,7 +139,58 @@ export default function HomeScreen() {
       const cleanTitle = importantMusic.caption.replace('[MUSIC-IMPORTANT]', '').replace('[MUSIC]', '').trim();
       const message = `Playing ${cleanTitle}`;
       setRemiText(message);
-      playCustomAudio(importantMusic.audio_url);
+      setIsImportantMusicPlaying(true);
+      
+      try {
+        if (memorySound) {
+          await memorySound.unloadAsync().catch(()=>{});
+        }
+        const { sound } = await Audio.Sound.createAsync(
+          { uri: importantMusic.audio_url },
+          { shouldPlay: true }
+        );
+        setMemorySound(sound);
+
+        // Optional: Auto-detect when the song naturally finishes
+        sound.setOnPlaybackStatusUpdate((status: any) => {
+          if (status.didJustFinish) {
+            setIsImportantMusicPlaying(false);
+          }
+        });
+      } catch (error) {
+        console.error("Error playing important music:", error);
+      }
+    }
+  };
+
+  const dismissImportantMusic = async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    
+    // 1. Stop the music
+    if (memorySound) {
+      await memorySound.stopAsync().catch(()=>{});
+    }
+    setIsImportantMusicPlaying(false);
+    
+    // 2. Clear the UI
+    const musicToDowngrade = importantMusic;
+    setImportantMusic(null); // This hides the purple banner instantly
+    
+    const text = "I hope you enjoyed the song.";
+    setRemiText(text);
+    speak(text);
+
+    // 3. Update Database (Remove the "IMPORTANT" flag so it doesn't get stuck forever)
+    if (musicToDowngrade) {
+      try {
+        const newCaption = musicToDowngrade.caption.replace('[MUSIC-IMPORTANT]', '[MUSIC]');
+        await supabase
+          .from('memory_vault')
+          .update({ caption: newCaption })
+          .eq('id', musicToDowngrade.id);
+      } catch (error) {
+        console.error("Failed to downgrade music tag", error);
+      }
     }
   };
 
