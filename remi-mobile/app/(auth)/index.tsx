@@ -44,6 +44,7 @@ export default function HomeScreen() {
   // Vault States
   const [dailyMemory, setDailyMemory] = useState<any>(null);
   const [importantMusic, setImportantMusic] = useState<any>(null);
+  const [isImportantMusicPlaying, setIsImportantMusicPlaying] = useState(false);
 
   const [recording, setRecording] = useState<Audio.Recording | null>(null);
   const [isRecording, setIsRecording] = useState(false);
@@ -107,7 +108,6 @@ export default function HomeScreen() {
         await bgMusic.pauseAsync();
         setIsPlayingMusic(false);
       } else {
-        // Pause any memory/family audio if they play background music
         if (memorySound) await memorySound.stopAsync();
 
         if (bgMusic) {
@@ -128,11 +128,8 @@ export default function HomeScreen() {
     }
   };
 
-  // --- NEW: PLAY IMPORTANT MUSIC LOGIC ---
   const playImportantMusic = async () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    
-    // Auto-pause background music
     if (isPlayingMusic && bgMusic) {
       await bgMusic.pauseAsync();
       setIsPlayingMusic(false);
@@ -142,7 +139,57 @@ export default function HomeScreen() {
       const cleanTitle = importantMusic.caption.replace('[MUSIC-IMPORTANT]', '').replace('[MUSIC]', '').trim();
       const message = `Playing ${cleanTitle}`;
       setRemiText(message);
-      playCustomAudio(importantMusic.audio_url);
+      setIsImportantMusicPlaying(true);
+      
+      try {
+        if (memorySound) {
+          await memorySound.unloadAsync().catch(()=>{});
+        }
+        const { sound } = await Audio.Sound.createAsync(
+          { uri: importantMusic.audio_url },
+          { shouldPlay: true }
+        );
+        setMemorySound(sound);
+
+        sound.setOnPlaybackStatusUpdate((status: any) => {
+          if (status.didJustFinish) {
+            setIsImportantMusicPlaying(false);
+          }
+        });
+      } catch (error) {
+        console.error("Error playing important music:", error);
+      }
+    }
+  };
+
+  const dismissImportantMusic = async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    
+    // Stop the music
+    if (memorySound) {
+      await memorySound.stopAsync().catch(()=>{});
+    }
+    setIsImportantMusicPlaying(false);
+    
+    // Clear the UI immediately
+    const musicToDowngrade = importantMusic;
+    setImportantMusic(null);
+    
+    const text = "I hope you enjoyed the song.";
+    setRemiText(text);
+    speak(text);
+
+    // Update Database to remove the important flag
+    if (musicToDowngrade) {
+      try {
+        const newCaption = musicToDowngrade.caption.replace('[MUSIC-IMPORTANT]', '[MUSIC]');
+        await supabase
+          .from('memory_vault')
+          .update({ caption: newCaption })
+          .eq('id', musicToDowngrade.id);
+      } catch (error) {
+        console.error("Failed to downgrade music tag", error);
+      }
     }
   };
 
@@ -212,15 +259,13 @@ export default function HomeScreen() {
         if (profileData.secondary_contact) setSecondaryContact(profileData.secondary_contact);
       }
 
-      // --- SMART VAULT FILTERING ---
+      // SMART VAULT FILTERING
       const { data: memories } = await supabase.from('memory_vault').select('*');
       
       if (memories && memories.length > 0) {
-        // Find important music
         const impMusic = memories.find(m => m.caption?.includes('[MUSIC-IMPORTANT]'));
         if (impMusic) setImportantMusic(impMusic);
 
-        // Find standard photos/voices (ignoring all music tags)
         const standardMemories = memories.filter(m => !m.caption?.includes('[MUSIC'));
         if (standardMemories.length > 0) {
           setDailyMemory(standardMemories[Math.floor(Math.random() * standardMemories.length)]); 
@@ -248,8 +293,16 @@ export default function HomeScreen() {
     setIsNudgeActive(false);
     
     if (dailyMemory && !isEvening && !importantMusic) {
+      const isPhoto = !!dailyMemory.image_url;
       const memoryCaption = dailyMemory.caption ? dailyMemory.caption : "";
-      const memoryGreeting = `I was just admiring this photo. ${memoryCaption}`.trim();
+      
+      let memoryGreeting = "";
+      if (isPhoto) {
+        memoryGreeting = `I was just looking at this photo. ${memoryCaption}`.trim();
+      } else {
+        memoryGreeting = `Your family left you a new voice message!`.trim();
+      }
+      
       setRemiText(memoryGreeting);
       announceMemory(memoryGreeting, dailyMemory);
     } else {
@@ -461,14 +514,18 @@ export default function HomeScreen() {
               style={[styles.repeatVoiceButton, { backgroundColor: isEvening ? '#FBBF24' : '#F5F3FF' }]}
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                speak(remiText);
+                if (dailyMemory?.audio_url && remiText.includes("voice message")) {
+                    playCustomAudio(dailyMemory.audio_url); 
+                } else {
+                    speak(remiText);
+                }
               }}
             >
               <Ionicons name="volume-high" size={20} color={isEvening ? '#92400E' : '#8B5CF6'} />
               <Text style={[styles.repeatVoiceText, isEvening && { color: '#92400E' }]}>Hear again</Text>
             </TouchableOpacity>
             
-            {/* IMPORTANT MUSIC OVERRIDE */}
+            {/* IMPORTANT MUSIC BANNER */}
             {importantMusic && !isNudgeActive && !isEvening && (
               <Animated.View style={{ width: '100%', opacity: uiOpacity, marginTop: 15 }}>
                 <View style={styles.musicBannerCard}>
@@ -477,15 +534,23 @@ export default function HomeScreen() {
                   <Text style={styles.musicBannerSubtitle}>
                     {importantMusic.caption.replace('[MUSIC-IMPORTANT]', '').replace('[MUSIC]', '').trim()}
                   </Text>
-                  <TouchableOpacity style={styles.musicBannerBtn} onPress={playImportantMusic}>
-                    <Ionicons name="play" size={20} color="#8B5CF6" style={{ marginRight: 8 }} />
-                    <Text style={styles.musicBannerBtnText}>Listen Now</Text>
-                  </TouchableOpacity>
+                  
+                  {!isImportantMusicPlaying ? (
+                    <TouchableOpacity style={styles.musicBannerBtn} onPress={playImportantMusic}>
+                      <Ionicons name="play" size={20} color="#8B5CF6" style={{ marginRight: 8 }} />
+                      <Text style={styles.musicBannerBtnText}>Listen Now</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <TouchableOpacity style={[styles.musicBannerBtn, { backgroundColor: '#EF4444' }]} onPress={dismissImportantMusic}>
+                      <Ionicons name="checkmark-circle" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
+                      <Text style={[styles.musicBannerBtnText, { color: '#FFFFFF' }]}>Finished Listening</Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
               </Animated.View>
             )}
 
-            {/* FALLBACK TO DAILY PHOTO MEMORY IF NO IMPORTANT MUSIC */}
+            {/* PHOTO MEMORY CARD */}
             {dailyMemory && !importantMusic && !isNudgeActive && !isEvening && dailyMemory.image_url && (
               <Animated.View style={{ width: '100%', opacity: uiOpacity, marginTop: 15 }}>
                 <TouchableOpacity activeOpacity={0.8} onPress={() => setIsMemoryExpanded(true)} style={styles.memoryDropContainer}>
@@ -497,6 +562,22 @@ export default function HomeScreen() {
                     </Text>
                   </View>
                 </TouchableOpacity>
+              </Animated.View>
+            )}
+
+            {/* VOICE NOTE ONLY CARD */}
+            {dailyMemory && !importantMusic && !isNudgeActive && !isEvening && !dailyMemory.image_url && dailyMemory.audio_url && (
+              <Animated.View style={{ width: '100%', opacity: uiOpacity, marginTop: 15 }}>
+                <View style={styles.voiceNoteCard}>
+                  <View style={styles.voiceNoteIconWrap}>
+                    <Ionicons name="mic" size={28} color="#8B5CF6" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.voiceNoteTitle}>Family Voice Note</Text>
+                    <Text style={styles.voiceNoteSubtitle}>Playing now...</Text>
+                  </View>
+                  <Ionicons name="radio-outline" size={24} color="#8B5CF6" />
+                </View>
               </Animated.View>
             )}
           </View>
@@ -663,12 +744,16 @@ const styles = StyleSheet.create({
   repeatVoiceButton: { flexDirection: 'row', alignItems: 'center', paddingVertical: 6, paddingHorizontal: 14, borderRadius: 20, marginBottom: 5 },
   repeatVoiceText: { fontSize: 14, fontWeight: '700', marginLeft: 6 },
   
-  // MUSIC BANNER UI
   musicBannerCard: { backgroundColor: '#8B5CF6', borderRadius: 20, padding: 25, alignItems: 'center', shadowColor: '#8B5CF6', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.4, shadowRadius: 10, elevation: 8 },
   musicBannerTitle: { color: '#FFFFFF', fontSize: 18, fontWeight: 'bold', marginBottom: 4 },
   musicBannerSubtitle: { color: '#E0E7FF', fontSize: 14, marginBottom: 15, textAlign: 'center' },
   musicBannerBtn: { backgroundColor: '#FFFFFF', flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 20, borderRadius: 20 },
   musicBannerBtnText: { color: '#8B5CF6', fontSize: 16, fontWeight: 'bold' },
+
+  voiceNoteCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF', padding: 16, borderRadius: 20, borderWidth: 1, borderColor: '#E5E7EB' },
+  voiceNoteIconWrap: { backgroundColor: '#F5F3FF', padding: 10, borderRadius: 15, marginRight: 15 },
+  voiceNoteTitle: { color: '#111827', fontSize: 16, fontWeight: 'bold' },
+  voiceNoteSubtitle: { color: '#6B7280', fontSize: 13, marginTop: 2 },
 
   musicButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F5F3FF', paddingVertical: 12, paddingHorizontal: 24, borderRadius: 25, marginBottom: 15, alignSelf: 'center', borderWidth: 1, borderColor: '#DDD6FE' },
   musicButtonActive: { backgroundColor: '#8B5CF6', borderColor: '#8B5CF6' },
