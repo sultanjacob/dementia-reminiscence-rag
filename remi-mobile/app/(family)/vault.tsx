@@ -44,6 +44,7 @@ export default function HomeScreen() {
   // Vault States
   const [dailyMemory, setDailyMemory] = useState<any>(null);
   const [importantMusic, setImportantMusic] = useState<any>(null);
+  const [isImportantMusicPlaying, setIsImportantMusicPlaying] = useState(false);
 
   const [recording, setRecording] = useState<Audio.Recording | null>(null);
   const [isRecording, setIsRecording] = useState(false);
@@ -53,7 +54,6 @@ export default function HomeScreen() {
   const [showEmergencyMenu, setShowEmergencyMenu] = useState(false);
 
   const [tapCount, setTapCount] = useState(0);
-  const [isImportantMusicPlaying, setIsImportantMusicPlaying] = useState(false);
   const [lastTapTime, setLastTapTime] = useState(0);
   const [showPinModal, setShowPinModal] = useState(false);
   const [enteredPin, setEnteredPin] = useState('');
@@ -151,7 +151,6 @@ export default function HomeScreen() {
         );
         setMemorySound(sound);
 
-        // Optional: Auto-detect when the song naturally finishes
         sound.setOnPlaybackStatusUpdate((status: any) => {
           if (status.didJustFinish) {
             setIsImportantMusicPlaying(false);
@@ -166,21 +165,21 @@ export default function HomeScreen() {
   const dismissImportantMusic = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     
-    // 1. Stop the music
+    // Stop the music
     if (memorySound) {
       await memorySound.stopAsync().catch(()=>{});
     }
     setIsImportantMusicPlaying(false);
     
-    // 2. Clear the UI
+    // Clear the UI immediately
     const musicToDowngrade = importantMusic;
-    setImportantMusic(null); // This hides the purple banner instantly
+    setImportantMusic(null);
     
     const text = "I hope you enjoyed the song.";
     setRemiText(text);
     speak(text);
 
-    // 3. Update Database (Remove the "IMPORTANT" flag so it doesn't get stuck forever)
+    // Update Database to remove the important flag
     if (musicToDowngrade) {
       try {
         const newCaption = musicToDowngrade.caption.replace('[MUSIC-IMPORTANT]', '[MUSIC]');
@@ -260,7 +259,7 @@ export default function HomeScreen() {
         if (profileData.secondary_contact) setSecondaryContact(profileData.secondary_contact);
       }
 
-      // --- SMART VAULT FILTERING ---
+      // SMART VAULT FILTERING
       const { data: memories } = await supabase.from('memory_vault').select('*');
       
       if (memories && memories.length > 0) {
@@ -294,7 +293,6 @@ export default function HomeScreen() {
     setIsNudgeActive(false);
     
     if (dailyMemory && !isEvening && !importantMusic) {
-      // SMART TEXT BASED ON MEMORY TYPE
       const isPhoto = !!dailyMemory.image_url;
       const memoryCaption = dailyMemory.caption ? dailyMemory.caption : "";
       
@@ -517,7 +515,7 @@ export default function HomeScreen() {
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 if (dailyMemory?.audio_url && remiText.includes("voice message")) {
-                    playCustomAudio(dailyMemory.audio_url); // Replay voice note directly
+                    playCustomAudio(dailyMemory.audio_url); 
                 } else {
                     speak(remiText);
                 }
@@ -527,7 +525,7 @@ export default function HomeScreen() {
               <Text style={[styles.repeatVoiceText, isEvening && { color: '#92400E' }]}>Hear again</Text>
             </TouchableOpacity>
             
-            {/* 1. IMPORTANT MUSIC BANNER */}
+            {/* IMPORTANT MUSIC BANNER */}
             {importantMusic && !isNudgeActive && !isEvening && (
               <Animated.View style={{ width: '100%', opacity: uiOpacity, marginTop: 15 }}>
                 <View style={styles.musicBannerCard}>
@@ -552,7 +550,7 @@ export default function HomeScreen() {
               </Animated.View>
             )}
 
-            {/* 2. PHOTO MEMORY CARD */}
+            {/* PHOTO MEMORY CARD */}
             {dailyMemory && !importantMusic && !isNudgeActive && !isEvening && dailyMemory.image_url && (
               <Animated.View style={{ width: '100%', opacity: uiOpacity, marginTop: 15 }}>
                 <TouchableOpacity activeOpacity={0.8} onPress={() => setIsMemoryExpanded(true)} style={styles.memoryDropContainer}>
@@ -567,7 +565,7 @@ export default function HomeScreen() {
               </Animated.View>
             )}
 
-            {/* 3. VOICE NOTE ONLY CARD */}
+            {/* VOICE NOTE ONLY CARD */}
             {dailyMemory && !importantMusic && !isNudgeActive && !isEvening && !dailyMemory.image_url && dailyMemory.audio_url && (
               <Animated.View style={{ width: '100%', opacity: uiOpacity, marginTop: 15 }}>
                 <View style={styles.voiceNoteCard}>
@@ -746,14 +744,12 @@ const styles = StyleSheet.create({
   repeatVoiceButton: { flexDirection: 'row', alignItems: 'center', paddingVertical: 6, paddingHorizontal: 14, borderRadius: 20, marginBottom: 5 },
   repeatVoiceText: { fontSize: 14, fontWeight: '700', marginLeft: 6 },
   
-  // 1. MUSIC BANNER UI
   musicBannerCard: { backgroundColor: '#8B5CF6', borderRadius: 20, padding: 25, alignItems: 'center', shadowColor: '#8B5CF6', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.4, shadowRadius: 10, elevation: 8 },
   musicBannerTitle: { color: '#FFFFFF', fontSize: 18, fontWeight: 'bold', marginBottom: 4 },
   musicBannerSubtitle: { color: '#E0E7FF', fontSize: 14, marginBottom: 15, textAlign: 'center' },
   musicBannerBtn: { backgroundColor: '#FFFFFF', flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 20, borderRadius: 20 },
   musicBannerBtnText: { color: '#8B5CF6', fontSize: 16, fontWeight: 'bold' },
 
-  // 2. VOICE NOTE UI
   voiceNoteCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF', padding: 16, borderRadius: 20, borderWidth: 1, borderColor: '#E5E7EB' },
   voiceNoteIconWrap: { backgroundColor: '#F5F3FF', padding: 10, borderRadius: 15, marginRight: 15 },
   voiceNoteTitle: { color: '#111827', fontSize: 16, fontWeight: 'bold' },
