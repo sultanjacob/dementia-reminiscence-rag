@@ -40,13 +40,10 @@ export default function PatientGalleryScreen() {
   const fetchMemories = async () => {
     setLoading(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
+      // Removed the strict patient_code filter so it matches the Home screen perfectly!
       const { data, error } = await supabase
         .from('memory_vault')
         .select('*')
-        .eq('patient_code', user.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
