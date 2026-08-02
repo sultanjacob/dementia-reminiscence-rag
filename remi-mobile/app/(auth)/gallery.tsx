@@ -1,11 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
+import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
-import * as Speech from 'expo-speech';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Image,
   Platform,
   SafeAreaView,
@@ -20,195 +19,271 @@ import { supabase } from '../../supabase';
 
 export default function PatientGalleryScreen() {
   const router = useRouter();
-  const [images, setImages] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
   
-  // Audio Recording States
-  const [recording, setRecording] = useState<Audio.Recording | null>(null);
-  const [activeRecordingId, setActiveRecordingId] = useState<string | null>(null);
-  const [isProcessing, setIsProcessing] = useState(false);
+  // --- STATE ---
+  const [currentTab, setCurrentTab] = useState<'photos' | 'voices' | 'music'>('photos');
+  const [loading, setLoading] = useState(true);
+
+  const [photos, setPhotos] = useState<any[]>([]);
+  const [voices, setVoices] = useState<any[]>([]);
+  const [music, setMusic] = useState<any[]>([]);
+
+  const [sound, setSound] = useState<Audio.Sound | null>(null);
+  const [playingId, setPlayingId] = useState<string | null>(null); // Tracks which audio is currently playing
 
   useEffect(() => {
     fetchMemories();
+    
+    // Cleanup audio when leaving screen
     return () => {
-      Speech.stop();
-      if (recording) {
-        recording.stopAndUnloadAsync();
-      }
+      if (sound) sound.unloadAsync().catch(() => {});
     };
-  }, []);
+  }, [sound]);
 
   const fetchMemories = async () => {
+    setLoading(true);
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
       const { data, error } = await supabase
         .from('memory_vault')
         .select('*')
+        .eq('patient_code', user.id) // Get everything sent to Mary
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setImages(data || []);
+      
+      if (data) {
+        // Smart Filtering (Exactly like the family side!)
+        setPhotos(data.filter(item => item.image_url !== null));
+        setVoices(data.filter(item => item.image_url === null && item.audio_url !== null && !item.caption?.includes('[MUSIC')));
+        setMusic(data.filter(item => item.audio_url !== null && item.caption?.includes('[MUSIC')));
+      }
     } catch (error) {
-      console.error('Error fetching memories:', error);
+      console.error("Error fetching patient memories:", error);
     } finally {
       setLoading(false);
     }
   };
 
-  const speakMemory = (caption: string) => {
-    if (!caption) return;
-    Speech.stop(); 
-    const conversationalText = `${caption}. What do you remember about this?`;
-    Speech.speak(conversationalText, { language: 'en-GB', pitch: 0.9, rate: 0.8 });
-  };
-
-  // --- NEW: INTELLIGENT REPLY LOGIC ---
-  const startRecording = async (imageId: string) => {
+  const playAudio = async (url: string, id: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     try {
-      Speech.stop(); // Stop Remi talking if she is
-      
-      const permission = await Audio.requestPermissionsAsync();
-      if (permission.status !== 'granted') {
-        Alert.alert("Permission Denied", "Remi needs microphone access to hear your memories.");
-        return;
+      // If something is already playing, stop it first
+      if (sound) {
+        await sound.stopAsync();
+        await sound.unloadAsync();
       }
       
-      await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
-      const { recording: newRecording } = await Audio.Recording.createAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
+      // If the user tapped the button that was ALREADY playing, just stop it and return
+      if (playingId === id) {
+        setPlayingId(null);
+        return; 
+      }
+
+      // Otherwise, play the new audio
+      const { sound: newSound } = await Audio.Sound.createAsync(
+        { uri: url },
+        { shouldPlay: true }
+      );
       
-      setRecording(newRecording);
-      setActiveRecordingId(imageId);
-    } catch (err) {
-      console.error("Failed to start recording", err);
+      setSound(newSound);
+      setPlayingId(id);
+
+      // Auto-reset button when audio finishes
+      newSound.setOnPlaybackStatusUpdate((status: any) => {
+        if (status.didJustFinish) {
+          setPlayingId(null);
+        }
+      });
+
+    } catch (error) {
+      console.error("Audio playback failed", error);
     }
   };
 
-  const stopRecordingAndSendToRAG = async (imageContext: any) => {
-    if (!recording) return;
-
-    setActiveRecordingId(null);
-    setIsProcessing(true);
-    
-    try {
-      await recording.stopAndUnloadAsync();
-      const uri = recording.getURI();
-      
-      // ========================================================
-      // STARTUP RAG LOGIC GOES HERE:
-      // In your final app, you will send 'uri' AND 'imageContext'
-      // to your Python backend. The AI will transcribe the audio, 
-      // see that Mary added a new detail about this specific photo, 
-      // and save it to the Vector Database so Remi remembers it forever.
-      // ========================================================
-      
-      console.log(`Sending audio for image ${imageContext.id} to RAG memory...`);
-      
-      // Simulate network request
-      setTimeout(() => {
-        setIsProcessing(false);
-        Speech.speak("Thank you for telling me that. I will remember it.", { language: 'en-GB' });
-      }, 1500);
-
-    } catch (err) {
-      console.error("Failed to stop and send", err);
-      setIsProcessing(false);
+  const handleTabSwitch = (tab: 'photos' | 'voices' | 'music') => {
+    Haptics.selectionAsync();
+    setCurrentTab(tab);
+    // Stop any playing audio if she switches tabs
+    if (sound) {
+      sound.stopAsync().catch(()=>{});
+      setPlayingId(null);
     }
   };
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor="#000000" />
+      <StatusBar barStyle="dark-content" backgroundColor="#F3F4F6" />
       
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>My Memories</Text>
-      </View>
-
-      {loading ? (
-        <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color="#8B5CF6" />
+      <View style={styles.appCapsule}>
+        
+        {/* --- HEADER --- */}
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={32} color="#111827" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>My Memories</Text>
+          <View style={{ width: 50 }} /> {/* Spacer for centering */}
         </View>
-      ) : (
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+
+        {/* --- BIG ACCESSIBLE TABS --- */}
+        <View style={styles.tabContainer}>
+          <TouchableOpacity 
+            style={[styles.tabButton, currentTab === 'photos' && styles.activeTabButton]} 
+            onPress={() => handleTabSwitch('photos')}
+          >
+            <Ionicons name="images" size={24} color={currentTab === 'photos' ? "#FFFFFF" : "#6B7280"} />
+            <Text style={[styles.tabText, currentTab === 'photos' && styles.activeTabText]}>Photos</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={[styles.tabButton, currentTab === 'voices' && styles.activeTabButton]} 
+            onPress={() => handleTabSwitch('voices')}
+          >
+            <Ionicons name="mic" size={24} color={currentTab === 'voices' ? "#FFFFFF" : "#6B7280"} />
+            <Text style={[styles.tabText, currentTab === 'voices' && styles.activeTabText]}>Voices</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={[styles.tabButton, currentTab === 'music' && styles.activeTabButton]} 
+            onPress={() => handleTabSwitch('music')}
+          >
+            <Ionicons name="musical-notes" size={24} color={currentTab === 'music' ? "#FFFFFF" : "#6B7280"} />
+            <Text style={[styles.tabText, currentTab === 'music' && styles.activeTabText]}>Music</Text>
+          </TouchableOpacity>
+        </View>
+
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           
-          {images.map((img) => {
-            const isRecordingThis = activeRecordingId === img.id;
-            
-            return (
-              <View key={img.id} style={styles.memoryCard}>
-                <Image source={{ uri: img.image_url }} style={styles.image} />
-                
-                {img.caption ? (
-                  <View style={styles.captionContainer}>
-                    <Text style={styles.captionText}>{img.caption}</Text>
-                    
-                    {/* BUTTON ROW */}
-                    <View style={styles.actionRow}>
-                      <TouchableOpacity 
-                        style={[styles.actionButton, styles.listenButton, isRecordingThis && { opacity: 0.3 }]} 
-                        onPress={() => speakMemory(img.caption)}
-                        disabled={isRecordingThis || isProcessing}
-                      >
-                        <Ionicons name="volume-high" size={24} color="#000000" />
-                        <Text style={styles.listenButtonText}>Listen</Text>
-                      </TouchableOpacity>
+          {loading ? (
+            <ActivityIndicator size="large" color="#8B5CF6" style={{ marginTop: 40 }} />
+          ) : (
+            <>
+              {/* --- 1. PHOTOS VIEW --- */}
+              {currentTab === 'photos' && (
+                <View style={styles.contentSection}>
+                  {photos.length === 0 ? (
+                    <Text style={styles.emptyText}>No photos yet.</Text>
+                  ) : (
+                    photos.map(item => (
+                      <View key={item.id} style={styles.photoCard}>
+                        <Image source={{ uri: item.image_url }} style={styles.photoImage} />
+                        {item.caption ? (
+                          <View style={styles.photoCaptionBox}>
+                            <Text style={styles.photoCaptionText}>{item.caption}</Text>
+                          </View>
+                        ) : null}
+                      </View>
+                    ))
+                  )}
+                </View>
+              )}
 
-                      <TouchableOpacity 
-                        style={[styles.actionButton, isRecordingThis ? styles.recordingButton : styles.replyButton]} 
-                        onPress={() => isRecordingThis ? stopRecordingAndSendToRAG(img) : startRecording(img.id)}
-                        disabled={isProcessing}
-                      >
-                        {isProcessing && activeRecordingId === null ? (
-                           <ActivityIndicator color="#FFFFFF" />
-                        ) : (
-                          <>
-                            <Ionicons name={isRecordingThis ? "stop-circle" : "mic"} size={24} color="#FFFFFF" />
-                            <Text style={styles.replyButtonText}>
-                              {isRecordingThis ? "Stop" : "Reply"}
-                            </Text>
-                          </>
-                        )}
-                      </TouchableOpacity>
-                    </View>
-                    
-                    {isRecordingThis && (
-                      <Text style={styles.recordingStatusText}>Remi is listening to you...</Text>
-                    )}
+              {/* --- 2. VOICES VIEW --- */}
+              {currentTab === 'voices' && (
+                <View style={styles.contentSection}>
+                  {voices.length === 0 ? (
+                    <Text style={styles.emptyText}>No voice messages yet.</Text>
+                  ) : (
+                    voices.map(item => {
+                      const isPlaying = playingId === item.id;
+                      return (
+                        <View key={item.id} style={styles.audioCard}>
+                          <View style={styles.audioInfo}>
+                            <Ionicons name="mic-circle" size={40} color="#8B5CF6" />
+                            <View style={{ marginLeft: 15 }}>
+                              <Text style={styles.audioTitle}>Message from Family</Text>
+                              <Text style={styles.audioDate}>{new Date(item.created_at).toLocaleDateString()}</Text>
+                            </View>
+                          </View>
+                          <TouchableOpacity 
+                            style={[styles.playBigButton, isPlaying && { backgroundColor: '#EF4444' }]} 
+                            onPress={() => playAudio(item.audio_url, item.id)}
+                          >
+                            <Ionicons name={isPlaying ? "stop" : "play"} size={28} color="#FFFFFF" style={{ marginLeft: isPlaying ? 0 : 4 }} />
+                            <Text style={styles.playBigButtonText}>{isPlaying ? "Stop" : "Listen"}</Text>
+                          </TouchableOpacity>
+                        </View>
+                      );
+                    })
+                  )}
+                </View>
+              )}
 
-                  </View>
-                ) : null}
-              </View>
-            )
-          })}
-
-          {images.length === 0 && (
-            <Text style={styles.emptyText}>Your family hasn't added any photos yet.</Text>
+              {/* --- 3. MUSIC VIEW --- */}
+              {currentTab === 'music' && (
+                <View style={styles.contentSection}>
+                  {music.length === 0 ? (
+                    <Text style={styles.emptyText}>No music tracks yet.</Text>
+                  ) : (
+                    music.map(item => {
+                      const isPlaying = playingId === item.id;
+                      // Clean up tags for Mary's screen
+                      const cleanTitle = item.caption.replace('[MUSIC-IMPORTANT]', '').replace('[MUSIC]', '').trim();
+                      
+                      return (
+                        <View key={item.id} style={styles.audioCard}>
+                          <View style={styles.audioInfo}>
+                            <Ionicons name="musical-notes" size={40} color="#F59E0B" />
+                            <View style={{ marginLeft: 15, flex: 1 }}>
+                              <Text style={styles.audioTitle}>{cleanTitle}</Text>
+                              <Text style={styles.audioDate}>Your Playlist</Text>
+                            </View>
+                          </View>
+                          <TouchableOpacity 
+                            style={[styles.playBigButton, { backgroundColor: isPlaying ? '#EF4444' : '#F59E0B' }]} 
+                            onPress={() => playAudio(item.audio_url, item.id)}
+                          >
+                            <Ionicons name={isPlaying ? "stop" : "play"} size={28} color="#FFFFFF" style={{ marginLeft: isPlaying ? 0 : 4 }} />
+                            <Text style={styles.playBigButtonText}>{isPlaying ? "Stop" : "Play"}</Text>
+                          </TouchableOpacity>
+                        </View>
+                      );
+                    })
+                  )}
+                </View>
+              )}
+            </>
           )}
-          
-          <View style={{ height: 40 }} />
+
         </ScrollView>
-      )}
+      </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#000000', paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0 },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 20, paddingVertical: 20, borderBottomWidth: 1, borderBottomColor: '#1A1325' },
-  headerTitle: { fontSize: 32, fontWeight: 'bold', color: '#FFFFFF' },
-  centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  scrollContent: { paddingTop: 20 },
-  memoryCard: { backgroundColor: '#110C1D', marginBottom: 40, borderTopWidth: 1, borderBottomWidth: 1, borderColor: '#231A31' },
-  image: { width: '100%', aspectRatio: 1, backgroundColor: '#1A1325' },
-  captionContainer: { padding: 25, backgroundColor: '#110C1D' },
-  captionText: { color: '#FFFFFF', fontSize: 26, lineHeight: 38, fontWeight: '600', marginBottom: 25 },
+  safeArea: { flex: 1, backgroundColor: '#F3F4F6', paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0 },
+  appCapsule: { flex: 1, backgroundColor: '#FFFFFF', borderRadius: 35, overflow: 'hidden', marginHorizontal: 10, marginBottom: 10, marginTop: 10, borderWidth: 1, borderColor: '#E5E7EB', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 5 },
   
-  actionRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 15 },
-  actionButton: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 18, borderRadius: 20 },
-  listenButton: { backgroundColor: '#FDE68A' },
-  listenButtonText: { color: '#000000', fontSize: 20, fontWeight: 'bold', marginLeft: 8 },
-  replyButton: { backgroundColor: '#8B5CF6' },
-  recordingButton: { backgroundColor: '#EF4444' },
-  replyButtonText: { color: '#FFFFFF', fontSize: 20, fontWeight: 'bold', marginLeft: 8 },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 25, paddingBottom: 15 },
+  backButton: { padding: 10, backgroundColor: '#F3F4F6', borderRadius: 25 },
+  headerTitle: { fontSize: 26, fontWeight: '800', color: '#111827' },
   
-  recordingStatusText: { color: '#EF4444', textAlign: 'center', marginTop: 15, fontSize: 16, fontWeight: '600' },
-  emptyText: { color: '#6B7280', fontSize: 20, textAlign: 'center', marginTop: 40, paddingHorizontal: 20 },
+  // TABS
+  tabContainer: { flexDirection: 'row', paddingHorizontal: 15, marginBottom: 15, gap: 10 },
+  tabButton: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 14, backgroundColor: '#F9FAFB', borderRadius: 20, borderWidth: 1, borderColor: '#E5E7EB' },
+  activeTabButton: { backgroundColor: '#8B5CF6', borderColor: '#8B5CF6' },
+  tabText: { fontSize: 16, fontWeight: '700', color: '#6B7280', marginLeft: 6 },
+  activeTabText: { color: '#FFFFFF' },
+
+  scrollContent: { paddingHorizontal: 20, paddingBottom: 40 },
+  contentSection: { marginTop: 10 },
+  emptyText: { textAlign: 'center', fontSize: 18, color: '#9CA3AF', marginTop: 40, fontWeight: '600' },
+
+  // PHOTOS
+  photoCard: { backgroundColor: '#FFFFFF', borderRadius: 24, overflow: 'hidden', marginBottom: 20, borderWidth: 1, borderColor: '#E5E7EB', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 3 },
+  photoImage: { width: '100%', height: 300, resizeMode: 'cover' },
+  photoCaptionBox: { padding: 20, backgroundColor: '#F9FAFB' },
+  photoCaptionText: { fontSize: 18, color: '#1F2937', fontWeight: '600', lineHeight: 26 },
+
+  // AUDIO & MUSIC
+  audioCard: { backgroundColor: '#FFFFFF', borderRadius: 24, padding: 20, marginBottom: 15, borderWidth: 1, borderColor: '#E5E7EB', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 3 },
+  audioInfo: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
+  audioTitle: { fontSize: 20, fontWeight: 'bold', color: '#111827' },
+  audioDate: { fontSize: 15, color: '#6B7280', marginTop: 4, fontWeight: '600' },
+  playBigButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#8B5CF6', paddingVertical: 16, borderRadius: 20 },
+  playBigButtonText: { color: '#FFFFFF', fontSize: 20, fontWeight: 'bold', marginLeft: 8 },
 });
