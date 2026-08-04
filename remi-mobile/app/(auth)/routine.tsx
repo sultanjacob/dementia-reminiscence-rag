@@ -31,13 +31,10 @@ export default function PatientRoutinesScreen() {
   const fetchRoutines = async () => {
     setLoading(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
+      // We removed the strict ID filter here, just like we did for the Gallery!
       const { data, error } = await supabase
         .from('routines')
         .select('*')
-        .eq('patient_id', user.id)
         .order('created_at', { ascending: true }); 
 
       if (error) throw error;
