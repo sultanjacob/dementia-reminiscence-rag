@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import React, { useEffect, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
+import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -19,9 +20,13 @@ export default function PatientRoutinesScreen() {
   const [routines, setRoutines] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetchRoutines();
-  }, []);
+  // --- THE MAGIC FIX --- 
+  // This forces the screen to refresh data EVERY time Mary opens this tab
+  useFocusEffect(
+    useCallback(() => {
+      fetchRoutines();
+    }, [])
+  );
 
   const fetchRoutines = async () => {
     setLoading(true);
@@ -29,7 +34,6 @@ export default function PatientRoutinesScreen() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Changed 'patient_code' to 'patient_id' to match your database!
       const { data, error } = await supabase
         .from('routines')
         .select('*')
@@ -48,14 +52,12 @@ export default function PatientRoutinesScreen() {
   const toggleRoutineStatus = async (id: string, currentStatus: boolean) => {
     const newStatus = !currentStatus;
     
-    // Play a nice success vibration when checking off a task
     if (newStatus) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } else {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
 
-    // Optimistic UI update
     setRoutines(prev => prev.map(r => r.id === id ? { ...r, is_completed: newStatus } : r));
 
     try {
@@ -65,11 +67,10 @@ export default function PatientRoutinesScreen() {
         .eq('id', id);
     } catch (error) {
       console.error("Failed to update routine status", error);
-      fetchRoutines(); // Revert on failure
+      fetchRoutines(); 
     }
   };
 
-  // --- SMART ICON GENERATOR ---
   const getContextIcon = (title: string) => {
     const lower = String(title || '').toLowerCase();
     if (lower.includes('med') || lower.includes('pill')) return 'medkit';
@@ -79,16 +80,13 @@ export default function PatientRoutinesScreen() {
     if (lower.includes('bath') || lower.includes('shower') || lower.includes('wash') || lower.includes('teeth')) return 'water-outline';
     if (lower.includes('walk') || lower.includes('exercise') || lower.includes('outside')) return 'walk';
     if (lower.includes('doctor') || lower.includes('appointment')) return 'calendar';
-    return 'calendar-outline'; // Fallback
+    return 'calendar-outline'; 
   };
 
-  // --- FILTERING LOGIC ---
   const pendingRoutines = routines.filter(r => !r.is_completed);
   const completedRoutines = routines.filter(r => r.is_completed);
   
-  // The very first uncompleted task is spotlighted
   const nextUp = pendingRoutines.length > 0 ? pendingRoutines[0] : null;
-  // The rest go into the "Later Today" list
   const laterToday = pendingRoutines.slice(1);
 
   return (
@@ -110,7 +108,7 @@ export default function PatientRoutinesScreen() {
                 <Text style={styles.emptyText}>No routines scheduled for today.</Text>
               ) : (
                 <>
-                  {/* --- 1. NEXT UP SPOTLIGHT CARD --- */}
+                  {/* 1. NEXT UP SPOTLIGHT CARD */}
                   {nextUp && (
                     <View style={styles.nextUpContainer}>
                       <Text style={styles.sectionLabel}>RIGHT NOW</Text>
@@ -140,7 +138,7 @@ export default function PatientRoutinesScreen() {
                     </View>
                   )}
 
-                  {/* --- 2. LATER TODAY LIST --- */}
+                  {/* 2. LATER TODAY LIST */}
                   {laterToday.length > 0 && (
                     <View style={styles.listSection}>
                       <Text style={styles.sectionLabel}>LATER TODAY</Text>
@@ -163,7 +161,7 @@ export default function PatientRoutinesScreen() {
                     </View>
                   )}
 
-                  {/* --- 3. COMPLETED LIST --- */}
+                  {/* 3. COMPLETED LIST */}
                   {completedRoutines.length > 0 && (
                     <View style={styles.listSection}>
                       <Text style={styles.sectionLabel}>FINISHED</Text>
@@ -194,7 +192,6 @@ export default function PatientRoutinesScreen() {
                         <Text style={styles.allDoneSubtitle}>You have completed all your tasks.</Text>
                      </View>
                   )}
-
                 </>
               )}
             </View>
@@ -217,7 +214,6 @@ const styles = StyleSheet.create({
   emptyText: { textAlign: 'center', fontSize: 18, color: '#9CA3AF', marginTop: 40, fontWeight: '600' },
   sectionLabel: { fontSize: 14, fontWeight: '800', color: '#9CA3AF', letterSpacing: 1.5, marginBottom: 10, marginTop: 10 },
 
-  // NEXT UP CARD
   nextUpContainer: { marginBottom: 25 },
   nextUpCard: { backgroundColor: '#FFFFFF', borderRadius: 28, overflow: 'hidden', borderWidth: 2, borderColor: '#8B5CF6', shadowColor: '#8B5CF6', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.15, shadowRadius: 15, elevation: 8 },
   nextUpImage: { width: '100%', height: 180, resizeMode: 'cover', backgroundColor: '#F3F4F6' },
@@ -228,7 +224,6 @@ const styles = StyleSheet.create({
   doneButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#F5F3FF', paddingVertical: 16, borderRadius: 20, borderWidth: 1, borderColor: '#DDD6FE' },
   doneButtonText: { fontSize: 18, fontWeight: 'bold', color: '#8B5CF6', marginLeft: 10 },
 
-  // LIST CARDS (Later & Completed)
   listSection: { marginBottom: 25 },
   listCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF', borderRadius: 24, padding: 18, marginBottom: 12, borderWidth: 1, borderColor: '#E5E7EB', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.03, shadowRadius: 5, elevation: 2 },
   listCardCompleted: { backgroundColor: '#F9FAFB', borderColor: '#F3F4F6' },
@@ -239,7 +234,6 @@ const styles = StyleSheet.create({
   listTitle: { fontSize: 20, fontWeight: 'bold', color: '#111827' },
   textStrikethrough: { textDecorationLine: 'line-through', color: '#9CA3AF' },
 
-  // ALL DONE
   allDoneContainer: { alignItems: 'center', justifyContent: 'center', marginTop: 30, padding: 30, backgroundColor: '#FFFBEB', borderRadius: 30, borderWidth: 1, borderColor: '#FDE68A' },
   allDoneTitle: { fontSize: 24, fontWeight: 'bold', color: '#B45309', marginBottom: 8 },
   allDoneSubtitle: { fontSize: 16, color: '#D97706', fontWeight: '600', textAlign: 'center' },
