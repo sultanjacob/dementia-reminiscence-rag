@@ -29,12 +29,12 @@ export default function PatientRoutinesScreen() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Note: Adjust the table name 'routines' if yours is named differently!
+      // Changed 'patient_code' to 'patient_id' to match your database!
       const { data, error } = await supabase
         .from('routines')
         .select('*')
-        .eq('patient_code', user.id)
-        .order('created_at', { ascending: true }); // Assuming they are created in order
+        .eq('patient_id', user.id)
+        .order('created_at', { ascending: true }); 
 
       if (error) throw error;
       if (data) setRoutines(data);
