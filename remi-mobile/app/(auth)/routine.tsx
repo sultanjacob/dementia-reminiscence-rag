@@ -105,9 +105,16 @@ export default function PatientRoutinesScreen() {
                       <Text style={styles.sectionLabel}>LATER TODAY</Text>
                       {laterToday.map(routine => (
                         <View key={routine.id} style={styles.listCard}>
-                          <View style={styles.iconCirclePurple}>
-                            <Ionicons name={getContextIcon(routine.title)} size={24} color="#8B5CF6" />
-                          </View>
+                          
+                          {/* Render thumbnail if photo exists, otherwise fallback to icon */}
+                          {routine.image_url ? (
+                            <Image source={{ uri: routine.image_url }} style={styles.listThumbnail} />
+                          ) : (
+                            <View style={styles.iconCirclePurple}>
+                              <Ionicons name={getContextIcon(routine.title)} size={24} color="#8B5CF6" />
+                            </View>
+                          )}
+
                           <View style={styles.listTextContainer}>
                             <Text style={styles.listTime}>{String(routine.time_string || "Anytime")}</Text>
                             <Text style={styles.listTitle}>{String(routine.title)}</Text>
