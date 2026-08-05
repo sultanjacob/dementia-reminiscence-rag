@@ -187,4 +187,5 @@ const styles = StyleSheet.create({
   allDoneContainer: { alignItems: 'center', justifyContent: 'center', marginTop: 30, padding: 30, backgroundColor: '#FFFBEB', borderRadius: 30, borderWidth: 1, borderColor: '#FDE68A' },
   allDoneTitle: { fontSize: 24, fontWeight: 'bold', color: '#B45309', marginBottom: 8 },
   allDoneSubtitle: { fontSize: 16, color: '#D97706', fontWeight: '600', textAlign: 'center' },
+listThumbnail: { width: 56, height: 56, borderRadius: 28, marginRight: 16, backgroundColor: '#F3F4F6' },
 });
