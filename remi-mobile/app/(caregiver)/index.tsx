@@ -4,6 +4,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   Platform,
   SafeAreaView,
   ScrollView,
@@ -20,7 +21,6 @@ export default function CaregiverRoutinesScreen() {
   const [routines, setRoutines] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Refresh every time the caregiver opens this tab
   useFocusEffect(
     useCallback(() => {
       fetchRoutines();
@@ -36,7 +36,6 @@ export default function CaregiverRoutinesScreen() {
       const { data, error } = await supabase
         .from('routines')
         .select('*')
-        // Using patient_id to pull the tasks the family created
         .eq('patient_id', user.id)
         .order('created_at', { ascending: true });
 
@@ -58,18 +57,16 @@ export default function CaregiverRoutinesScreen() {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     }
 
-    // Instantly update the Caregiver's screen
     setRoutines(prev => prev.map(r => r.id === id ? { ...r, is_completed: newStatus } : r));
 
     try {
-      // Update the database so Mary's screen syncs automatically!
       await supabase
         .from('routines')
         .update({ is_completed: newStatus })
         .eq('id', id);
     } catch (error) {
       console.error("Failed to update routine status", error);
-      fetchRoutines(); // Revert on failure
+      fetchRoutines();
     }
   };
 
@@ -112,6 +109,16 @@ export default function CaregiverRoutinesScreen() {
             ) : (
               pendingRoutines.map((routine) => (
                 <View key={routine.id} style={styles.taskCard}>
+                  
+                  {/* --- RENDER IMAGE FOR CAREGIVER --- */}
+                  {routine.image_url ? (
+                    <Image source={{ uri: routine.image_url }} style={styles.taskImage} />
+                  ) : (
+                    <View style={styles.taskImagePlaceholder}>
+                      <Ionicons name="image-outline" size={24} color="#9CA3AF" />
+                    </View>
+                  )}
+
                   <View style={styles.taskInfo}>
                     <Text style={styles.taskTime}>{routine.time_string}</Text>
                     <Text style={styles.taskTitle}>{routine.title}</Text>
@@ -122,7 +129,7 @@ export default function CaregiverRoutinesScreen() {
                     onPress={() => toggleRoutineStatus(routine.id, routine.is_completed)}
                   >
                     <Ionicons name="ellipse-outline" size={24} color="#8B5CF6" />
-                    <Text style={styles.completeButtonText}>Mark Done</Text>
+                    <Text style={styles.completeButtonText}>Done</Text>
                   </TouchableOpacity>
                 </View>
               ))
@@ -133,6 +140,15 @@ export default function CaregiverRoutinesScreen() {
                 <Text style={[styles.sectionLabel, { marginTop: 30 }]}>COMPLETED TASKS</Text>
                 {completedRoutines.map((routine) => (
                   <View key={routine.id} style={[styles.taskCard, styles.taskCardCompleted]}>
+                    
+                    {routine.image_url ? (
+                      <Image source={{ uri: routine.image_url }} style={[styles.taskImage, { opacity: 0.5 }]} />
+                    ) : (
+                      <View style={styles.taskImagePlaceholder}>
+                        <Ionicons name="checkmark" size={24} color="#9CA3AF" />
+                      </View>
+                    )}
+
                     <View style={styles.taskInfo}>
                       <Text style={[styles.taskTime, styles.textStrikethrough]}>{routine.time_string}</Text>
                       <Text style={[styles.taskTitle, styles.textStrikethrough]}>{routine.title}</Text>
@@ -170,16 +186,20 @@ const styles = StyleSheet.create({
   
   sectionLabel: { fontSize: 14, fontWeight: '800', color: '#9CA3AF', letterSpacing: 1.5, marginBottom: 15 },
   
-  taskCard: { flexDirection: 'row', backgroundColor: '#FFFFFF', borderRadius: 20, padding: 18, marginBottom: 15, borderWidth: 1, borderColor: '#E5E7EB', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 5, elevation: 3 },
+  taskCard: { flexDirection: 'row', backgroundColor: '#FFFFFF', borderRadius: 20, padding: 16, marginBottom: 15, borderWidth: 1, borderColor: '#E5E7EB', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 5, elevation: 3 },
   taskCardCompleted: { backgroundColor: '#F9FAFB', shadowOpacity: 0, elevation: 0 },
   
-  taskInfo: { flex: 1, paddingRight: 15 },
-  taskTime: { color: '#8B5CF6', fontSize: 15, fontWeight: '800', marginBottom: 4 },
-  taskTitle: { color: '#111827', fontSize: 18, fontWeight: '700' },
+  // New Image Styles
+  taskImage: { width: 56, height: 56, borderRadius: 14, marginRight: 15, backgroundColor: '#F3F4F6' },
+  taskImagePlaceholder: { width: 56, height: 56, borderRadius: 14, backgroundColor: '#F3F4F6', alignItems: 'center', justifyContent: 'center', marginRight: 15 },
+  
+  taskInfo: { flex: 1, paddingRight: 10 },
+  taskTime: { color: '#8B5CF6', fontSize: 14, fontWeight: '800', marginBottom: 2 },
+  taskTitle: { color: '#111827', fontSize: 17, fontWeight: '700' },
   textStrikethrough: { textDecorationLine: 'line-through', color: '#9CA3AF' },
   
-  completeButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F5F3FF', paddingVertical: 12, paddingHorizontal: 16, borderRadius: 14, borderWidth: 1, borderColor: '#DDD6FE' },
-  completeButtonText: { color: '#8B5CF6', fontSize: 15, fontWeight: 'bold', marginLeft: 6 },
+  completeButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F5F3FF', paddingVertical: 10, paddingHorizontal: 14, borderRadius: 12, borderWidth: 1, borderColor: '#DDD6FE' },
+  completeButtonText: { color: '#8B5CF6', fontSize: 14, fontWeight: 'bold', marginLeft: 4 },
   
   undoButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F3F4F6', paddingVertical: 10, paddingHorizontal: 14, borderRadius: 12 },
   undoButtonText: { color: '#6B7280', fontSize: 14, fontWeight: 'bold', marginLeft: 4 },
