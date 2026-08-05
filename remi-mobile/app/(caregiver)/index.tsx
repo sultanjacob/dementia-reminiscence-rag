@@ -1,38 +1,34 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import * as Haptics from 'expo-haptics';
+import { useFocusEffect, useRouter } from 'expo-router';
+import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
-  KeyboardAvoidingView,
   Platform,
   SafeAreaView,
   ScrollView,
   StatusBar,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View
 } from 'react-native';
 import { supabase } from '../../supabase';
 
-export default function CaregiverDashboard() {
+export default function CaregiverRoutinesScreen() {
   const router = useRouter();
-
   const [routines, setRoutines] = useState<any[]>([]);
-  const [isLoadingRoutines, setIsLoadingRoutines] = useState(true);
+  const [loading, setLoading] = useState(true);
 
-  const [selectedVibe, setSelectedVibe] = useState<string | null>(null);
-  const [notes, setNotes] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  // --- NEW: FETCH REAL ROUTINES ---
-  useEffect(() => {
-    fetchRoutines();
-  }, []);
+  // Refresh every time the caregiver opens this tab
+  useFocusEffect(
+    useCallback(() => {
+      fetchRoutines();
+    }, [])
+  );
 
   const fetchRoutines = async () => {
+    setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
@@ -40,206 +36,154 @@ export default function CaregiverDashboard() {
       const { data, error } = await supabase
         .from('routines')
         .select('*')
+        // Using patient_id to pull the tasks the family created
         .eq('patient_id', user.id)
-        .order('time', { ascending: true }); // Orders them chronologically 
+        .order('created_at', { ascending: true });
 
       if (error) throw error;
       if (data) setRoutines(data);
     } catch (error) {
       console.error("Error fetching routines:", error);
     } finally {
-      setIsLoadingRoutines(false);
+      setLoading(false);
     }
   };
 
-  // --- NEW: TOGGLE ROUTINE IN DATABASE ---
-  const toggleRoutine = async (id: string, currentStatus: boolean) => {
-    // Optimistically update the UI instantly so it feels fast
-    setRoutines(routines.map(r => 
-      r.id === id ? { ...r, is_completed: !currentStatus } : r
-    ));
-
-    try {
-      const { error } = await supabase
-        .from('routines')
-        .update({ is_completed: !currentStatus })
-        .eq('id', id);
-
-      if (error) throw error;
-    } catch (error) {
-      // Revert the UI if the database failed
-      Alert.alert("Error", "Could not update routine.");
-      fetchRoutines(); 
-    }
-  };
-
-  const handleEndShift = async () => {
-    if (!selectedVibe) {
-      Alert.alert("Missing Vibe", "Please select Mary's overall mood for this shift.");
-      return;
-    }
-
-    setIsSubmitting(true);
+  const toggleRoutineStatus = async (id: string, currentStatus: boolean) => {
+    const newStatus = !currentStatus;
     
+    if (newStatus) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } else {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    }
+
+    // Instantly update the Caregiver's screen
+    setRoutines(prev => prev.map(r => r.id === id ? { ...r, is_completed: newStatus } : r));
+
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("No user found");
-
-      const { error } = await supabase.from('shift_logs').insert({
-        patient_id: user.id,
-        vibe: selectedVibe,
-        notes: notes,
-        caregiver_name: "Care Team" 
-      });
-
-      if (error) throw error;
-
-      Alert.alert(
-        "Shift Logged", 
-        "Your update has been beamed to the Family Dashboard.",
-        [{ text: "OK", onPress: lockToPatientMode }]
-      );
-    } catch (err: any) {
-      Alert.alert("Error Saving Log", err.message);
-    } finally {
-      setIsSubmitting(false);
+      // Update the database so Mary's screen syncs automatically!
+      await supabase
+        .from('routines')
+        .update({ is_completed: newStatus })
+        .eq('id', id);
+    } catch (error) {
+      console.error("Failed to update routine status", error);
+      fetchRoutines(); // Revert on failure
     }
   };
 
-  const lockToPatientMode = () => {
-    router.replace('/(auth)');
-  };
-
-  const vibes = [
-    { label: 'Calm', emoji: '🙂', color: '#10B981', bgColor: 'rgba(16, 185, 129, 0.15)' },
-    { label: 'Confused', emoji: '😕', color: '#F59E0B', bgColor: 'rgba(245, 158, 11, 0.15)' },
-    { label: 'Agitated', emoji: '😟', color: '#EF4444', bgColor: 'rgba(239, 68, 68, 0.15)' }
-  ];
+  const pendingRoutines = routines.filter(r => !r.is_completed);
+  const completedRoutines = routines.filter(r => r.is_completed);
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor="#0B0F19" />
+      <StatusBar barStyle="dark-content" backgroundColor="#F3F4F6" />
       
       <View style={styles.header}>
-        <View>
-          <Text style={styles.headerTitle}>Caregiver Actions</Text>
-          <Text style={styles.headerSubtitle}>Logged in securely</Text>
-        </View>
-        <TouchableOpacity style={styles.lockIconButton} onPress={lockToPatientMode}>
-          <Ionicons name="lock-closed" size={24} color="#EF4444" />
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <Ionicons name="arrow-back" size={24} color="#111827" />
         </TouchableOpacity>
+        <View>
+          <Text style={styles.headerTitle}>Caregiver Shift</Text>
+          <Text style={styles.headerSubtitle}>Task Execution Board</Text>
+        </View>
+        <View style={{ width: 44 }} />
       </View>
 
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
-          
-          {/* --- 1. ROUTINE CHECKLIST --- */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Today's Routines</Text>
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        {loading ? (
+          <ActivityIndicator size="large" color="#8B5CF6" style={{ marginTop: 40 }} />
+        ) : routines.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <Ionicons name="clipboard-outline" size={64} color="#9CA3AF" />
+            <Text style={styles.emptyText}>No tasks assigned.</Text>
+            <Text style={styles.emptySubtext}>The family has not scheduled any routines for today.</Text>
+          </View>
+        ) : (
+          <View>
+            <Text style={styles.sectionLabel}>PENDING TASKS</Text>
             
-            {isLoadingRoutines ? (
-              <ActivityIndicator size="large" color="#8B5CF6" style={{ marginVertical: 20 }} />
-            ) : routines.length === 0 ? (
-              <Text style={styles.emptyText}>No routines scheduled for today.</Text>
+            {pendingRoutines.length === 0 ? (
+              <View style={styles.allDoneBadge}>
+                <Ionicons name="checkmark-circle" size={24} color="#10B981" />
+                <Text style={styles.allDoneText}>All tasks completed for now!</Text>
+              </View>
             ) : (
-              routines.map((routine) => (
-                <TouchableOpacity 
-                  key={routine.id} 
-                  style={[styles.routineCard, routine.is_completed && styles.routineCompleted]}
-                  onPress={() => toggleRoutine(routine.id, routine.is_completed)}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.routineInfo}>
-                    <Text style={[styles.routineTime, routine.is_completed && styles.textCompleted]}>
-                      {routine.time}
-                    </Text>
-                    <Text style={[styles.routineTitle, routine.is_completed && styles.textCompleted]}>
-                      {routine.title}
-                    </Text>
+              pendingRoutines.map((routine) => (
+                <View key={routine.id} style={styles.taskCard}>
+                  <View style={styles.taskInfo}>
+                    <Text style={styles.taskTime}>{routine.time_string}</Text>
+                    <Text style={styles.taskTitle}>{routine.title}</Text>
                   </View>
-                  <View style={[styles.checkbox, routine.is_completed && styles.checkboxCompleted]}>
-                    {routine.is_completed && <Ionicons name="checkmark" size={18} color="#FFFFFF" />}
-                  </View>
-                </TouchableOpacity>
+                  
+                  <TouchableOpacity 
+                    style={styles.completeButton}
+                    onPress={() => toggleRoutineStatus(routine.id, routine.is_completed)}
+                  >
+                    <Ionicons name="ellipse-outline" size={24} color="#8B5CF6" />
+                    <Text style={styles.completeButtonText}>Mark Done</Text>
+                  </TouchableOpacity>
+                </View>
               ))
             )}
+
+            {completedRoutines.length > 0 && (
+              <>
+                <Text style={[styles.sectionLabel, { marginTop: 30 }]}>COMPLETED TASKS</Text>
+                {completedRoutines.map((routine) => (
+                  <View key={routine.id} style={[styles.taskCard, styles.taskCardCompleted]}>
+                    <View style={styles.taskInfo}>
+                      <Text style={[styles.taskTime, styles.textStrikethrough]}>{routine.time_string}</Text>
+                      <Text style={[styles.taskTitle, styles.textStrikethrough]}>{routine.title}</Text>
+                    </View>
+                    
+                    <TouchableOpacity 
+                      style={styles.undoButton}
+                      onPress={() => toggleRoutineStatus(routine.id, routine.is_completed)}
+                    >
+                      <Ionicons name="refresh" size={20} color="#6B7280" />
+                      <Text style={styles.undoButtonText}>Undo</Text>
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </>
+            )}
           </View>
-
-          {/* --- 2. END OF SHIFT LOG --- */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Shift Report</Text>
-            
-            <Text style={styles.label}>Overall Vibe</Text>
-            <View style={styles.vibeRow}>
-              {vibes.map((v) => {
-                const isSelected = selectedVibe === v.label;
-                return (
-                  <TouchableOpacity
-                    key={v.label}
-                    style={[styles.vibeButton, isSelected ? { backgroundColor: v.bgColor, borderColor: v.color } : {}]}
-                    onPress={() => setSelectedVibe(v.label)}
-                  >
-                    <Text style={styles.vibeEmoji}>{v.emoji}</Text>
-                    <Text style={[styles.vibeLabel, isSelected ? { color: v.color, fontWeight: 'bold' } : {}]}>
-                      {v.label}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-
-            <Text style={styles.label}>Shift Notes (Optional)</Text>
-            <TextInput
-              style={styles.notesInput}
-              placeholder="e.g., Mary had a great lunch, but asked about her old dog a few times."
-              placeholderTextColor="#6B7280"
-              multiline
-              value={notes}
-              onChangeText={setNotes}
-              textAlignVertical="top"
-            />
-          </View>
-
-        </ScrollView>
-      </KeyboardAvoidingView>
-
-      <View style={styles.footer}>
-        <TouchableOpacity style={styles.submitButton} onPress={handleEndShift} disabled={isSubmitting}>
-          <Text style={styles.submitButtonText}>
-            {isSubmitting ? "Sending to Family..." : "Submit Log & Lock Device"}
-          </Text>
-        </TouchableOpacity>
-      </View>
+        )}
+      </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#0B0F19', paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 20, borderBottomWidth: 1, borderBottomColor: '#1F2937' },
-  headerTitle: { fontSize: 24, fontWeight: '800', color: '#FFFFFF' },
-  headerSubtitle: { fontSize: 14, color: '#10B981', marginTop: 4, fontWeight: '600' },
-  lockIconButton: { backgroundColor: 'rgba(239, 68, 68, 0.1)', padding: 12, borderRadius: 16 },
-  container: { flex: 1 },
-  scrollContent: { padding: 20, paddingBottom: 40 },
-  section: { marginBottom: 35 },
-  sectionTitle: { fontSize: 18, fontWeight: '700', color: '#FFFFFF', marginBottom: 15, textTransform: 'uppercase', letterSpacing: 1 },
-  emptyText: { color: '#9CA3AF', fontSize: 15, fontStyle: 'italic', marginBottom: 20 },
-  routineCard: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#111827', padding: 18, borderRadius: 16, marginBottom: 10, borderWidth: 1, borderColor: '#1F2937' },
-  routineCompleted: { backgroundColor: 'rgba(16, 185, 129, 0.05)', borderColor: 'rgba(16, 185, 129, 0.3)' },
-  routineInfo: { flex: 1 },
-  routineTime: { color: '#8B5CF6', fontSize: 13, fontWeight: '700', marginBottom: 4 },
-  routineTitle: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
-  textCompleted: { color: '#6B7280', textDecorationLine: 'line-through' },
-  checkbox: { width: 28, height: 28, borderRadius: 14, borderWidth: 2, borderColor: '#4B5563', alignItems: 'center', justifyContent: 'center' },
-  checkboxCompleted: { backgroundColor: '#10B981', borderColor: '#10B981' },
-  label: { color: '#9CA3AF', fontSize: 14, fontWeight: '600', marginBottom: 10, marginTop: 5 },
-  vibeRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 25 },
-  vibeButton: { flex: 1, alignItems: 'center', backgroundColor: '#111827', paddingVertical: 16, borderRadius: 16, borderWidth: 1, borderColor: '#1F2937', marginHorizontal: 4 },
-  vibeEmoji: { fontSize: 28, marginBottom: 8 },
-  vibeLabel: { color: '#9CA3AF', fontSize: 13, fontWeight: '500' },
-  notesInput: { backgroundColor: '#111827', borderWidth: 1, borderColor: '#1F2937', borderRadius: 16, padding: 16, color: '#FFFFFF', fontSize: 16, minHeight: 120 },
-  footer: { padding: 20, borderTopWidth: 1, borderTopColor: '#1F2937', backgroundColor: '#0B0F19' },
-  submitButton: { backgroundColor: '#8B5CF6', paddingVertical: 18, borderRadius: 16, alignItems: 'center', shadowColor: '#8B5CF6', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 8 },
-  submitButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: 'bold' },
+  safeArea: { flex: 1, backgroundColor: '#F3F4F6', paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0 },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 20, backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: '#E5E7EB' },
+  backButton: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#F3F4F6', alignItems: 'center', justifyContent: 'center' },
+  headerTitle: { fontSize: 22, fontWeight: '900', color: '#111827', textAlign: 'center' },
+  headerSubtitle: { fontSize: 14, fontWeight: '600', color: '#8B5CF6', textAlign: 'center' },
+  
+  scrollContent: { paddingHorizontal: 20, paddingBottom: 50, paddingTop: 20 },
+  emptyContainer: { alignItems: 'center', justifyContent: 'center', marginTop: 80 },
+  emptyText: { color: '#111827', fontSize: 20, fontWeight: 'bold', marginTop: 15, marginBottom: 8 },
+  emptySubtext: { color: '#6B7280', fontSize: 15, textAlign: 'center' },
+  
+  sectionLabel: { fontSize: 14, fontWeight: '800', color: '#9CA3AF', letterSpacing: 1.5, marginBottom: 15 },
+  
+  taskCard: { flexDirection: 'row', backgroundColor: '#FFFFFF', borderRadius: 20, padding: 18, marginBottom: 15, borderWidth: 1, borderColor: '#E5E7EB', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 5, elevation: 3 },
+  taskCardCompleted: { backgroundColor: '#F9FAFB', shadowOpacity: 0, elevation: 0 },
+  
+  taskInfo: { flex: 1, paddingRight: 15 },
+  taskTime: { color: '#8B5CF6', fontSize: 15, fontWeight: '800', marginBottom: 4 },
+  taskTitle: { color: '#111827', fontSize: 18, fontWeight: '700' },
+  textStrikethrough: { textDecorationLine: 'line-through', color: '#9CA3AF' },
+  
+  completeButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F5F3FF', paddingVertical: 12, paddingHorizontal: 16, borderRadius: 14, borderWidth: 1, borderColor: '#DDD6FE' },
+  completeButtonText: { color: '#8B5CF6', fontSize: 15, fontWeight: 'bold', marginLeft: 6 },
+  
+  undoButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F3F4F6', paddingVertical: 10, paddingHorizontal: 14, borderRadius: 12 },
+  undoButtonText: { color: '#6B7280', fontSize: 14, fontWeight: 'bold', marginLeft: 4 },
+
+  allDoneBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#ECFDF5', padding: 20, borderRadius: 16, borderWidth: 1, borderColor: '#A7F3D0' },
+  allDoneText: { color: '#065F46', fontSize: 16, fontWeight: 'bold', marginLeft: 10 },
 });
