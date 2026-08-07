@@ -5,6 +5,7 @@ import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
+  Modal,
   Platform,
   SafeAreaView,
   ScrollView,
@@ -20,6 +21,9 @@ export default function CaregiverRoutinesScreen() {
   const router = useRouter();
   const [routines, setRoutines] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  // State for the pop-up image
+  const [expandedImage, setExpandedImage] = useState<string | null>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -30,7 +34,6 @@ export default function CaregiverRoutinesScreen() {
   const fetchRoutines = async () => {
     setLoading(true);
     try {
-      // We removed the strict .eq('patient_id') filter here so it pulls everything!
       const { data, error } = await supabase
         .from('routines')
         .select('*')
@@ -70,9 +73,13 @@ export default function CaregiverRoutinesScreen() {
   const pendingRoutines = routines.filter(r => !r.is_completed);
   const completedRoutines = routines.filter(r => r.is_completed);
 
-  // Safety fallbacks to prevent "null" from showing up on screen
   const safeTitle = (title: any) => (title && title !== 'null') ? String(title) : "Scheduled Task";
   const safeTime = (time: any) => (time && time !== 'null') ? String(time) : "Anytime";
+
+  const handleImageTap = (url: string) => {
+    Haptics.selectionAsync();
+    setExpandedImage(url);
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -112,7 +119,9 @@ export default function CaregiverRoutinesScreen() {
                 <View key={routine.id} style={styles.taskCard}>
                   
                   {routine.image_url ? (
-                    <Image source={{ uri: routine.image_url }} style={styles.taskImage} />
+                    <TouchableOpacity activeOpacity={0.8} onPress={() => handleImageTap(routine.image_url)}>
+                      <Image source={{ uri: routine.image_url }} style={styles.taskImage} />
+                    </TouchableOpacity>
                   ) : (
                     <View style={styles.taskImagePlaceholder}>
                       <Ionicons name="image-outline" size={24} color="#9CA3AF" />
@@ -142,7 +151,9 @@ export default function CaregiverRoutinesScreen() {
                   <View key={routine.id} style={[styles.taskCard, styles.taskCardCompleted]}>
                     
                     {routine.image_url ? (
-                      <Image source={{ uri: routine.image_url }} style={[styles.taskImage, { opacity: 0.5 }]} />
+                      <TouchableOpacity activeOpacity={0.8} onPress={() => handleImageTap(routine.image_url)}>
+                        <Image source={{ uri: routine.image_url }} style={[styles.taskImage, { opacity: 0.5 }]} />
+                      </TouchableOpacity>
                     ) : (
                       <View style={styles.taskImagePlaceholder}>
                         <Ionicons name="checkmark" size={24} color="#9CA3AF" />
@@ -168,6 +179,21 @@ export default function CaregiverRoutinesScreen() {
           </View>
         )}
       </ScrollView>
+
+      {/* MODAL TO POP-UP THE IMAGE */}
+      <Modal visible={!!expandedImage} transparent={true} animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.imageCapsule}>
+            <TouchableOpacity onPress={() => setExpandedImage(null)} style={styles.closeImageButton} hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}>
+              <Ionicons name="close-circle" size={36} color="#FFFFFF" />
+            </TouchableOpacity>
+            {expandedImage && (
+              <Image source={{ uri: expandedImage }} style={styles.largeExpandedImage} />
+            )}
+          </View>
+        </View>
+      </Modal>
+
     </SafeAreaView>
   );
 }
@@ -178,23 +204,37 @@ const styles = StyleSheet.create({
   backButton: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#F3F4F6', alignItems: 'center', justifyContent: 'center' },
   headerTitle: { fontSize: 22, fontWeight: '900', color: '#111827', textAlign: 'center' },
   headerSubtitle: { fontSize: 14, fontWeight: '600', color: '#8B5CF6', textAlign: 'center' },
+  
   scrollContent: { paddingHorizontal: 20, paddingBottom: 50, paddingTop: 20 },
   emptyContainer: { alignItems: 'center', justifyContent: 'center', marginTop: 80 },
   emptyText: { color: '#111827', fontSize: 20, fontWeight: 'bold', marginTop: 15, marginBottom: 8 },
   emptySubtext: { color: '#6B7280', fontSize: 15, textAlign: 'center' },
+  
   sectionLabel: { fontSize: 14, fontWeight: '800', color: '#9CA3AF', letterSpacing: 1.5, marginBottom: 15 },
+  
   taskCard: { flexDirection: 'row', backgroundColor: '#FFFFFF', borderRadius: 20, padding: 16, marginBottom: 15, borderWidth: 1, borderColor: '#E5E7EB', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 5, elevation: 3 },
   taskCardCompleted: { backgroundColor: '#F9FAFB', shadowOpacity: 0, elevation: 0 },
+  
   taskImage: { width: 56, height: 56, borderRadius: 14, marginRight: 15, backgroundColor: '#F3F4F6' },
   taskImagePlaceholder: { width: 56, height: 56, borderRadius: 14, backgroundColor: '#F3F4F6', alignItems: 'center', justifyContent: 'center', marginRight: 15 },
+  
   taskInfo: { flex: 1, paddingRight: 10 },
   taskTime: { color: '#8B5CF6', fontSize: 14, fontWeight: '800', marginBottom: 2 },
   taskTitle: { color: '#111827', fontSize: 17, fontWeight: '700' },
   textStrikethrough: { textDecorationLine: 'line-through', color: '#9CA3AF' },
+  
   completeButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F5F3FF', paddingVertical: 10, paddingHorizontal: 14, borderRadius: 12, borderWidth: 1, borderColor: '#DDD6FE' },
   completeButtonText: { color: '#8B5CF6', fontSize: 14, fontWeight: 'bold', marginLeft: 4 },
+  
   undoButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F3F4F6', paddingVertical: 10, paddingHorizontal: 14, borderRadius: 12 },
   undoButtonText: { color: '#6B7280', fontSize: 14, fontWeight: 'bold', marginLeft: 4 },
+
   allDoneBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#ECFDF5', padding: 20, borderRadius: 16, borderWidth: 1, borderColor: '#A7F3D0' },
   allDoneText: { color: '#065F46', fontSize: 16, fontWeight: 'bold', marginLeft: 10 },
+
+  // MODAL STYLES
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.85)', justifyContent: 'center', alignItems: 'center' },
+  imageCapsule: { width: '90%', height: '70%', alignItems: 'center', justifyContent: 'center' },
+  closeImageButton: { position: 'absolute', top: -15, right: -15, zIndex: 10 },
+  largeExpandedImage: { width: '100%', height: '100%', resizeMode: 'contain', borderRadius: 24 },
 });
