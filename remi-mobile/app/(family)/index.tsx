@@ -55,6 +55,25 @@ export default function FamilyDashboardScreen() {
       }
 
       // 2. Fetch the most recent shift log
+      // -> We removed the strict patient_id filter here so it grabs the Caregiver's log!
+      const { data: logData } = await supabase
+        .from('shift_logs')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (logData) {
+        setLatestLog(logData);
+      }
+    } catch (error) {
+      console.error("Error fetching dashboard data:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+      // 2. Fetch the most recent shift log
       const { data: logData } = await supabase
         .from('shift_logs')
         .select('*')
