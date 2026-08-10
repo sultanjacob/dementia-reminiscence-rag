@@ -8,6 +8,7 @@ import {
   Alert,
   Animated,
   Image,
+  Linking,
   Modal,
   Platform,
   SafeAreaView,
@@ -392,8 +393,13 @@ export default function HomeScreen() {
         const aiText = responseData.message || "I didn't quite catch that.";
         setRemiText(aiText);
         speak(aiText);
-        if (aiText.toLowerCase().includes("call family")) setIsDistressed(true);
-        else setIsDistressed(false); 
+        
+        // SOS Trigger Detection
+        if (aiText.toLowerCase().includes("call family") || aiText.toLowerCase().includes("contact family")) {
+          setIsDistressed(true);
+        } else {
+          setIsDistressed(false); 
+        }
       } else {
         throw new Error(`[HTTP ${response.status}]`);
       }
@@ -597,13 +603,18 @@ export default function HomeScreen() {
             </Animated.View>
           )}
 
+          {/* ----- FIXED ANDROID SOS BUTTON ----- */}
           {isDistressed && (
-            <Animated.View style={{ opacity: flashAnim }}>
-              <TouchableOpacity style={styles.flashingEmergencyButton} onPress={() => setShowEmergencyMenu(true)}>
+            <TouchableOpacity 
+              activeOpacity={0.8}
+              onPress={() => setShowEmergencyMenu(true)}
+              style={{ zIndex: 100, elevation: 10 }} // Ensures it sits perfectly on top
+            >
+              <Animated.View style={[styles.flashingEmergencyButton, { opacity: flashAnim }]}>
                 <Ionicons name="warning" size={24} color="#FFFFFF" style={{ marginRight: 8 }} />
                 <Text style={styles.flashingEmergencyText}>TAP HERE FOR HELP</Text>
-              </TouchableOpacity>
-            </Animated.View>
+              </Animated.View>
+            </TouchableOpacity>
           )}
 
           {(!isRecording && !isProcessing && !isDistressed && !isNudgeActive) && (
@@ -656,6 +667,7 @@ export default function HomeScreen() {
         </ScrollView>
       </View>
 
+      {/* --- MEMORY IMAGE FULLSCREEN MODAL --- */}
       <Modal visible={isMemoryExpanded} transparent={true} animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.imageCapsule}>
@@ -672,6 +684,7 @@ export default function HomeScreen() {
         </View>
       </Modal>
 
+      {/* --- REGULAR MENU MODAL --- */}
       <Modal visible={isMenuVisible} transparent={true} animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
@@ -701,6 +714,7 @@ export default function HomeScreen() {
         </View>
       </Modal>
 
+      {/* --- CAREGIVER PIN MODAL --- */}
       <Modal visible={showPinModal} transparent={true} animationType="fade">
         <View style={[styles.modalOverlay, { justifyContent: 'center', alignItems: 'center' }]}>
           <View style={styles.pinModalContent}>
@@ -720,6 +734,69 @@ export default function HomeScreen() {
             <TouchableOpacity style={{ paddingVertical: 15 }} onPress={() => { setShowPinModal(false); setEnteredPin(''); }}>
               <Text style={{ color: '#9CA3AF', fontSize: 18, fontWeight: '700' }}>Cancel</Text>
             </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* --- EMERGENCY SOS MENU MODAL --- */}
+      <Modal visible={showEmergencyMenu} transparent={true} animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: '#FEF2F2' }]}>
+            <View style={[styles.modalDragIndicator, { backgroundColor: '#FCA5A5' }]} />
+            
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: '#DC2626' }]}>Emergency Contacts</Text>
+              <TouchableOpacity 
+                onPress={() => setShowEmergencyMenu(false)} 
+                hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+              >
+                <Ionicons name="close" size={32} color="#DC2626" />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={{ fontSize: 16, color: '#991B1B', marginBottom: 20, fontWeight: '600' }}>
+              Who would you like to call?
+            </Text>
+
+            {/* Call Primary Contact */}
+            <TouchableOpacity 
+              style={[styles.menuRow, { backgroundColor: '#FEE2E2', borderRadius: 16, marginBottom: 12, paddingHorizontal: 15, borderBottomWidth: 0 }]} 
+              onPress={() => {
+                if (primaryContact) Linking.openURL(`tel:${primaryContact}`);
+                else Alert.alert("No Number", "Primary contact number is not set.");
+              }}
+            >
+              <View style={[styles.menuIconContainer, { backgroundColor: '#FECACA' }]}>
+                <Ionicons name="call" size={24} color="#DC2626" />
+              </View>
+              <Text style={[styles.menuRowText, { color: '#991B1B', fontWeight: 'bold' }]}>Call Primary Contact</Text>
+            </TouchableOpacity>
+
+            {/* Call Secondary Contact */}
+            <TouchableOpacity 
+              style={[styles.menuRow, { backgroundColor: '#FEE2E2', borderRadius: 16, paddingHorizontal: 15, borderBottomWidth: 0 }]} 
+              onPress={() => {
+                if (secondaryContact) Linking.openURL(`tel:${secondaryContact}`);
+                else Alert.alert("No Number", "Secondary contact number is not set.");
+              }}
+            >
+              <View style={[styles.menuIconContainer, { backgroundColor: '#FECACA' }]}>
+                <Ionicons name="call" size={24} color="#DC2626" />
+              </View>
+              <Text style={[styles.menuRowText, { color: '#991B1B', fontWeight: 'bold' }]}>Call Secondary Contact</Text>
+            </TouchableOpacity>
+            
+            {/* Dismiss and Reset Button */}
+            <TouchableOpacity 
+               style={{ marginTop: 25, alignSelf: 'center', padding: 15 }} 
+               onPress={() => {
+                 setShowEmergencyMenu(false);
+                 setIsDistressed(false); 
+               }}
+            >
+               <Text style={{ color: '#DC2626', fontSize: 16, fontWeight: '700' }}>I am safe, hide this menu</Text>
+            </TouchableOpacity>
+
           </View>
         </View>
       </Modal>
