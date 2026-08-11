@@ -715,7 +715,7 @@ export default function HomeScreen() {
           >
             <Ionicons name={isRecording ? "stop-circle" : (isProcessing ? "hourglass" : "mic")} size={28} color="#FFFFFF" />
             <Text style={styles.primaryButtonText}>
-              {isRecording ? "Tap to Stop" : (isProcessing ? "Remi is thinking..." : "Tap to Talk")}
+              {isRecording ? "Tap to Stop" : (isProcessing ? "Remi is thinking..." : "Please tap to talk")}
             </Text>
           </TouchableOpacity>
 
