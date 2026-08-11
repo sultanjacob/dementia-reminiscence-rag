@@ -735,7 +735,7 @@ export default function HomeScreen() {
           <View style={styles.imageCapsule}>
             <View style={styles.imageModalHeader}>
               <View style={{ flex: 1, paddingRight: 15 }}>
-                <Text style={styles.imageModalTitle}>{dailyMemory?.caption || "A beautiful memory"}</Text>
+                <Text style={styles.imageModalTitle}>{dailyMemory?.caption || "A beautiful memory!"}</Text>
               </View>
               <TouchableOpacity onPress={() => setIsMemoryExpanded(false)} style={styles.closeImageButton} hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
                 <Ionicons name="close" size={28} color="#111827" />
