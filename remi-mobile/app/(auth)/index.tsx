@@ -64,6 +64,9 @@ export default function HomeScreen() {
   const [bgMusic, setBgMusic] = useState<Audio.Sound | null>(null);
   const [isPlayingMusic, setIsPlayingMusic] = useState(false);
 
+  // Auto-Announcer State
+  const [announcedTasks, setAnnouncedTasks] = useState<string[]>([]);
+
   const flashAnim = useRef(new Animated.Value(1)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const uiOpacity = useRef(new Animated.Value(1)).current;
@@ -286,6 +289,65 @@ export default function HomeScreen() {
     
     initializeHome();
   }, []);
+
+  // --- THE ZERO-COST AUTO-ANNOUNCER ---
+  useEffect(() => {
+    const checkRoutines = async () => {
+      // Don't interrupt if Mary is already doing something important
+      if (isRecording || isProcessing || isImportantMusicPlaying || isDistressed) return;
+
+      try {
+        const { data, error } = await supabase
+          .from('routines')
+          .select('*')
+          .eq('is_completed', false)
+          .order('created_at', { ascending: true });
+
+        if (error || !data) return;
+
+        const now = new Date();
+        let currentHour = now.getHours();
+        const currentMinute = now.getMinutes();
+        const ampm = currentHour >= 12 ? 'PM' : 'AM';
+        
+        currentHour = currentHour % 12;
+        currentHour = currentHour ? currentHour : 12; 
+
+        // Generates formats like "12:30 PM" or "12pm" to match family input
+        const timeString1 = `${currentHour}:${currentMinute < 10 ? '0'+currentMinute : currentMinute} ${ampm}`.toLowerCase();
+        const timeString2 = `${currentHour}${ampm}`.toLowerCase(); 
+        
+        for (const routine of data) {
+          // Skip if we already announced this one, or if it has no specific time
+          if (announcedTasks.includes(routine.id)) continue;
+          if (!routine.time_string || routine.time_string.toLowerCase() === 'anytime') continue;
+
+          const routineTime = routine.time_string.toLowerCase();
+
+          // Trigger if the time roughly matches what the family typed
+          if (routineTime.includes(timeString1) || (currentMinute === 0 && routineTime.includes(timeString2))) {
+            
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            const announcement = `Excuse me ${userName}, it is time for: ${routine.title}.`;
+            setRemiText(announcement);
+            speak(announcement);
+            
+            // Mark as announced so it doesn't repeat endlessly
+            setAnnouncedTasks(prev => [...prev, routine.id]);
+            break; 
+          }
+        }
+      } catch (err) {
+        console.error("Auto-announcer error:", err);
+      }
+    };
+
+    // Check the clock every 60 seconds
+    const intervalId = setInterval(checkRoutines, 60000); 
+    checkRoutines(); 
+
+    return () => clearInterval(intervalId);
+  }, [userName, announcedTasks, isRecording, isProcessing, isImportantMusicPlaying, isDistressed]);
 
   const resetRemi = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -608,7 +670,7 @@ export default function HomeScreen() {
             <TouchableOpacity 
               activeOpacity={0.8}
               onPress={() => setShowEmergencyMenu(true)}
-              style={{ zIndex: 100, elevation: 10 }} // Ensures it sits perfectly on top
+              style={{ zIndex: 100, elevation: 10 }}
             >
               <Animated.View style={[styles.flashingEmergencyButton, { opacity: flashAnim }]}>
                 <Ionicons name="warning" size={24} color="#FFFFFF" style={{ marginRight: 8 }} />
