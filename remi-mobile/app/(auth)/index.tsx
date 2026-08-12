@@ -293,7 +293,6 @@ export default function HomeScreen() {
   // --- SUPERCHARGED AUTO-ANNOUNCER ---
   useEffect(() => {
     const checkRoutines = async () => {
-      // Don't interrupt if Mary is already doing something important
       if (isRecording || isProcessing || isImportantMusicPlaying || isDistressed) return;
 
       try {
@@ -309,20 +308,17 @@ export default function HomeScreen() {
         const h24 = now.getHours();
         const m = now.getMinutes();
         
-        // Format components
         const h12 = h24 % 12 || 12;
         const ampm = h24 >= 12 ? 'pm' : 'am';
         const mm = m < 10 ? '0' + m : m;
         
-        // Generate every possible way a family member might type the time!
         const possibleFormats = [
-          `${h12}:${mm} ${ampm}`, // "11:30 pm"
-          `${h12}:${mm}${ampm}`,  // "11:30pm"
-          `${h12}:${mm}`,         // "11:30"
-          `${h24}:${mm}`          // "23:30" (Military Time)
+          `${h12}:${mm} ${ampm}`, 
+          `${h12}:${mm}${ampm}`,  
+          `${h12}:${mm}`,         
+          `${h24}:${mm}`          
         ];
 
-        // If it is exactly on the hour, also check for "11 pm" or "11pm"
         if (m === 0) {
           possibleFormats.push(`${h12} ${ampm}`);
           possibleFormats.push(`${h12}${ampm}`);
@@ -333,19 +329,13 @@ export default function HomeScreen() {
           if (!routine.time_string || routine.time_string.toLowerCase() === 'anytime') continue;
 
           const routineTime = routine.time_string.toLowerCase().trim();
-
-          // Check if the routine matches ANY of our formats
           const isMatch = possibleFormats.some(format => routineTime.includes(format));
 
           if (isMatch) {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             const announcement = `Excuse me ${userName}, it is time for: ${routine.title}.`;
-            
-            // Update the screen UI and speak out loud
             setRemiText(announcement);
             speak(announcement);
-            
-            // Mark as announced so it doesn't repeat endlessly
             setAnnouncedTasks(prev => [...prev, routine.id]);
             break; 
           }
@@ -355,10 +345,8 @@ export default function HomeScreen() {
       }
     };
 
-    // Check the clock every 10 seconds to ensure we never miss the minute window!
     const intervalId = setInterval(checkRoutines, 10000); 
     checkRoutines(); 
-
     return () => clearInterval(intervalId);
   }, [userName, announcedTasks, isRecording, isProcessing, isImportantMusicPlaying, isDistressed]);
 
@@ -468,6 +456,32 @@ export default function HomeScreen() {
         const aiText = responseData.message || "I didn't quite catch that.";
         setRemiText(aiText);
         speak(aiText);
+
+        // --- 🤖 ZERO-COST AI SENTIMENT TRACKING ---
+        // We analyze the context of the AI's response to determine Mary's state of mind
+        if (user) {
+          const lowerText = aiText.toLowerCase();
+          let detectedVibe = 'Calm & Relaxed';
+
+          // Basic Heuristic Analysis
+          if (lowerText.includes("sorry") || lowerText.includes("safe") || lowerText.includes("worry") || lowerText.includes("help") || lowerText.includes("tough time")) {
+              detectedVibe = 'Anxious';
+          } else if (lowerText.includes("not sure") || lowerText.includes("don't know") || lowerText.includes("confused")) {
+              detectedVibe = 'Confused';
+          } else if (lowerText.includes("wonderful") || lowerText.includes("great") || lowerText.includes("excited") || lowerText.includes("happy")) {
+              detectedVibe = 'Energetic';
+          }
+
+          // Silently log it to the database for the Family Dashboard
+          supabase.from('shift_logs').insert({
+              patient_id: user.id,
+              caregiver_name: 'Remi AI', // This tells the family it was an automated insight!
+              vibe: detectedVibe,
+              notes: `Automated interaction log. Remi recently discussed: "${aiText.substring(0, 80)}..."`
+          }).then(({error}) => {
+              if (error) console.error("Error saving AI log:", error);
+          });
+        }
         
         // SOS Trigger Detection
         if (aiText.toLowerCase().includes("call family") || aiText.toLowerCase().includes("contact family")) {
