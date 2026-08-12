@@ -519,9 +519,9 @@ export default function HomeScreen() {
   const handleNudgePress = (suggestion: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setIsNudgeActive(true); 
-    const textPrompt = `Tap the microphone and ask me: "${suggestion}"`;
+    const textPrompt = `Tap the microphone and: "${suggestion}"`;
     setRemiText(textPrompt);
-    speak(`Tap the purple microphone and ask me: ${suggestion}`);
+    speak(`Tap the purple microphone and ask: ${suggestion}`);
   };
 
   const handleSecretTap = () => {
