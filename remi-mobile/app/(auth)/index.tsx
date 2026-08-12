@@ -290,7 +290,7 @@ export default function HomeScreen() {
     initializeHome();
   }, []);
 
-  // --- THE ZERO-COST AUTO-ANNOUNCER ---
+  // --- SUPERCHARGED AUTO-ANNOUNCER ---
   useEffect(() => {
     const checkRoutines = async () => {
       // Don't interrupt if Mary is already doing something important
@@ -306,29 +306,42 @@ export default function HomeScreen() {
         if (error || !data) return;
 
         const now = new Date();
-        let currentHour = now.getHours();
-        const currentMinute = now.getMinutes();
-        const ampm = currentHour >= 12 ? 'PM' : 'AM';
+        const h24 = now.getHours();
+        const m = now.getMinutes();
         
-        currentHour = currentHour % 12;
-        currentHour = currentHour ? currentHour : 12; 
+        // Format components
+        const h12 = h24 % 12 || 12;
+        const ampm = h24 >= 12 ? 'pm' : 'am';
+        const mm = m < 10 ? '0' + m : m;
+        
+        // Generate every possible way a family member might type the time!
+        const possibleFormats = [
+          `${h12}:${mm} ${ampm}`, // "11:30 pm"
+          `${h12}:${mm}${ampm}`,  // "11:30pm"
+          `${h12}:${mm}`,         // "11:30"
+          `${h24}:${mm}`          // "23:30" (Military Time)
+        ];
 
-        // Generates formats like "12:30 PM" or "12pm" to match family input
-        const timeString1 = `${currentHour}:${currentMinute < 10 ? '0'+currentMinute : currentMinute} ${ampm}`.toLowerCase();
-        const timeString2 = `${currentHour}${ampm}`.toLowerCase(); 
-        
+        // If it is exactly on the hour, also check for "11 pm" or "11pm"
+        if (m === 0) {
+          possibleFormats.push(`${h12} ${ampm}`);
+          possibleFormats.push(`${h12}${ampm}`);
+        }
+
         for (const routine of data) {
-          // Skip if we already announced this one, or if it has no specific time
           if (announcedTasks.includes(routine.id)) continue;
           if (!routine.time_string || routine.time_string.toLowerCase() === 'anytime') continue;
 
-          const routineTime = routine.time_string.toLowerCase();
+          const routineTime = routine.time_string.toLowerCase().trim();
 
-          // Trigger if the time roughly matches what the family typed
-          if (routineTime.includes(timeString1) || (currentMinute === 0 && routineTime.includes(timeString2))) {
-            
+          // Check if the routine matches ANY of our formats
+          const isMatch = possibleFormats.some(format => routineTime.includes(format));
+
+          if (isMatch) {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             const announcement = `Excuse me ${userName}, it is time for: ${routine.title}.`;
+            
+            // Update the screen UI and speak out loud
             setRemiText(announcement);
             speak(announcement);
             
@@ -342,8 +355,8 @@ export default function HomeScreen() {
       }
     };
 
-    // Check the clock every 60 seconds
-    const intervalId = setInterval(checkRoutines, 60000); 
+    // Check the clock every 10 seconds to ensure we never miss the minute window!
+    const intervalId = setInterval(checkRoutines, 10000); 
     checkRoutines(); 
 
     return () => clearInterval(intervalId);
@@ -715,7 +728,7 @@ export default function HomeScreen() {
           >
             <Ionicons name={isRecording ? "stop-circle" : (isProcessing ? "hourglass" : "mic")} size={28} color="#FFFFFF" />
             <Text style={styles.primaryButtonText}>
-              {isRecording ? "Tap to Stop" : (isProcessing ? "Remi is thinking..." : "Please tap to talk")}
+              {isRecording ? "Tap to Stop" : (isProcessing ? "Remi is thinking..." : "Tap to Talk")}
             </Text>
           </TouchableOpacity>
 
@@ -735,7 +748,7 @@ export default function HomeScreen() {
           <View style={styles.imageCapsule}>
             <View style={styles.imageModalHeader}>
               <View style={{ flex: 1, paddingRight: 15 }}>
-                <Text style={styles.imageModalTitle}>{dailyMemory?.caption || "A beautiful memory!"}</Text>
+                <Text style={styles.imageModalTitle}>{dailyMemory?.caption || "A beautiful memory"}</Text>
               </View>
               <TouchableOpacity onPress={() => setIsMemoryExpanded(false)} style={styles.closeImageButton} hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
                 <Ionicons name="close" size={28} color="#111827" />
