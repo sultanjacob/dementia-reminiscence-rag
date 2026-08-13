@@ -78,10 +78,13 @@ export default function HomeScreen() {
     };
   }, [memorySound, bgMusic]);
 
+  // --- DYNAMIC SPEECH RATE ---
+  // Remi speaks 15% slower when in Evening/Calm mode to soothe the patient
   const speak = (text: string) => {
     if (!text) return;
     const cleanText = text.replace(/\*/g, ''); 
-    Speech.speak(cleanText, { language: 'en-GB', pitch: 0.9, rate: 0.8 });
+    const speechRate = isEvening ? 0.68 : 0.8; 
+    Speech.speak(cleanText, { language: 'en-GB', pitch: 0.9, rate: speechRate });
   };
 
   const playCustomAudio = async (url: string) => {
@@ -105,30 +108,48 @@ export default function HomeScreen() {
     }
   };
 
-  const toggleMusic = async () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  // --- RELAXING MUSIC HELPERS ---
+  const startRelaxingMusic = async () => {
     try {
-      if (isPlayingMusic && bgMusic) {
-        await bgMusic.pauseAsync();
-        setIsPlayingMusic(false);
-      } else {
-        if (memorySound) await memorySound.stopAsync();
+      if (isPlayingMusic) return;
+      if (memorySound) await memorySound.stopAsync();
 
-        if (bgMusic) {
-          await bgMusic.playAsync();
-          setIsPlayingMusic(true);
-        } else {
-          const musicUrl = 'https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3?filename=calm-piano-music-111826.mp3';
-          const { sound } = await Audio.Sound.createAsync(
-            { uri: musicUrl },
-            { shouldPlay: true, isLooping: true }
-          );
-          setBgMusic(sound);
-          setIsPlayingMusic(true);
-        }
+      if (bgMusic) {
+        await bgMusic.playAsync();
+        setIsPlayingMusic(true);
+      } else {
+        const musicUrl = 'https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3?filename=calm-piano-music-111826.mp3';
+        const { sound } = await Audio.Sound.createAsync(
+          { uri: musicUrl },
+          { shouldPlay: true, isLooping: true }
+        );
+        setBgMusic(sound);
+        setIsPlayingMusic(true);
       }
     } catch (error) {
-      Alert.alert("Music Error", "Could not play the relaxing music right now.");
+      console.error("Error starting music:", error);
+    }
+  };
+
+  const toggleMusic = async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (isPlayingMusic && bgMusic) {
+      await bgMusic.pauseAsync();
+      setIsPlayingMusic(false);
+    } else {
+      await startRelaxingMusic();
+    }
+  };
+
+  const triggerCalmMode = async (reasonText?: string) => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setIsEvening(true);
+    setTimeIcon("moon");
+    await startRelaxingMusic();
+    
+    if (reasonText) {
+      setRemiText(reasonText);
+      speak(reasonText);
     }
   };
 
@@ -169,13 +190,11 @@ export default function HomeScreen() {
   const dismissImportantMusic = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     
-    // Stop the music
     if (memorySound) {
       await memorySound.stopAsync().catch(()=>{});
     }
     setIsImportantMusicPlaying(false);
     
-    // Clear the UI immediately
     const musicToDowngrade = importantMusic;
     setImportantMusic(null);
     
@@ -183,7 +202,6 @@ export default function HomeScreen() {
     setRemiText(text);
     speak(text);
 
-    // Update Database to remove the important flag
     if (musicToDowngrade) {
       try {
         const newCaption = musicToDowngrade.caption.replace('[MUSIC-IMPORTANT]', '[MUSIC]');
@@ -230,8 +248,10 @@ export default function HomeScreen() {
   useEffect(() => {
     const initializeHome = async () => {
       const hour = new Date().getHours();
+      const minute = new Date().getMinutes();
       
-      const evening = hour >= 17 || hour < 6;
+      // Default Sundowning logic: 4:30 PM (16:30) to 6:00 AM
+      const evening = (hour === 16 && minute >= 30) || hour >= 17 || hour < 6;
       setIsEvening(evening);
       setTimeIcon(evening ? "moon" : "sunny");
 
@@ -263,7 +283,6 @@ export default function HomeScreen() {
         if (profileData.secondary_contact) setSecondaryContact(profileData.secondary_contact);
       }
 
-      // SMART VAULT FILTERING
       const { data: memories } = await supabase.from('memory_vault').select('*');
       
       if (memories && memories.length > 0) {
@@ -290,7 +309,22 @@ export default function HomeScreen() {
     initializeHome();
   }, []);
 
-  // --- SUPERCHARGED AUTO-ANNOUNCER ---
+  // --- AUTOMATED 4:30 PM SUNDOWNING SHIFT ---
+  useEffect(() => {
+    const checkSundowning = () => {
+      if (isRecording || isProcessing || isImportantMusicPlaying || isDistressed) return;
+      
+      const now = new Date();
+      if (now.getHours() === 16 && now.getMinutes() === 30 && !isEvening) {
+        triggerCalmMode(`Good evening ${userName}, it is getting a bit late, so I've turned on some relaxing music for you.`);
+      }
+    };
+
+    const intervalId = setInterval(checkSundowning, 60000); 
+    return () => clearInterval(intervalId);
+  }, [userName, isEvening, isRecording, isProcessing, isImportantMusicPlaying, isDistressed]);
+
+  // --- AUTO-ANNOUNCER ---
   useEffect(() => {
     const checkRoutines = async () => {
       if (isRecording || isProcessing || isImportantMusicPlaying || isDistressed) return;
@@ -377,11 +411,14 @@ export default function HomeScreen() {
   };
 
   const toggleSundowningOverride = () => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    const newIsEvening = !isEvening;
-    setIsEvening(newIsEvening);
-    setTimeIcon(newIsEvening ? "moon" : "sunny");
-    resetRemi();
+    if (!isEvening) {
+      triggerCalmMode();
+    } else {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setIsEvening(false);
+      setTimeIcon("sunny");
+      resetRemi();
+    }
   };
 
   useEffect(() => {
@@ -454,28 +491,31 @@ export default function HomeScreen() {
       if (response.ok) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         const aiText = responseData.message || "I didn't quite catch that.";
+        
+        let detectedVibe = 'Calm & Relaxed';
+        const lowerText = aiText.toLowerCase();
+
+        // Basic Heuristic Analysis
+        if (lowerText.includes("sorry") || lowerText.includes("safe") || lowerText.includes("worry") || lowerText.includes("help") || lowerText.includes("tough time")) {
+            detectedVibe = 'Anxious';
+        } else if (lowerText.includes("not sure") || lowerText.includes("don't know") || lowerText.includes("confused")) {
+            detectedVibe = 'Confused';
+        } else if (lowerText.includes("wonderful") || lowerText.includes("great") || lowerText.includes("excited") || lowerText.includes("happy")) {
+            detectedVibe = 'Energetic';
+        }
+
+        // --- 🤖 DYNAMIC UI ANXIETY INTERVENTION ---
+        if ((detectedVibe === 'Anxious' || detectedVibe === 'Confused') && !isEvening) {
+            triggerCalmMode(); 
+        }
+
         setRemiText(aiText);
         speak(aiText);
 
-        // --- 🤖 ZERO-COST AI SENTIMENT TRACKING ---
-        // We analyze the context of the AI's response to determine Mary's state of mind
         if (user) {
-          const lowerText = aiText.toLowerCase();
-          let detectedVibe = 'Calm & Relaxed';
-
-          // Basic Heuristic Analysis
-          if (lowerText.includes("sorry") || lowerText.includes("safe") || lowerText.includes("worry") || lowerText.includes("help") || lowerText.includes("tough time")) {
-              detectedVibe = 'Anxious';
-          } else if (lowerText.includes("not sure") || lowerText.includes("don't know") || lowerText.includes("confused")) {
-              detectedVibe = 'Confused';
-          } else if (lowerText.includes("wonderful") || lowerText.includes("great") || lowerText.includes("excited") || lowerText.includes("happy")) {
-              detectedVibe = 'Energetic';
-          }
-
-          // Silently log it to the database for the Family Dashboard
           supabase.from('shift_logs').insert({
               patient_id: user.id,
-              caregiver_name: 'Remi AI', // This tells the family it was an automated insight!
+              caregiver_name: 'Remi AI', 
               vibe: detectedVibe,
               notes: `Automated interaction log. Remi recently discussed: "${aiText.substring(0, 80)}..."`
           }).then(({error}) => {
@@ -483,8 +523,7 @@ export default function HomeScreen() {
           });
         }
         
-        // SOS Trigger Detection
-        if (aiText.toLowerCase().includes("call family") || aiText.toLowerCase().includes("contact family")) {
+        if (lowerText.includes("call family") || lowerText.includes("contact family")) {
           setIsDistressed(true);
         } else {
           setIsDistressed(false); 
@@ -519,9 +558,9 @@ export default function HomeScreen() {
   const handleNudgePress = (suggestion: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setIsNudgeActive(true); 
-    const textPrompt = `Tap the microphone and: "${suggestion}"`;
+    const textPrompt = `Tap the microphone and ask me: "${suggestion}"`;
     setRemiText(textPrompt);
-    speak(`Tap the purple microphone and ask: ${suggestion}`);
+    speak(`Tap the purple microphone and ask me: ${suggestion}`);
   };
 
   const handleSecretTap = () => {
