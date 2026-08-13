@@ -60,11 +60,9 @@ export default function HomeScreen() {
   const [enteredPin, setEnteredPin] = useState('');
   
   const [memorySound, setMemorySound] = useState<Audio.Sound | null>(null);
-  
   const [bgMusic, setBgMusic] = useState<Audio.Sound | null>(null);
   const [isPlayingMusic, setIsPlayingMusic] = useState(false);
 
-  // Auto-Announcer State
   const [announcedTasks, setAnnouncedTasks] = useState<string[]>([]);
 
   const flashAnim = useRef(new Animated.Value(1)).current;
@@ -78,8 +76,6 @@ export default function HomeScreen() {
     };
   }, [memorySound, bgMusic]);
 
-  // --- DYNAMIC SPEECH RATE ---
-  // Remi speaks 15% slower when in Evening/Calm mode to soothe the patient
   const speak = (text: string) => {
     if (!text) return;
     const cleanText = text.replace(/\*/g, ''); 
@@ -108,7 +104,6 @@ export default function HomeScreen() {
     }
   };
 
-  // --- RELAXING MUSIC HELPERS ---
   const startRelaxingMusic = async () => {
     try {
       if (isPlayingMusic) return;
@@ -215,6 +210,26 @@ export default function HomeScreen() {
     }
   };
 
+  // --- PHOTO DIALER HELPER ---
+  const handleFamilyCall = (phoneNumber: string | null, name: string) => {
+    if (!phoneNumber) {
+      Alert.alert("No Number", `${name}'s phone number hasn't been set up yet by the care team.`);
+      return;
+    }
+    Haptics.selectionAsync();
+    Alert.alert(
+      `Call ${name}?`,
+      `Would you like to call ${name} now?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        { 
+          text: "Yes, Call", 
+          onPress: () => Linking.openURL(`tel:${phoneNumber}`).catch(() => Alert.alert("Error", "Could not place the call.")) 
+        }
+      ]
+    );
+  };
+
   useEffect(() => {
     Animated.timing(uiOpacity, {
       toValue: (isRecording || isProcessing) ? 0 : 1,
@@ -250,7 +265,6 @@ export default function HomeScreen() {
       const hour = new Date().getHours();
       const minute = new Date().getMinutes();
       
-      // Default Sundowning logic: 4:30 PM (16:30) to 6:00 AM
       const evening = (hour === 16 && minute >= 30) || hour >= 17 || hour < 6;
       setIsEvening(evening);
       setTimeIcon(evening ? "moon" : "sunny");
@@ -260,11 +274,7 @@ export default function HomeScreen() {
       else setGreeting("Good evening");
 
       const today = new Date();
-      const formattedDate = today.toLocaleDateString('en-US', { 
-        weekday: 'long', 
-        month: 'long', 
-        day: 'numeric' 
-      });
+      const formattedDate = today.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
       setCurrentDate(formattedDate);
 
       const { data: { user } } = await supabase.auth.getUser();
@@ -309,26 +319,21 @@ export default function HomeScreen() {
     initializeHome();
   }, []);
 
-  // --- AUTOMATED 4:30 PM SUNDOWNING SHIFT ---
   useEffect(() => {
     const checkSundowning = () => {
       if (isRecording || isProcessing || isImportantMusicPlaying || isDistressed) return;
-      
       const now = new Date();
       if (now.getHours() === 16 && now.getMinutes() === 30 && !isEvening) {
         triggerCalmMode(`Good evening ${userName}, it is getting a bit late, so I've turned on some relaxing music for you.`);
       }
     };
-
     const intervalId = setInterval(checkSundowning, 60000); 
     return () => clearInterval(intervalId);
   }, [userName, isEvening, isRecording, isProcessing, isImportantMusicPlaying, isDistressed]);
 
-  // --- AUTO-ANNOUNCER ---
   useEffect(() => {
     const checkRoutines = async () => {
       if (isRecording || isProcessing || isImportantMusicPlaying || isDistressed) return;
-
       try {
         const { data, error } = await supabase
           .from('routines')
@@ -341,18 +346,13 @@ export default function HomeScreen() {
         const now = new Date();
         const h24 = now.getHours();
         const m = now.getMinutes();
-        
         const h12 = h24 % 12 || 12;
         const ampm = h24 >= 12 ? 'pm' : 'am';
         const mm = m < 10 ? '0' + m : m;
         
         const possibleFormats = [
-          `${h12}:${mm} ${ampm}`, 
-          `${h12}:${mm}${ampm}`,  
-          `${h12}:${mm}`,         
-          `${h24}:${mm}`          
+          `${h12}:${mm} ${ampm}`, `${h12}:${mm}${ampm}`, `${h12}:${mm}`, `${h24}:${mm}`          
         ];
-
         if (m === 0) {
           possibleFormats.push(`${h12} ${ampm}`);
           possibleFormats.push(`${h12}${ampm}`);
@@ -432,10 +432,8 @@ export default function HomeScreen() {
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       setIsNudgeActive(false); 
-
       Speech.stop();
       if (memorySound) await memorySound.stopAsync();
-
       if (isPlayingMusic && bgMusic) {
         await bgMusic.pauseAsync();
         setIsPlayingMusic(false);
@@ -491,11 +489,9 @@ export default function HomeScreen() {
       if (response.ok) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         const aiText = responseData.message || "I didn't quite catch that.";
-        
         let detectedVibe = 'Calm & Relaxed';
         const lowerText = aiText.toLowerCase();
 
-        // Basic Heuristic Analysis
         if (lowerText.includes("sorry") || lowerText.includes("safe") || lowerText.includes("worry") || lowerText.includes("help") || lowerText.includes("tough time")) {
             detectedVibe = 'Anxious';
         } else if (lowerText.includes("not sure") || lowerText.includes("don't know") || lowerText.includes("confused")) {
@@ -504,7 +500,6 @@ export default function HomeScreen() {
             detectedVibe = 'Energetic';
         }
 
-        // --- 🤖 DYNAMIC UI ANXIETY INTERVENTION ---
         if ((detectedVibe === 'Anxious' || detectedVibe === 'Confused') && !isEvening) {
             triggerCalmMode(); 
         }
@@ -514,9 +509,7 @@ export default function HomeScreen() {
 
         if (user) {
           supabase.from('shift_logs').insert({
-              patient_id: user.id,
-              caregiver_name: 'Remi AI', 
-              vibe: detectedVibe,
+              patient_id: user.id, caregiver_name: 'Remi AI', vibe: detectedVibe,
               notes: `Automated interaction log. Remi recently discussed: "${aiText.substring(0, 80)}..."`
           }).then(({error}) => {
               if (error) console.error("Error saving AI log:", error);
@@ -605,6 +598,8 @@ export default function HomeScreen() {
   const safeAreaBgColor = isEvening ? '#FDE68A' : '#F3F4F6'; 
   const appCapsuleBgColor = isEvening ? '#FEF3C7' : '#FFFFFF'; 
   const bubbleBgColor = isEvening ? '#FDE68A' : '#F9FAFB';
+  const familyCardBgColor = isEvening ? '#FDE68A' : '#FFFFFF';
+  const familyCardBorderColor = isEvening ? '#FCD34D' : '#E5E7EB';
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: safeAreaBgColor }]}>
@@ -731,6 +726,45 @@ export default function HomeScreen() {
             </Animated.View>
           )}
 
+          {/* ----- ONE-TAP PHOTO DIALER ----- */}
+          {(!isRecording && !isProcessing && !isDistressed && !isNudgeActive) && (
+             <Animated.View style={[styles.familyRowContainer, { opacity: uiOpacity }]}>
+                <Text style={[styles.nudgeTitle, isEvening && { color: '#92400E' }]}>Connect with Family:</Text>
+                
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 15, paddingHorizontal: 5 }}>
+                  
+                  {/* Primary Contact Card */}
+                  <TouchableOpacity 
+                    style={[styles.familyCard, { backgroundColor: familyCardBgColor, borderColor: familyCardBorderColor }]} 
+                    activeOpacity={0.7}
+                    onPress={() => handleFamilyCall(primaryContact, "Sarah")}
+                  >
+                     <Image source={{uri: 'https://i.pravatar.cc/150?u=sarah'}} style={styles.familyAvatar} />
+                     <Text style={[styles.familyName, isEvening && { color: '#92400E' }]}>Sarah</Text>
+                     <Text style={[styles.familyRole, isEvening && { color: '#B45309' }]}>Daughter</Text>
+                     <View style={styles.callIconBadge}>
+                       <Ionicons name="call" size={12} color="#FFFFFF" />
+                     </View>
+                  </TouchableOpacity>
+
+                  {/* Secondary Contact Card */}
+                  <TouchableOpacity 
+                    style={[styles.familyCard, { backgroundColor: familyCardBgColor, borderColor: familyCardBorderColor }]} 
+                    activeOpacity={0.7}
+                    onPress={() => handleFamilyCall(secondaryContact, "David")}
+                  >
+                     <Image source={{uri: 'https://i.pravatar.cc/150?u=david'}} style={styles.familyAvatar} />
+                     <Text style={[styles.familyName, isEvening && { color: '#92400E' }]}>David</Text>
+                     <Text style={[styles.familyRole, isEvening && { color: '#B45309' }]}>Son</Text>
+                     <View style={styles.callIconBadge}>
+                       <Ionicons name="call" size={12} color="#FFFFFF" />
+                     </View>
+                  </TouchableOpacity>
+
+                </ScrollView>
+             </Animated.View>
+          )}
+
           {/* ----- FIXED ANDROID SOS BUTTON ----- */}
           {isDistressed && (
             <TouchableOpacity 
@@ -747,7 +781,9 @@ export default function HomeScreen() {
 
           {(!isRecording && !isProcessing && !isDistressed && !isNudgeActive) && (
              <Animated.View style={[styles.nudgesContainer, { opacity: uiOpacity }]}>
-                <Text style={styles.nudgeTitle}>{isEvening ? "Relaxing suggestions:" : "Not sure what to say? Try asking:"}</Text>
+                <Text style={[styles.nudgeTitle, isEvening && { color: '#92400E' }]}>
+                  {isEvening ? "Relaxing suggestions:" : "Not sure what to say? Try asking:"}
+                </Text>
                 
                 <View style={styles.nudgeRow}>
                   {isEvening ? (
@@ -963,6 +999,15 @@ const styles = StyleSheet.create({
   musicButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F5F3FF', paddingVertical: 12, paddingHorizontal: 24, borderRadius: 25, marginBottom: 15, alignSelf: 'center', borderWidth: 1, borderColor: '#DDD6FE' },
   musicButtonActive: { backgroundColor: '#8B5CF6', borderColor: '#8B5CF6' },
   musicButtonText: { fontSize: 16, fontWeight: '700', color: '#8B5CF6', marginLeft: 8 },
+  
+  // --- NEW STYLES FOR PHOTO DIALER ---
+  familyRowContainer: { marginBottom: 20, alignItems: 'center' },
+  familyCard: { padding: 12, borderRadius: 24, alignItems: 'center', width: 100, borderWidth: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 5, elevation: 2 },
+  familyAvatar: { width: 64, height: 64, borderRadius: 32, marginBottom: 8, backgroundColor: '#F3F4F6' },
+  familyName: { fontSize: 16, fontWeight: '700', color: '#1F2937', marginBottom: 2 },
+  familyRole: { fontSize: 12, color: '#6B7280', fontWeight: '500' },
+  callIconBadge: { position: 'absolute', top: 8, right: 8, backgroundColor: '#10B981', width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#FFFFFF' },
+
   nudgesContainer: { alignItems: 'center', marginBottom: 10 },
   nudgeTitle: { fontSize: 13, color: '#6B7280', marginBottom: 6, fontWeight: '600' },
   nudgeRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 8 },
