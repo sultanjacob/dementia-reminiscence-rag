@@ -210,7 +210,6 @@ export default function HomeScreen() {
     }
   };
 
-  // --- PHOTO DIALER HELPER ---
   const handleFamilyCall = (phoneNumber: string | null, name: string) => {
     if (!phoneNumber) {
       Alert.alert("No Number", `${name}'s phone number hasn't been set up yet by the care team.`);
@@ -228,6 +227,30 @@ export default function HomeScreen() {
         }
       ]
     );
+  };
+
+  // --- START MEMORY GAME FUNCTION ---
+  const startMemoryGame = () => {
+    setIsMenuVisible(false);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+    if (dailyMemory && dailyMemory.image_url) {
+      const memoryCaption = dailyMemory.caption ? dailyMemory.caption : "this beautiful picture";
+      const prompt = `Let's play a game! I am looking at a photo of ${memoryCaption}. Do you remember anything special about this day? Tap the purple microphone and tell me about it!`;
+      
+      if (isEvening) {
+        setIsEvening(false);
+        setTimeIcon("sunny");
+      }
+
+      setRemiText(prompt);
+      speak(prompt);
+      
+    } else {
+      const text = "I would love to play a memory game, but your family hasn't added any photos to your vault yet. We can play once they add some!";
+      setRemiText(text);
+      speak(text);
+    }
   };
 
   useEffect(() => {
@@ -848,7 +871,7 @@ export default function HomeScreen() {
         </View>
       </Modal>
 
-      {/* --- REGULAR MENU MODAL --- */}
+      {/* --- REGULAR MENU MODAL (UPDATED WITH GAME) --- */}
       <Modal visible={isMenuVisible} transparent={true} animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
@@ -859,6 +882,15 @@ export default function HomeScreen() {
                 <Ionicons name="close" size={32} color="#111827" />
               </TouchableOpacity>
             </View>
+
+            {/* NEW: Play Memory Game Button */}
+            <TouchableOpacity style={styles.menuRow} onPress={startMemoryGame}>
+              <View style={[styles.menuIconContainer, { backgroundColor: '#DBEAFE' }]}>
+                <Ionicons name="extension-puzzle" size={24} color="#3B82F6" />
+              </View>
+              <Text style={styles.menuRowText}>Play Memory Game</Text>
+              <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
+            </TouchableOpacity>
             
             <TouchableOpacity style={styles.menuRow} onPress={() => { setIsMenuVisible(false); router.push('/settings'); }}>
               <View style={styles.menuIconContainer}>
