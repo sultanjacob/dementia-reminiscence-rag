@@ -726,45 +726,6 @@ export default function HomeScreen() {
             </Animated.View>
           )}
 
-          {/* ----- ONE-TAP PHOTO DIALER ----- */}
-          {(!isRecording && !isProcessing && !isDistressed && !isNudgeActive) && (
-             <Animated.View style={[styles.familyRowContainer, { opacity: uiOpacity }]}>
-                <Text style={[styles.nudgeTitle, isEvening && { color: '#92400E' }]}>Connect with Family:</Text>
-                
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 15, paddingHorizontal: 5 }}>
-                  
-                  {/* Primary Contact Card */}
-                  <TouchableOpacity 
-                    style={[styles.familyCard, { backgroundColor: familyCardBgColor, borderColor: familyCardBorderColor }]} 
-                    activeOpacity={0.7}
-                    onPress={() => handleFamilyCall(primaryContact, "Sarah")}
-                  >
-                     <Image source={{uri: 'https://i.pravatar.cc/150?u=sarah'}} style={styles.familyAvatar} />
-                     <Text style={[styles.familyName, isEvening && { color: '#92400E' }]}>Sarah</Text>
-                     <Text style={[styles.familyRole, isEvening && { color: '#B45309' }]}>Daughter</Text>
-                     <View style={styles.callIconBadge}>
-                       <Ionicons name="call" size={12} color="#FFFFFF" />
-                     </View>
-                  </TouchableOpacity>
-
-                  {/* Secondary Contact Card */}
-                  <TouchableOpacity 
-                    style={[styles.familyCard, { backgroundColor: familyCardBgColor, borderColor: familyCardBorderColor }]} 
-                    activeOpacity={0.7}
-                    onPress={() => handleFamilyCall(secondaryContact, "David")}
-                  >
-                     <Image source={{uri: 'https://i.pravatar.cc/150?u=david'}} style={styles.familyAvatar} />
-                     <Text style={[styles.familyName, isEvening && { color: '#92400E' }]}>David</Text>
-                     <Text style={[styles.familyRole, isEvening && { color: '#B45309' }]}>Son</Text>
-                     <View style={styles.callIconBadge}>
-                       <Ionicons name="call" size={12} color="#FFFFFF" />
-                     </View>
-                  </TouchableOpacity>
-
-                </ScrollView>
-             </Animated.View>
-          )}
-
           {/* ----- FIXED ANDROID SOS BUTTON ----- */}
           {isDistressed && (
             <TouchableOpacity 
@@ -827,6 +788,45 @@ export default function HomeScreen() {
               {isRecording ? "Recording your voice..." : "Remi is listening..."}
             </Text>
           </View>
+
+          {/* ----- ONE-TAP PHOTO DIALER (MOVED TO BOTTOM) ----- */}
+          {(!isRecording && !isProcessing && !isDistressed && !isNudgeActive) && (
+             <Animated.View style={[styles.familyRowContainer, { opacity: uiOpacity, marginTop: 25 }]}>
+                <Text style={[styles.nudgeTitle, isEvening && { color: '#92400E' }]}>Connect with Family:</Text>
+                
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 15, paddingHorizontal: 5 }}>
+                  
+                  {/* Primary Contact Card */}
+                  <TouchableOpacity 
+                    style={[styles.familyCard, { backgroundColor: familyCardBgColor, borderColor: familyCardBorderColor }]} 
+                    activeOpacity={0.7}
+                    onPress={() => handleFamilyCall(primaryContact, "Sarah")}
+                  >
+                     <Image source={{uri: 'https://i.pravatar.cc/150?u=sarah'}} style={styles.familyAvatar} />
+                     <Text style={[styles.familyName, isEvening && { color: '#92400E' }]}>Sarah</Text>
+                     <Text style={[styles.familyRole, isEvening && { color: '#B45309' }]}>Daughter</Text>
+                     <View style={styles.callIconBadge}>
+                       <Ionicons name="call" size={12} color="#FFFFFF" />
+                     </View>
+                  </TouchableOpacity>
+
+                  {/* Secondary Contact Card */}
+                  <TouchableOpacity 
+                    style={[styles.familyCard, { backgroundColor: familyCardBgColor, borderColor: familyCardBorderColor }]} 
+                    activeOpacity={0.7}
+                    onPress={() => handleFamilyCall(secondaryContact, "David")}
+                  >
+                     <Image source={{uri: 'https://i.pravatar.cc/150?u=david'}} style={styles.familyAvatar} />
+                     <Text style={[styles.familyName, isEvening && { color: '#92400E' }]}>David</Text>
+                     <Text style={[styles.familyRole, isEvening && { color: '#B45309' }]}>Son</Text>
+                     <View style={styles.callIconBadge}>
+                       <Ionicons name="call" size={12} color="#FFFFFF" />
+                     </View>
+                  </TouchableOpacity>
+
+                </ScrollView>
+             </Animated.View>
+          )}
 
         </ScrollView>
       </View>
@@ -927,7 +927,7 @@ export default function HomeScreen() {
               style={[styles.menuRow, { backgroundColor: '#FEE2E2', borderRadius: 16, marginBottom: 12, paddingHorizontal: 15, borderBottomWidth: 0 }]} 
               onPress={() => {
                 if (primaryContact) Linking.openURL(`tel:${primaryContact}`);
-                else Alert.alert("No Number", "Primary contact number is not set!");
+                else Alert.alert("No Number", "Primary contact number is not set.");
               }}
             >
               <View style={[styles.menuIconContainer, { backgroundColor: '#FECACA' }]}>
@@ -941,7 +941,7 @@ export default function HomeScreen() {
               style={[styles.menuRow, { backgroundColor: '#FEE2E2', borderRadius: 16, paddingHorizontal: 15, borderBottomWidth: 0 }]} 
               onPress={() => {
                 if (secondaryContact) Linking.openURL(`tel:${secondaryContact}`);
-                else Alert.alert("No Number", "Secondary contact number is not set!");
+                else Alert.alert("No Number", "Secondary contact number is not set.");
               }}
             >
               <View style={[styles.menuIconContainer, { backgroundColor: '#FECACA' }]}>
@@ -1000,7 +1000,6 @@ const styles = StyleSheet.create({
   musicButtonActive: { backgroundColor: '#8B5CF6', borderColor: '#8B5CF6' },
   musicButtonText: { fontSize: 16, fontWeight: '700', color: '#8B5CF6', marginLeft: 8 },
   
-  // --- NEW STYLES FOR PHOTO DIALER ---
   familyRowContainer: { marginBottom: 20, alignItems: 'center' },
   familyCard: { padding: 12, borderRadius: 24, alignItems: 'center', width: 100, borderWidth: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 5, elevation: 2 },
   familyAvatar: { width: 64, height: 64, borderRadius: 32, marginBottom: 8, backgroundColor: '#F3F4F6' },
