@@ -214,6 +214,7 @@ export default function PatientGalleryScreen() {
         </View>
       ) : activeTab === 'photos' ? (
         <FlatList
+          key="flatlist-photos" // <-- FIX: Force fresh render for 2 columns
           data={items}
           keyExtractor={(item) => item.id.toString()}
           numColumns={2}
@@ -233,6 +234,7 @@ export default function PatientGalleryScreen() {
         />
       ) : (
         <FlatList
+          key={`flatlist-${activeTab}`} // <-- FIX: Force fresh render for 1 column
           data={items}
           keyExtractor={(item) => item.id.toString()}
           contentContainerStyle={styles.listContent}
