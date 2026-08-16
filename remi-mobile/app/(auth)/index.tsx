@@ -34,7 +34,9 @@ export default function HomeScreen() {
   const [userName, setUserName] = useState("Peter");
   const [currentDate, setCurrentDate] = useState("");
   const [isEvening, setIsEvening] = useState(false);
+  
   const [isNudgeActive, setIsNudgeActive] = useState(false);
+  const [isGameActive, setIsGameActive] = useState(false); // <-- NEW: Game Override State
 
   const [primaryContact, setPrimaryContact] = useState<string | null>(null);
   const [secondaryContact, setSecondaryContact] = useState<string | null>(null);
@@ -242,6 +244,10 @@ export default function HomeScreen() {
         setIsEvening(false);
         setTimeIcon("sunny");
       }
+      
+      // Override standard UI states
+      setIsGameActive(true); 
+      setIsNudgeActive(false);
 
       setRemiText(prompt);
       speak(prompt);
@@ -412,6 +418,7 @@ export default function HomeScreen() {
     setIsRecording(false);
     setIsProcessing(false);
     setIsNudgeActive(false);
+    setIsGameActive(false); // <-- NEW: Disables Game Mode on refresh
     
     if (dailyMemory && !isEvening && !importantMusic) {
       const isPhoto = !!dailyMemory.image_url;
@@ -677,8 +684,8 @@ export default function HomeScreen() {
               <Text style={[styles.repeatVoiceText, isEvening && { color: '#92400E' }]}>Hear again</Text>
             </TouchableOpacity>
             
-            {/* IMPORTANT MUSIC BANNER */}
-            {importantMusic && !isNudgeActive && !isEvening && (
+            {/* IMPORTANT MUSIC BANNER: Hides during a game! */}
+            {importantMusic && !isGameActive && !isNudgeActive && !isEvening && (
               <Animated.View style={{ width: '100%', opacity: uiOpacity, marginTop: 15 }}>
                 <View style={styles.musicBannerCard}>
                   <Ionicons name="musical-notes" size={36} color="#FFFFFF" style={{ marginBottom: 10 }} />
@@ -702,8 +709,8 @@ export default function HomeScreen() {
               </Animated.View>
             )}
 
-            {/* PHOTO MEMORY CARD */}
-            {dailyMemory && !importantMusic && !isNudgeActive && !isEvening && dailyMemory.image_url && (
+            {/* PHOTO MEMORY CARD: Always shows during a game! */}
+            {dailyMemory && (!importantMusic || isGameActive) && !isNudgeActive && !isEvening && dailyMemory.image_url && (
               <Animated.View style={{ width: '100%', opacity: uiOpacity, marginTop: 15 }}>
                 <TouchableOpacity activeOpacity={0.8} onPress={() => setIsMemoryExpanded(true)} style={styles.memoryDropContainer}>
                   <Image source={{ uri: dailyMemory.image_url }} style={styles.memoryImage} resizeMode="cover" />
@@ -718,7 +725,7 @@ export default function HomeScreen() {
             )}
 
             {/* VOICE NOTE ONLY CARD */}
-            {dailyMemory && !importantMusic && !isNudgeActive && !isEvening && !dailyMemory.image_url && dailyMemory.audio_url && (
+            {dailyMemory && (!importantMusic || isGameActive) && !isNudgeActive && !isEvening && !dailyMemory.image_url && dailyMemory.audio_url && (
               <Animated.View style={{ width: '100%', opacity: uiOpacity, marginTop: 15 }}>
                 <View style={styles.voiceNoteCard}>
                   <View style={styles.voiceNoteIconWrap}>
@@ -973,7 +980,7 @@ export default function HomeScreen() {
               style={[styles.menuRow, { backgroundColor: '#FEE2E2', borderRadius: 16, paddingHorizontal: 15, borderBottomWidth: 0 }]} 
               onPress={() => {
                 if (secondaryContact) Linking.openURL(`tel:${secondaryContact}`);
-                else Alert.alert("No Number", "Secondary contact number is not set!");
+                else Alert.alert("No Number", "Secondary contact number is not set.");
               }}
             >
               <View style={[styles.menuIconContainer, { backgroundColor: '#FECACA' }]}>
