@@ -1044,7 +1044,7 @@ export default function HomeScreen() {
               style={[styles.menuRow, { backgroundColor: '#FEE2E2', borderRadius: 16, marginBottom: 12, paddingHorizontal: 15, borderBottomWidth: 0 }]} 
               onPress={() => {
                 if (primaryContact) Linking.openURL(`tel:${primaryContact}`);
-                else Alert.alert("No Number", "Primary contact number is not set.");
+                else Alert.alert("No Number", "Primary contact number is not set!");
               }}
             >
               <View style={[styles.menuIconContainer, { backgroundColor: '#FECACA' }]}>
@@ -1057,7 +1057,7 @@ export default function HomeScreen() {
               style={[styles.menuRow, { backgroundColor: '#FEE2E2', borderRadius: 16, paddingHorizontal: 15, borderBottomWidth: 0 }]} 
               onPress={() => {
                 if (secondaryContact) Linking.openURL(`tel:${secondaryContact}`);
-                else Alert.alert("No Number", "Secondary contact number is not set.");
+                else Alert.alert("No Number", "Secondary contact number is not set!");
               }}
             >
               <View style={[styles.menuIconContainer, { backgroundColor: '#FECACA' }]}>
