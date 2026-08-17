@@ -38,7 +38,7 @@ export default function HomeScreen() {
   const [isNudgeActive, setIsNudgeActive] = useState(false);
   const [isGameActive, setIsGameActive] = useState(false);
 
-  // --- NEW: Wellness Prompt State ---
+  // Wellness Prompt State
   const [wellnessPrompt, setWellnessPrompt] = useState<{type: 'water' | 'meal', title: string, message: string} | null>(null);
 
   const [primaryContact, setPrimaryContact] = useState<string | null>(null);
@@ -72,6 +72,7 @@ export default function HomeScreen() {
   const flashAnim = useRef(new Animated.Value(1)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const uiOpacity = useRef(new Animated.Value(1)).current;
+  const attentionAnim = useRef(new Animated.Value(1)).current; // <-- NEW: Animation value for the modal pop
 
   useEffect(() => {
     return () => {
@@ -259,6 +260,37 @@ export default function HomeScreen() {
     }
   };
 
+  // --- NEW: REPEATING ATTENTION TIMER FOR WELLNESS PROMPT ---
+  useEffect(() => {
+    let reminderInterval: NodeJS.Timeout;
+
+    if (wellnessPrompt !== null) {
+      // Set an interval to run every 60 seconds
+      reminderInterval = setInterval(() => {
+        // Trigger Haptics
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+        
+        // Speak the message again
+        speak(wellnessPrompt.message);
+        
+        // Trigger the rapid "Glitter/Pop" animation
+        Animated.sequence([
+          Animated.timing(attentionAnim, { toValue: 1.08, duration: 150, useNativeDriver: true }),
+          Animated.timing(attentionAnim, { toValue: 0.95, duration: 150, useNativeDriver: true }),
+          Animated.timing(attentionAnim, { toValue: 1.05, duration: 150, useNativeDriver: true }),
+          Animated.timing(attentionAnim, { toValue: 1, duration: 150, useNativeDriver: true })
+        ]).start();
+        
+      }, 60000); // 60,000 milliseconds = 1 minute
+    }
+
+    return () => {
+      // If the prompt is dismissed, clear the timer
+      if (reminderInterval) clearInterval(reminderInterval);
+    };
+  }, [wellnessPrompt]);
+
+
   useEffect(() => {
     Animated.timing(uiOpacity, {
       toValue: (isRecording || isProcessing || wellnessPrompt !== null) ? 0 : 1,
@@ -360,7 +392,6 @@ export default function HomeScreen() {
     return () => clearInterval(intervalId);
   }, [userName, isEvening, isRecording, isProcessing, isImportantMusicPlaying, isDistressed, wellnessPrompt]);
 
-  // --- SUPERCHARGED AUTO-ANNOUNCER WITH VISUAL WELLNESS POP-UPS ---
   useEffect(() => {
     const checkRoutines = async () => {
       if (isRecording || isProcessing || isImportantMusicPlaying || isDistressed || wellnessPrompt) return;
@@ -399,7 +430,6 @@ export default function HomeScreen() {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             const rTitle = routine.title.toLowerCase();
             
-            // Wellness Logic: Detect if this task is for water/food and trigger visual modal
             if (rTitle.includes('water') || rTitle.includes('drink') || rTitle.includes('hydrate')) {
               const msg = `Excuse me ${userName}, it's time for a refreshing glass of water.`;
               setWellnessPrompt({ type: 'water', title: "Hydration Time!", message: msg });
@@ -411,7 +441,6 @@ export default function HomeScreen() {
               speak(msg);
             } 
             else {
-              // Standard routine announcement in the main bubble
               const announcement = `Excuse me ${userName}, it is time for: ${routine.title}.`;
               setRemiText(announcement);
               speak(announcement);
@@ -703,7 +732,6 @@ export default function HomeScreen() {
               <Text style={[styles.repeatVoiceText, isEvening && { color: '#92400E' }]}>Hear again</Text>
             </TouchableOpacity>
             
-            {/* IMPORTANT MUSIC BANNER: Hides during a game! */}
             {importantMusic && !isGameActive && !isNudgeActive && !isEvening && (
               <Animated.View style={{ width: '100%', opacity: uiOpacity, marginTop: 15 }}>
                 <View style={styles.musicBannerCard}>
@@ -728,7 +756,6 @@ export default function HomeScreen() {
               </Animated.View>
             )}
 
-            {/* PHOTO MEMORY CARD: Always shows during a game! */}
             {dailyMemory && (!importantMusic || isGameActive) && !isNudgeActive && !isEvening && dailyMemory.image_url && (
               <Animated.View style={{ width: '100%', opacity: uiOpacity, marginTop: 15 }}>
                 <TouchableOpacity activeOpacity={0.8} onPress={() => setIsMemoryExpanded(true)} style={styles.memoryDropContainer}>
@@ -743,7 +770,6 @@ export default function HomeScreen() {
               </Animated.View>
             )}
 
-            {/* VOICE NOTE ONLY CARD */}
             {dailyMemory && (!importantMusic || isGameActive) && !isNudgeActive && !isEvening && !dailyMemory.image_url && dailyMemory.audio_url && (
               <Animated.View style={{ width: '100%', opacity: uiOpacity, marginTop: 15 }}>
                 <View style={styles.voiceNoteCard}>
@@ -775,7 +801,6 @@ export default function HomeScreen() {
             </Animated.View>
           )}
 
-          {/* ----- FIXED ANDROID SOS BUTTON ----- */}
           {isDistressed && (
             <TouchableOpacity 
               activeOpacity={0.8}
@@ -838,7 +863,6 @@ export default function HomeScreen() {
             </Text>
           </View>
 
-          {/* ----- ONE-TAP PHOTO DIALER (MOVED TO BOTTOM) ----- */}
           {(!isRecording && !isProcessing && !isDistressed && !isNudgeActive) && (
              <Animated.View style={[styles.familyRowContainer, { opacity: uiOpacity, marginTop: 25 }]}>
                 <Text style={[styles.nudgeTitle, isEvening && { color: '#92400E' }]}>Connect with Family:</Text>
@@ -876,7 +900,6 @@ export default function HomeScreen() {
         </ScrollView>
       </View>
 
-      {/* --- MEMORY IMAGE FULLSCREEN MODAL --- */}
       <Modal visible={isMemoryExpanded} transparent={true} animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.imageCapsule}>
@@ -893,12 +916,14 @@ export default function HomeScreen() {
         </View>
       </Modal>
 
-      {/* --- NEW: VISUAL WELLNESS MODAL --- */}
+      {/* --- REPEATING VISUAL WELLNESS MODAL --- */}
       <Modal visible={wellnessPrompt !== null} transparent={true} animationType="slide">
         <View style={[styles.modalOverlay, { justifyContent: 'center', backgroundColor: 'rgba(17, 24, 39, 0.8)' }]}>
-          <View style={[
+          {/* Animated Container for the Pop effect */}
+          <Animated.View style={[
               styles.wellnessModalContainer, 
-              wellnessPrompt?.type === 'water' ? { backgroundColor: '#DBEAFE', borderColor: '#93C5FD' } : { backgroundColor: '#FFEDD5', borderColor: '#FDBA74' }
+              wellnessPrompt?.type === 'water' ? { backgroundColor: '#DBEAFE', borderColor: '#93C5FD' } : { backgroundColor: '#FFEDD5', borderColor: '#FDBA74' },
+              { transform: [{ scale: attentionAnim }] }
             ]}
           >
             <View style={[
@@ -926,17 +951,16 @@ export default function HomeScreen() {
               onPress={() => {
                 Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                 setWellnessPrompt(null);
-                resetRemi(); // Reset to normal state
+                resetRemi(); 
               }}
             >
               <Ionicons name="checkmark-circle" size={24} color="#FFFFFF" style={{ marginRight: 8 }} />
               <Text style={styles.wellnessButtonText}>Okay, I got it!</Text>
             </TouchableOpacity>
-          </View>
+          </Animated.View>
         </View>
       </Modal>
 
-      {/* --- REGULAR MENU MODAL --- */}
       <Modal visible={isMenuVisible} transparent={true} animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
@@ -974,7 +998,6 @@ export default function HomeScreen() {
         </View>
       </Modal>
 
-      {/* --- CAREGIVER PIN MODAL --- */}
       <Modal visible={showPinModal} transparent={true} animationType="fade">
         <View style={[styles.modalOverlay, { justifyContent: 'center', alignItems: 'center' }]}>
           <View style={styles.pinModalContent}>
@@ -998,7 +1021,6 @@ export default function HomeScreen() {
         </View>
       </Modal>
 
-      {/* --- EMERGENCY SOS MENU MODAL --- */}
       <Modal visible={showEmergencyMenu} transparent={true} animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: '#FEF2F2' }]}>
@@ -1136,7 +1158,6 @@ const styles = StyleSheet.create({
   pinModalSubtitle: { color: '#9CA3AF', fontSize: 14, textAlign: 'center', marginBottom: 25 },
   pinInputDisplay: { backgroundColor: '#111827', width: '100%', borderWidth: 1, borderColor: '#374151', borderRadius: 16, paddingVertical: 20, color: '#FFFFFF', fontSize: 32, fontWeight: 'bold', textAlign: 'center', letterSpacing: 12, marginBottom: 20 },
 
-  // --- NEW: WELLNESS MODAL STYLES ---
   wellnessModalContainer: { width: '85%', padding: 30, borderRadius: 30, alignItems: 'center', borderWidth: 2 },
   wellnessIconWrap: { width: 90, height: 90, borderRadius: 45, alignItems: 'center', justifyContent: 'center', marginBottom: 20 },
   wellnessTitle: { fontSize: 26, fontWeight: '800', marginBottom: 10, textAlign: 'center' },
