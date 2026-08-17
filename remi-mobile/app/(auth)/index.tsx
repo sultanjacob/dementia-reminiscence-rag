@@ -36,7 +36,10 @@ export default function HomeScreen() {
   const [isEvening, setIsEvening] = useState(false);
   
   const [isNudgeActive, setIsNudgeActive] = useState(false);
-  const [isGameActive, setIsGameActive] = useState(false); // <-- NEW: Game Override State
+  const [isGameActive, setIsGameActive] = useState(false);
+
+  // --- NEW: Wellness Prompt State ---
+  const [wellnessPrompt, setWellnessPrompt] = useState<{type: 'water' | 'meal', title: string, message: string} | null>(null);
 
   const [primaryContact, setPrimaryContact] = useState<string | null>(null);
   const [secondaryContact, setSecondaryContact] = useState<string | null>(null);
@@ -44,7 +47,6 @@ export default function HomeScreen() {
   const [isMenuVisible, setIsMenuVisible] = useState(false);
   const [isMemoryExpanded, setIsMemoryExpanded] = useState(false);
   
-  // Vault States
   const [dailyMemory, setDailyMemory] = useState<any>(null);
   const [importantMusic, setImportantMusic] = useState<any>(null);
   const [isImportantMusicPlaying, setIsImportantMusicPlaying] = useState(false);
@@ -231,7 +233,6 @@ export default function HomeScreen() {
     );
   };
 
-  // --- START MEMORY GAME FUNCTION ---
   const startMemoryGame = () => {
     setIsMenuVisible(false);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -245,7 +246,6 @@ export default function HomeScreen() {
         setTimeIcon("sunny");
       }
       
-      // Override standard UI states
       setIsGameActive(true); 
       setIsNudgeActive(false);
 
@@ -261,11 +261,11 @@ export default function HomeScreen() {
 
   useEffect(() => {
     Animated.timing(uiOpacity, {
-      toValue: (isRecording || isProcessing) ? 0 : 1,
+      toValue: (isRecording || isProcessing || wellnessPrompt !== null) ? 0 : 1,
       duration: 400,
       useNativeDriver: true,
     }).start();
-  }, [isRecording, isProcessing]);
+  }, [isRecording, isProcessing, wellnessPrompt]);
 
   useEffect(() => {
     if (isDistressed) {
@@ -350,7 +350,7 @@ export default function HomeScreen() {
 
   useEffect(() => {
     const checkSundowning = () => {
-      if (isRecording || isProcessing || isImportantMusicPlaying || isDistressed) return;
+      if (isRecording || isProcessing || isImportantMusicPlaying || isDistressed || wellnessPrompt) return;
       const now = new Date();
       if (now.getHours() === 16 && now.getMinutes() === 30 && !isEvening) {
         triggerCalmMode(`Good evening ${userName}, it is getting a bit late, so I've turned on some relaxing music for you.`);
@@ -358,11 +358,12 @@ export default function HomeScreen() {
     };
     const intervalId = setInterval(checkSundowning, 60000); 
     return () => clearInterval(intervalId);
-  }, [userName, isEvening, isRecording, isProcessing, isImportantMusicPlaying, isDistressed]);
+  }, [userName, isEvening, isRecording, isProcessing, isImportantMusicPlaying, isDistressed, wellnessPrompt]);
 
+  // --- SUPERCHARGED AUTO-ANNOUNCER WITH VISUAL WELLNESS POP-UPS ---
   useEffect(() => {
     const checkRoutines = async () => {
-      if (isRecording || isProcessing || isImportantMusicPlaying || isDistressed) return;
+      if (isRecording || isProcessing || isImportantMusicPlaying || isDistressed || wellnessPrompt) return;
       try {
         const { data, error } = await supabase
           .from('routines')
@@ -396,9 +397,26 @@ export default function HomeScreen() {
 
           if (isMatch) {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            const announcement = `Excuse me ${userName}, it is time for: ${routine.title}.`;
-            setRemiText(announcement);
-            speak(announcement);
+            const rTitle = routine.title.toLowerCase();
+            
+            // Wellness Logic: Detect if this task is for water/food and trigger visual modal
+            if (rTitle.includes('water') || rTitle.includes('drink') || rTitle.includes('hydrate')) {
+              const msg = `Excuse me ${userName}, it's time for a refreshing glass of water.`;
+              setWellnessPrompt({ type: 'water', title: "Hydration Time!", message: msg });
+              speak(msg);
+            } 
+            else if (rTitle.includes('lunch') || rTitle.includes('dinner') || rTitle.includes('breakfast') || rTitle.includes('eat') || rTitle.includes('snack')) {
+              const msg = `Excuse me ${userName}, it's time for your ${routine.title}.`;
+              setWellnessPrompt({ type: 'meal', title: "Meal Time!", message: msg });
+              speak(msg);
+            } 
+            else {
+              // Standard routine announcement in the main bubble
+              const announcement = `Excuse me ${userName}, it is time for: ${routine.title}.`;
+              setRemiText(announcement);
+              speak(announcement);
+            }
+            
             setAnnouncedTasks(prev => [...prev, routine.id]);
             break; 
           }
@@ -411,14 +429,15 @@ export default function HomeScreen() {
     const intervalId = setInterval(checkRoutines, 10000); 
     checkRoutines(); 
     return () => clearInterval(intervalId);
-  }, [userName, announcedTasks, isRecording, isProcessing, isImportantMusicPlaying, isDistressed]);
+  }, [userName, announcedTasks, isRecording, isProcessing, isImportantMusicPlaying, isDistressed, wellnessPrompt]);
 
   const resetRemi = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setIsRecording(false);
     setIsProcessing(false);
     setIsNudgeActive(false);
-    setIsGameActive(false); // <-- NEW: Disables Game Mode on refresh
+    setIsGameActive(false); 
+    setWellnessPrompt(null);
     
     if (dailyMemory && !isEvening && !importantMusic) {
       const isPhoto = !!dailyMemory.image_url;
@@ -825,8 +844,6 @@ export default function HomeScreen() {
                 <Text style={[styles.nudgeTitle, isEvening && { color: '#92400E' }]}>Connect with Family:</Text>
                 
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 15, paddingHorizontal: 5 }}>
-                  
-                  {/* Primary Contact Card */}
                   <TouchableOpacity 
                     style={[styles.familyCard, { backgroundColor: familyCardBgColor, borderColor: familyCardBorderColor }]} 
                     activeOpacity={0.7}
@@ -840,7 +857,6 @@ export default function HomeScreen() {
                      </View>
                   </TouchableOpacity>
 
-                  {/* Secondary Contact Card */}
                   <TouchableOpacity 
                     style={[styles.familyCard, { backgroundColor: familyCardBgColor, borderColor: familyCardBorderColor }]} 
                     activeOpacity={0.7}
@@ -853,7 +869,6 @@ export default function HomeScreen() {
                        <Ionicons name="call" size={12} color="#FFFFFF" />
                      </View>
                   </TouchableOpacity>
-
                 </ScrollView>
              </Animated.View>
           )}
@@ -878,7 +893,50 @@ export default function HomeScreen() {
         </View>
       </Modal>
 
-      {/* --- REGULAR MENU MODAL (UPDATED WITH GAME) --- */}
+      {/* --- NEW: VISUAL WELLNESS MODAL --- */}
+      <Modal visible={wellnessPrompt !== null} transparent={true} animationType="slide">
+        <View style={[styles.modalOverlay, { justifyContent: 'center', backgroundColor: 'rgba(17, 24, 39, 0.8)' }]}>
+          <View style={[
+              styles.wellnessModalContainer, 
+              wellnessPrompt?.type === 'water' ? { backgroundColor: '#DBEAFE', borderColor: '#93C5FD' } : { backgroundColor: '#FFEDD5', borderColor: '#FDBA74' }
+            ]}
+          >
+            <View style={[
+                styles.wellnessIconWrap, 
+                wellnessPrompt?.type === 'water' ? { backgroundColor: '#BFDBFE' } : { backgroundColor: '#FED7AA' }
+              ]}
+            >
+              <Ionicons 
+                name={wellnessPrompt?.type === 'water' ? 'water' : 'restaurant'} 
+                size={56} 
+                color={wellnessPrompt?.type === 'water' ? '#1D4ED8' : '#C2410C'} 
+              />
+            </View>
+            
+            <Text style={[styles.wellnessTitle, wellnessPrompt?.type === 'water' ? { color: '#1E3A8A' } : { color: '#9A3412' }]}>
+              {wellnessPrompt?.title}
+            </Text>
+            
+            <Text style={[styles.wellnessMessage, wellnessPrompt?.type === 'water' ? { color: '#1E40AF' } : { color: '#9A3412' }]}>
+              {wellnessPrompt?.message}
+            </Text>
+
+            <TouchableOpacity 
+              style={[styles.wellnessButton, wellnessPrompt?.type === 'water' ? { backgroundColor: '#2563EB' } : { backgroundColor: '#EA580C' }]} 
+              onPress={() => {
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                setWellnessPrompt(null);
+                resetRemi(); // Reset to normal state
+              }}
+            >
+              <Ionicons name="checkmark-circle" size={24} color="#FFFFFF" style={{ marginRight: 8 }} />
+              <Text style={styles.wellnessButtonText}>Okay, I got it!</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* --- REGULAR MENU MODAL --- */}
       <Modal visible={isMenuVisible} transparent={true} animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
@@ -890,7 +948,6 @@ export default function HomeScreen() {
               </TouchableOpacity>
             </View>
 
-            {/* NEW: Play Memory Game Button */}
             <TouchableOpacity style={styles.menuRow} onPress={startMemoryGame}>
               <View style={[styles.menuIconContainer, { backgroundColor: '#DBEAFE' }]}>
                 <Ionicons name="extension-puzzle" size={24} color="#3B82F6" />
@@ -961,7 +1018,6 @@ export default function HomeScreen() {
               Who would you like to call?
             </Text>
 
-            {/* Call Primary Contact */}
             <TouchableOpacity 
               style={[styles.menuRow, { backgroundColor: '#FEE2E2', borderRadius: 16, marginBottom: 12, paddingHorizontal: 15, borderBottomWidth: 0 }]} 
               onPress={() => {
@@ -975,12 +1031,11 @@ export default function HomeScreen() {
               <Text style={[styles.menuRowText, { color: '#991B1B', fontWeight: 'bold' }]}>Call Primary Contact</Text>
             </TouchableOpacity>
 
-            {/* Call Secondary Contact */}
             <TouchableOpacity 
               style={[styles.menuRow, { backgroundColor: '#FEE2E2', borderRadius: 16, paddingHorizontal: 15, borderBottomWidth: 0 }]} 
               onPress={() => {
                 if (secondaryContact) Linking.openURL(`tel:${secondaryContact}`);
-                else Alert.alert("No Number", "Secondary contact number is not set!");
+                else Alert.alert("No Number", "Secondary contact number is not set.");
               }}
             >
               <View style={[styles.menuIconContainer, { backgroundColor: '#FECACA' }]}>
@@ -989,7 +1044,6 @@ export default function HomeScreen() {
               <Text style={[styles.menuRowText, { color: '#991B1B', fontWeight: 'bold' }]}>Call Secondary Contact</Text>
             </TouchableOpacity>
             
-            {/* Dismiss and Reset Button */}
             <TouchableOpacity 
                style={{ marginTop: 25, alignSelf: 'center', padding: 15 }} 
                onPress={() => {
@@ -999,7 +1053,6 @@ export default function HomeScreen() {
             >
                <Text style={{ color: '#DC2626', fontSize: 16, fontWeight: '700' }}>I am safe, hide this menu</Text>
             </TouchableOpacity>
-
           </View>
         </View>
       </Modal>
@@ -1082,4 +1135,12 @@ const styles = StyleSheet.create({
   pinModalTitle: { color: '#FFFFFF', fontSize: 22, fontWeight: 'bold', marginBottom: 8 },
   pinModalSubtitle: { color: '#9CA3AF', fontSize: 14, textAlign: 'center', marginBottom: 25 },
   pinInputDisplay: { backgroundColor: '#111827', width: '100%', borderWidth: 1, borderColor: '#374151', borderRadius: 16, paddingVertical: 20, color: '#FFFFFF', fontSize: 32, fontWeight: 'bold', textAlign: 'center', letterSpacing: 12, marginBottom: 20 },
+
+  // --- NEW: WELLNESS MODAL STYLES ---
+  wellnessModalContainer: { width: '85%', padding: 30, borderRadius: 30, alignItems: 'center', borderWidth: 2 },
+  wellnessIconWrap: { width: 90, height: 90, borderRadius: 45, alignItems: 'center', justifyContent: 'center', marginBottom: 20 },
+  wellnessTitle: { fontSize: 26, fontWeight: '800', marginBottom: 10, textAlign: 'center' },
+  wellnessMessage: { fontSize: 18, fontWeight: '600', textAlign: 'center', marginBottom: 30, lineHeight: 26 },
+  wellnessButton: { flexDirection: 'row', alignItems: 'center', paddingVertical: 16, paddingHorizontal: 24, borderRadius: 25, width: '100%', justifyContent: 'center' },
+  wellnessButtonText: { color: '#FFFFFF', fontSize: 18, fontWeight: 'bold' }
 });
