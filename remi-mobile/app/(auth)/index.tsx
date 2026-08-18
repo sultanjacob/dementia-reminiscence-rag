@@ -29,16 +29,16 @@ export default function HomeScreen() {
   const API_URL = "https://dementia-reminiscence-rag.onrender.com"; 
   
   const [remiText, setRemiText] = useState("Hello! I am Remi. How can I help you?");
-  const [greeting, setGreeting] = useState("Good morning");
   const [timeIcon, setTimeIcon] = useState("sunny");
   const [userName, setUserName] = useState("Peter");
-  const [currentDate, setCurrentDate] = useState("");
   const [isEvening, setIsEvening] = useState(false);
   
+  // --- NEW: Orientation Clock States ---
+  const [dayOfWeek, setDayOfWeek] = useState("MONDAY");
+  const [timeOfDay, setTimeOfDay] = useState("MORNING");
+
   const [isNudgeActive, setIsNudgeActive] = useState(false);
   const [isGameActive, setIsGameActive] = useState(false);
-
-  // Wellness Prompt State
   const [wellnessPrompt, setWellnessPrompt] = useState<{type: 'water' | 'meal', title: string, message: string} | null>(null);
 
   const [primaryContact, setPrimaryContact] = useState<string | null>(null);
@@ -72,7 +72,7 @@ export default function HomeScreen() {
   const flashAnim = useRef(new Animated.Value(1)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const uiOpacity = useRef(new Animated.Value(1)).current;
-  const attentionAnim = useRef(new Animated.Value(1)).current; // <-- NEW: Animation value for the modal pop
+  const attentionAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     return () => {
@@ -189,7 +189,6 @@ export default function HomeScreen() {
 
   const dismissImportantMusic = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    
     if (memorySound) {
       await memorySound.stopAsync().catch(()=>{});
     }
@@ -205,33 +204,21 @@ export default function HomeScreen() {
     if (musicToDowngrade) {
       try {
         const newCaption = musicToDowngrade.caption.replace('[MUSIC-IMPORTANT]', '[MUSIC]');
-        await supabase
-          .from('memory_vault')
-          .update({ caption: newCaption })
-          .eq('id', musicToDowngrade.id);
-      } catch (error) {
-        console.error("Failed to downgrade music tag", error);
-      }
+        await supabase.from('memory_vault').update({ caption: newCaption }).eq('id', musicToDowngrade.id);
+      } catch (error) {}
     }
   };
 
   const handleFamilyCall = (phoneNumber: string | null, name: string) => {
     if (!phoneNumber) {
-      Alert.alert("No Number", `${name}'s phone number hasn't been set up yet by the care team.`);
+      Alert.alert("No Number", `${name}'s phone number hasn't been set up yet.`);
       return;
     }
     Haptics.selectionAsync();
-    Alert.alert(
-      `Call ${name}?`,
-      `Would you like to call ${name} now?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        { 
-          text: "Yes, Call", 
-          onPress: () => Linking.openURL(`tel:${phoneNumber}`).catch(() => Alert.alert("Error", "Could not place the call.")) 
-        }
-      ]
-    );
+    Alert.alert(`Call ${name}?`, `Would you like to call ${name} now?`, [
+      { text: "Cancel", style: "cancel" },
+      { text: "Yes, Call", onPress: () => Linking.openURL(`tel:${phoneNumber}`).catch(() => Alert.alert("Error", "Could not place the call.")) }
+    ]);
   };
 
   const startMemoryGame = () => {
@@ -241,18 +228,14 @@ export default function HomeScreen() {
     if (dailyMemory && dailyMemory.image_url) {
       const memoryCaption = dailyMemory.caption ? dailyMemory.caption : "this beautiful picture";
       const prompt = `Let's play a game! I am looking at a photo of ${memoryCaption}. Do you remember anything special about this day? Tap the purple microphone and tell me about it!`;
-      
       if (isEvening) {
         setIsEvening(false);
         setTimeIcon("sunny");
       }
-      
       setIsGameActive(true); 
       setIsNudgeActive(false);
-
       setRemiText(prompt);
       speak(prompt);
-      
     } else {
       const text = "I would love to play a memory game, but your family hasn't added any photos to your vault yet. We can play once they add some!";
       setRemiText(text);
@@ -260,34 +243,21 @@ export default function HomeScreen() {
     }
   };
 
-  // --- NEW: REPEATING ATTENTION TIMER FOR WELLNESS PROMPT ---
   useEffect(() => {
     let reminderInterval: NodeJS.Timeout;
-
     if (wellnessPrompt !== null) {
-      // Set an interval to run every 60 seconds
       reminderInterval = setInterval(() => {
-        // Trigger Haptics
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-        
-        // Speak the message again
         speak(wellnessPrompt.message);
-        
-        // Trigger the rapid "Glitter/Pop" animation
         Animated.sequence([
           Animated.timing(attentionAnim, { toValue: 1.08, duration: 150, useNativeDriver: true }),
           Animated.timing(attentionAnim, { toValue: 0.95, duration: 150, useNativeDriver: true }),
           Animated.timing(attentionAnim, { toValue: 1.05, duration: 150, useNativeDriver: true }),
           Animated.timing(attentionAnim, { toValue: 1, duration: 150, useNativeDriver: true })
         ]).start();
-        
-      }, 60000); // 60,000 milliseconds = 1 minute
+      }, 60000); 
     }
-
-    return () => {
-      // If the prompt is dismissed, clear the timer
-      if (reminderInterval) clearInterval(reminderInterval);
-    };
+    return () => { if (reminderInterval) clearInterval(reminderInterval); };
   }, [wellnessPrompt]);
 
 
@@ -321,28 +291,43 @@ export default function HomeScreen() {
     ).start();
   }, []);
 
+  const updateClockLogic = () => {
+    const now = new Date();
+    const h = now.getHours();
+    
+    setDayOfWeek(now.toLocaleDateString('en-US', { weekday: 'long' }).toUpperCase());
+
+    let tod = "MORNING";
+    let icon = "sunny";
+    if (h >= 12 && h < 17) {
+      tod = "AFTERNOON";
+      icon = "partly-sunny";
+    } else if (h >= 17 && h < 20) {
+      tod = "EVENING";
+      icon = "moon";
+    } else if (h >= 20 || h < 6) {
+      tod = "NIGHT";
+      icon = "moon";
+    }
+    setTimeOfDay(tod);
+    setTimeIcon(icon);
+    
+    // Sundowning trigger check
+    if (h === 16 && now.getMinutes() >= 30 && h < 20) {
+        if (!isEvening) setIsEvening(true);
+    } else if (h >= 20 || h < 6) {
+        if (!isEvening) setIsEvening(true);
+    }
+  };
+
   useEffect(() => {
     const initializeHome = async () => {
-      const hour = new Date().getHours();
-      const minute = new Date().getMinutes();
-      
-      const evening = (hour === 16 && minute >= 30) || hour >= 17 || hour < 6;
-      setIsEvening(evening);
-      setTimeIcon(evening ? "moon" : "sunny");
-
-      if (hour < 12) setGreeting("Good morning");
-      else if (hour < 17) setGreeting("Good afternoon");
-      else setGreeting("Good evening");
-
-      const today = new Date();
-      const formattedDate = today.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
-      setCurrentDate(formattedDate);
+      updateClockLogic();
 
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
       let fetchedName = "John";
-      
       const { data: profileData } = await supabase.from('profiles').select('nickname, primary_contact, secondary_contact').eq('id', user.id).single();
       
       if (profileData) {
@@ -366,7 +351,8 @@ export default function HomeScreen() {
         }
       }
 
-      if (evening) {
+      const h = new Date().getHours();
+      if (h >= 17 || h < 6) {
         const defaultGreeting = `Good evening, ${fetchedName}. It's getting late. I am here to help you relax.`;
         setRemiText(defaultGreeting);
         speak(defaultGreeting);
@@ -380,15 +366,19 @@ export default function HomeScreen() {
     initializeHome();
   }, []);
 
+  // One-minute interval check for the clock and announcements
   useEffect(() => {
-    const checkSundowning = () => {
+    const globalCheck = () => {
+      updateClockLogic();
+      
       if (isRecording || isProcessing || isImportantMusicPlaying || isDistressed || wellnessPrompt) return;
+      
       const now = new Date();
       if (now.getHours() === 16 && now.getMinutes() === 30 && !isEvening) {
         triggerCalmMode(`Good evening ${userName}, it is getting a bit late, so I've turned on some relaxing music for you.`);
       }
     };
-    const intervalId = setInterval(checkSundowning, 60000); 
+    const intervalId = setInterval(globalCheck, 60000); 
     return () => clearInterval(intervalId);
   }, [userName, isEvening, isRecording, isProcessing, isImportantMusicPlaying, isDistressed, wellnessPrompt]);
 
@@ -467,6 +457,7 @@ export default function HomeScreen() {
     setIsNudgeActive(false);
     setIsGameActive(false); 
     setWellnessPrompt(null);
+    updateClockLogic();
     
     if (dailyMemory && !isEvening && !importantMusic) {
       const isPhoto = !!dailyMemory.image_url;
@@ -494,7 +485,7 @@ export default function HomeScreen() {
     } else {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setIsEvening(false);
-      setTimeIcon("sunny");
+      updateClockLogic(); // Reset icon based on true time
       resetRemi();
     }
   };
@@ -686,21 +677,10 @@ export default function HomeScreen() {
         
         <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.internalContent} showsVerticalScrollIndicator={false}>
           
-          <Animated.View style={[styles.header, { opacity: uiOpacity }]}>
-            <View>
-              <TouchableOpacity 
-                activeOpacity={0.7} 
-                onLongPress={toggleSundowningOverride} 
-                delayLongPress={800}
-                style={{ flexDirection: 'row', alignItems: 'center' }}
-              >
-                <Ionicons name={timeIcon as any} size={20} color={isEvening ? '#D97706' : '#F59E0B'} style={{ marginRight: 6 }} />
-                <Text style={styles.greetingText}>{greeting},</Text>
-              </TouchableOpacity>
-              <Text style={styles.nameText}>{userName}</Text>
-              <Text style={styles.dateText}>{currentDate}</Text>
-            </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          {/* --- NEW: INTERACTIVE ORIENTATION CLOCK HEADER --- */}
+          <Animated.View style={{ opacity: uiOpacity, zIndex: 10 }}>
+            {/* Top utility row */}
+            <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 10, marginTop: 5 }}>
               <TouchableOpacity onPress={resetRemi} style={[styles.menuIconButton, { marginRight: 10 }]} hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
                 <Ionicons name="refresh" size={26} color="#8B5CF6" />
               </TouchableOpacity>
@@ -708,6 +688,29 @@ export default function HomeScreen() {
                 <Ionicons name="menu" size={32} color="#111827" />
               </TouchableOpacity>
             </View>
+
+            {/* Orientation Board */}
+            <TouchableOpacity 
+              activeOpacity={0.9} 
+              onLongPress={toggleSundowningOverride} 
+              delayLongPress={800}
+              style={[styles.orientationBoard, isEvening ? { backgroundColor: '#1E3A8A', borderColor: '#1E40AF' } : { backgroundColor: '#FEF3C7', borderColor: '#FDE68A' }]}
+            >
+              <View style={styles.orientationInner}>
+                 <Ionicons name={timeIcon as any} size={48} color={isEvening ? '#FCD34D' : '#D97706'} style={{ marginRight: 18 }} />
+                 <View style={{ flex: 1 }}>
+                   <Text style={[styles.orientationDayText, isEvening ? { color: '#FFFFFF' } : { color: '#92400E' }]}>
+                     IT IS {dayOfWeek}
+                   </Text>
+                   <Text style={[styles.orientationTimeText, isEvening ? { color: '#93C5FD' } : { color: '#B45309' }]}>
+                     {timeOfDay}
+                   </Text>
+                   <Text style={[styles.orientationSubtitle, isEvening ? { color: '#BFDBFE' } : { color: '#D97706' }]}>
+                     Hello {userName}. {timeOfDay === 'NIGHT' ? 'It is time to sleep.' : 'You are safe at home.'}
+                   </Text>
+                 </View>
+              </View>
+            </TouchableOpacity>
           </Animated.View>
 
           <TouchableOpacity activeOpacity={1} onPress={handleSecretTap} style={styles.orbContainer}>
@@ -916,10 +919,8 @@ export default function HomeScreen() {
         </View>
       </Modal>
 
-      {/* --- REPEATING VISUAL WELLNESS MODAL --- */}
       <Modal visible={wellnessPrompt !== null} transparent={true} animationType="slide">
         <View style={[styles.modalOverlay, { justifyContent: 'center', backgroundColor: 'rgba(17, 24, 39, 0.8)' }]}>
-          {/* Animated Container for the Pop effect */}
           <Animated.View style={[
               styles.wellnessModalContainer, 
               wellnessPrompt?.type === 'water' ? { backgroundColor: '#DBEAFE', borderColor: '#93C5FD' } : { backgroundColor: '#FFEDD5', borderColor: '#FDBA74' },
@@ -1044,7 +1045,7 @@ export default function HomeScreen() {
               style={[styles.menuRow, { backgroundColor: '#FEE2E2', borderRadius: 16, marginBottom: 12, paddingHorizontal: 15, borderBottomWidth: 0 }]} 
               onPress={() => {
                 if (primaryContact) Linking.openURL(`tel:${primaryContact}`);
-                else Alert.alert("No Number", "Primary contact number is not set!");
+                else Alert.alert("No Number", "Primary contact number is not set.");
               }}
             >
               <View style={[styles.menuIconContainer, { backgroundColor: '#FECACA' }]}>
@@ -1057,7 +1058,7 @@ export default function HomeScreen() {
               style={[styles.menuRow, { backgroundColor: '#FEE2E2', borderRadius: 16, paddingHorizontal: 15, borderBottomWidth: 0 }]} 
               onPress={() => {
                 if (secondaryContact) Linking.openURL(`tel:${secondaryContact}`);
-                else Alert.alert("No Number", "Secondary contact number is not set!");
+                else Alert.alert("No Number", "Secondary contact number is not set.");
               }}
             >
               <View style={[styles.menuIconContainer, { backgroundColor: '#FECACA' }]}>
@@ -1087,11 +1088,16 @@ const styles = StyleSheet.create({
   safeArea: { flex: 1, paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0 },
   appCapsule: { flex: 1, borderRadius: 35, overflow: 'hidden', marginHorizontal: 10, marginBottom: 10, marginTop: 10, borderWidth: 1, borderColor: '#E5E7EB', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 5 },
   internalContent: { flexGrow: 1, paddingHorizontal: 20, justifyContent: 'space-between', paddingTop: 10, paddingBottom: 30 }, 
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginTop: 5, marginBottom: 0 }, 
-  greetingText: { fontSize: 16, color: '#6B7280', fontWeight: '600' }, 
-  nameText: { fontSize: 28, fontWeight: '800', color: '#111827', marginTop: 2, letterSpacing: -0.5 },
-  dateText: { fontSize: 12, color: '#8B5CF6', fontWeight: '700', marginTop: 4, textTransform: 'uppercase', letterSpacing: 1 },
+  
+  // --- NEW: ORIENTATION BOARD STYLES ---
   menuIconButton: { padding: 8, backgroundColor: '#F3F4F6', borderRadius: 20 },
+  orientationBoard: { width: '100%', borderRadius: 24, padding: 20, borderWidth: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 4 },
+  orientationInner: { flexDirection: 'row', alignItems: 'center' },
+  orientationDayText: { fontSize: 22, fontWeight: '900', letterSpacing: 1 },
+  orientationTimeText: { fontSize: 24, fontWeight: '800', marginTop: 2 },
+  orientationSubtitle: { fontSize: 15, fontWeight: '700', marginTop: 6 },
+  // ------------------------------------
+
   orbContainer: { alignItems: 'center', justifyContent: 'center', marginVertical: 10 }, 
   orb: { width: 86, height: 86, borderRadius: 43, backgroundColor: '#8B5CF6', shadowColor: '#8B5CF6', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.6, shadowRadius: 25, elevation: 15 }, 
   speechBubble: { padding: 18, borderRadius: 24, alignItems: 'center', marginBottom: 10, borderWidth: 1, borderColor: '#E5E7EB' }, 
