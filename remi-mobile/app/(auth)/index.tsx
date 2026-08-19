@@ -33,9 +33,13 @@ export default function HomeScreen() {
   const [userName, setUserName] = useState("Peter");
   const [isEvening, setIsEvening] = useState(false);
   
-  // --- NEW: Orientation Clock States ---
   const [dayOfWeek, setDayOfWeek] = useState("MONDAY");
   const [timeOfDay, setTimeOfDay] = useState("MORNING");
+
+  // --- NEW: Smart Fallback States ---
+  const [nextRoutine, setNextRoutine] = useState<any>(null);
+  const [customDayMessage, setCustomDayMessage] = useState<string | null>(null);
+  const [customNightMessage, setCustomNightMessage] = useState<string | null>(null);
 
   const [isNudgeActive, setIsNudgeActive] = useState(false);
   const [isGameActive, setIsGameActive] = useState(false);
@@ -312,7 +316,6 @@ export default function HomeScreen() {
     setTimeOfDay(tod);
     setTimeIcon(icon);
     
-    // Sundowning trigger check
     if (h === 16 && now.getMinutes() >= 30 && h < 20) {
         if (!isEvening) setIsEvening(true);
     } else if (h >= 20 || h < 6) {
@@ -328,7 +331,8 @@ export default function HomeScreen() {
       if (!user) return;
 
       let fetchedName = "John";
-      const { data: profileData } = await supabase.from('profiles').select('nickname, primary_contact, secondary_contact').eq('id', user.id).single();
+      // We select * so it automatically grabs the new custom messages if they exist!
+      const { data: profileData } = await supabase.from('profiles').select('*').eq('id', user.id).single();
       
       if (profileData) {
         if (profileData.nickname) {
@@ -337,6 +341,10 @@ export default function HomeScreen() {
         }
         if (profileData.primary_contact) setPrimaryContact(profileData.primary_contact);
         if (profileData.secondary_contact) setSecondaryContact(profileData.secondary_contact);
+        
+        // Grab the custom messages
+        if (profileData.day_message) setCustomDayMessage(profileData.day_message);
+        if (profileData.night_message) setCustomNightMessage(profileData.night_message);
       }
 
       const { data: memories } = await supabase.from('memory_vault').select('*');
@@ -366,7 +374,6 @@ export default function HomeScreen() {
     initializeHome();
   }, []);
 
-  // One-minute interval check for the clock and announcements
   useEffect(() => {
     const globalCheck = () => {
       updateClockLogic();
@@ -393,6 +400,13 @@ export default function HomeScreen() {
           .order('created_at', { ascending: true });
 
         if (error || !data) return;
+
+        // --- SMART FALLBACK: Store the upcoming task to show on the board ---
+        if (data.length > 0) {
+          setNextRoutine(data[0]); 
+        } else {
+          setNextRoutine(null);
+        }
 
         const now = new Date();
         const h24 = now.getHours();
@@ -485,7 +499,7 @@ export default function HomeScreen() {
     } else {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setIsEvening(false);
-      updateClockLogic(); // Reset icon based on true time
+      updateClockLogic();
       resetRemi();
     }
   };
@@ -670,6 +684,19 @@ export default function HomeScreen() {
   const familyCardBgColor = isEvening ? '#FDE68A' : '#FFFFFF';
   const familyCardBorderColor = isEvening ? '#FCD34D' : '#E5E7EB';
 
+  // --- SMART FALLBACK LOGIC ---
+  let dynamicSubtitle = "";
+  if (nextRoutine && nextRoutine.title) {
+    const timeDisplay = nextRoutine.time_string && nextRoutine.time_string !== 'Anytime' ? `at ${nextRoutine.time_string}` : "";
+    dynamicSubtitle = `Next up: ${nextRoutine.title} ${timeDisplay}`;
+  } else {
+    if (isEvening) {
+      dynamicSubtitle = customNightMessage || `Hello ${userName}. It is time to rest.`;
+    } else {
+      dynamicSubtitle = customDayMessage || `Hello ${userName}. You are safe at home.`;
+    }
+  }
+
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: safeAreaBgColor }]}>
       <StatusBar barStyle="dark-content" backgroundColor={safeAreaBgColor} />
@@ -677,9 +704,7 @@ export default function HomeScreen() {
         
         <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.internalContent} showsVerticalScrollIndicator={false}>
           
-          {/* --- NEW: INTERACTIVE ORIENTATION CLOCK HEADER --- */}
           <Animated.View style={{ opacity: uiOpacity, zIndex: 10 }}>
-            {/* Top utility row */}
             <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 10, marginTop: 5 }}>
               <TouchableOpacity onPress={resetRemi} style={[styles.menuIconButton, { marginRight: 10 }]} hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
                 <Ionicons name="refresh" size={26} color="#8B5CF6" />
@@ -689,7 +714,6 @@ export default function HomeScreen() {
               </TouchableOpacity>
             </View>
 
-            {/* Orientation Board */}
             <TouchableOpacity 
               activeOpacity={0.9} 
               onLongPress={toggleSundowningOverride} 
@@ -705,8 +729,9 @@ export default function HomeScreen() {
                    <Text style={[styles.orientationTimeText, isEvening ? { color: '#93C5FD' } : { color: '#B45309' }]}>
                      {timeOfDay}
                    </Text>
+                   {/* RENDERING THE DYNAMIC SUBTITLE HERE */}
                    <Text style={[styles.orientationSubtitle, isEvening ? { color: '#BFDBFE' } : { color: '#D97706' }]}>
-                     Hello {userName}. {timeOfDay === 'NIGHT' ? 'It is time to sleep.' : 'You are safe at home.'}
+                     {dynamicSubtitle}
                    </Text>
                  </View>
               </View>
@@ -1089,14 +1114,12 @@ const styles = StyleSheet.create({
   appCapsule: { flex: 1, borderRadius: 35, overflow: 'hidden', marginHorizontal: 10, marginBottom: 10, marginTop: 10, borderWidth: 1, borderColor: '#E5E7EB', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 5 },
   internalContent: { flexGrow: 1, paddingHorizontal: 20, justifyContent: 'space-between', paddingTop: 10, paddingBottom: 30 }, 
   
-  // --- NEW: ORIENTATION BOARD STYLES ---
   menuIconButton: { padding: 8, backgroundColor: '#F3F4F6', borderRadius: 20 },
   orientationBoard: { width: '100%', borderRadius: 24, padding: 20, borderWidth: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 4 },
   orientationInner: { flexDirection: 'row', alignItems: 'center' },
   orientationDayText: { fontSize: 22, fontWeight: '900', letterSpacing: 1 },
   orientationTimeText: { fontSize: 24, fontWeight: '800', marginTop: 2 },
   orientationSubtitle: { fontSize: 15, fontWeight: '700', marginTop: 6 },
-  // ------------------------------------
 
   orbContainer: { alignItems: 'center', justifyContent: 'center', marginVertical: 10 }, 
   orb: { width: 86, height: 86, borderRadius: 43, backgroundColor: '#8B5CF6', shadowColor: '#8B5CF6', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.6, shadowRadius: 25, elevation: 15 }, 
