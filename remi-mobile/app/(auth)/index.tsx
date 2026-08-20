@@ -649,7 +649,7 @@ export default function HomeScreen() {
       }
     } catch (error: any) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      const fallbackMessage = "I'm having a little trouble connecting to the internet right now. Let's try again in a minute.";
+      const fallbackMessage = "Sorry, I'm having a little trouble connecting to the internet right now. Let's try again in a minute.";
       setRemiText(fallbackMessage);
       speak(fallbackMessage); 
     } finally {
