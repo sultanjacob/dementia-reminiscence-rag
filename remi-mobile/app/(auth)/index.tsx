@@ -36,7 +36,6 @@ export default function HomeScreen() {
   const [dayOfWeek, setDayOfWeek] = useState("MONDAY");
   const [timeOfDay, setTimeOfDay] = useState("MORNING");
 
-  // --- NEW: Smart Fallback States ---
   const [nextRoutine, setNextRoutine] = useState<any>(null);
   const [customDayMessage, setCustomDayMessage] = useState<string | null>(null);
   const [customNightMessage, setCustomNightMessage] = useState<string | null>(null);
@@ -44,6 +43,9 @@ export default function HomeScreen() {
   const [isNudgeActive, setIsNudgeActive] = useState(false);
   const [isGameActive, setIsGameActive] = useState(false);
   const [wellnessPrompt, setWellnessPrompt] = useState<{type: 'water' | 'meal', title: string, message: string} | null>(null);
+
+  // --- NEW: Reassurance State ---
+  const [reassuranceNotes, setReassuranceNotes] = useState<{keywords: string[], audio_url: string, id: string}[]>([]);
 
   const [primaryContact, setPrimaryContact] = useState<string | null>(null);
   const [secondaryContact, setSecondaryContact] = useState<string | null>(null);
@@ -331,7 +333,6 @@ export default function HomeScreen() {
       if (!user) return;
 
       let fetchedName = "John";
-      // We select * so it automatically grabs the new custom messages if they exist!
       const { data: profileData } = await supabase.from('profiles').select('*').eq('id', user.id).single();
       
       if (profileData) {
@@ -341,8 +342,6 @@ export default function HomeScreen() {
         }
         if (profileData.primary_contact) setPrimaryContact(profileData.primary_contact);
         if (profileData.secondary_contact) setSecondaryContact(profileData.secondary_contact);
-        
-        // Grab the custom messages
         if (profileData.day_message) setCustomDayMessage(profileData.day_message);
         if (profileData.night_message) setCustomNightMessage(profileData.night_message);
       }
@@ -353,7 +352,25 @@ export default function HomeScreen() {
         const impMusic = memories.find(m => m.caption?.includes('[MUSIC-IMPORTANT]'));
         if (impMusic) setImportantMusic(impMusic);
 
-        const standardMemories = memories.filter(m => !m.caption?.includes('[MUSIC'));
+        // --- NEW: EXTRACT REASSURANCE TRIGGERS FROM THE DATABASE ---
+        const rNotes: any[] = [];
+        const standardMemories: any[] = [];
+
+        memories.forEach(m => {
+          if (m.caption && m.caption.includes('[REASSURANCE:')) {
+             // Extracts words between the brackets using simple regex
+             const match = m.caption.match(/\[REASSURANCE:\s*(.+?)\]/i);
+             if (match && m.audio_url) {
+                const keywords = match[1].split(',').map((k: string) => k.trim().toLowerCase());
+                rNotes.push({ keywords, audio_url: m.audio_url, id: m.id });
+             }
+          } else if (!m.caption?.includes('[MUSIC')) {
+             standardMemories.push(m);
+          }
+        });
+
+        setReassuranceNotes(rNotes);
+
         if (standardMemories.length > 0) {
           setDailyMemory(standardMemories[Math.floor(Math.random() * standardMemories.length)]); 
         }
@@ -401,7 +418,6 @@ export default function HomeScreen() {
 
         if (error || !data) return;
 
-        // --- SMART FALLBACK: Store the upcoming task to show on the board ---
         if (data.length > 0) {
           setNextRoutine(data[0]); 
         } else {
@@ -587,8 +603,32 @@ export default function HomeScreen() {
             triggerCalmMode(); 
         }
 
-        setRemiText(aiText);
-        speak(aiText);
+        // --- NEW: DYNAMIC REASSURANCE INTERCEPTION ---
+        let foundReassurance = null;
+        for (const note of reassuranceNotes) {
+           // If the AI response contains ANY of the trigger words from the database
+           if (note.keywords.some(keyword => lowerText.includes(keyword))) {
+              foundReassurance = note;
+              break;
+           }
+        }
+
+        if (foundReassurance) {
+            // INTERCEPT!
+            const introMsg = "I actually have a message from your family about that. Let's listen.";
+            setRemiText("Playing message from family...");
+            speak(introMsg);
+            
+            // Wait 4 seconds for Remi to finish speaking the intro, then play the family audio
+            setTimeout(() => {
+                playCustomAudio(foundReassurance.audio_url);
+            }, 4000);
+
+        } else {
+            // No trigger words found. Proceed normally.
+            setRemiText(aiText);
+            speak(aiText);
+        }
 
         if (user) {
           supabase.from('shift_logs').insert({
@@ -684,7 +724,6 @@ export default function HomeScreen() {
   const familyCardBgColor = isEvening ? '#FDE68A' : '#FFFFFF';
   const familyCardBorderColor = isEvening ? '#FCD34D' : '#E5E7EB';
 
-  // --- SMART FALLBACK LOGIC ---
   let dynamicSubtitle = "";
   if (nextRoutine && nextRoutine.title) {
     const timeDisplay = nextRoutine.time_string && nextRoutine.time_string !== 'Anytime' ? `at ${nextRoutine.time_string}` : "";
@@ -729,7 +768,6 @@ export default function HomeScreen() {
                    <Text style={[styles.orientationTimeText, isEvening ? { color: '#93C5FD' } : { color: '#B45309' }]}>
                      {timeOfDay}
                    </Text>
-                   {/* RENDERING THE DYNAMIC SUBTITLE HERE */}
                    <Text style={[styles.orientationSubtitle, isEvening ? { color: '#BFDBFE' } : { color: '#D97706' }]}>
                      {dynamicSubtitle}
                    </Text>
@@ -798,7 +836,7 @@ export default function HomeScreen() {
               </Animated.View>
             )}
 
-            {dailyMemory && (!importantMusic || isGameActive) && !isNudgeActive && !isEvening && !dailyMemory.image_url && dailyMemory.audio_url && (
+            {dailyMemory && (!importantMusic || isGameActive) && !isNudgeActive && !isEvening && !dailyMemory.image_url && dailyMemory.audio_url && !dailyMemory.caption?.includes('[REASSURANCE:') && (
               <Animated.View style={{ width: '100%', opacity: uiOpacity, marginTop: 15 }}>
                 <View style={styles.voiceNoteCard}>
                   <View style={styles.voiceNoteIconWrap}>
@@ -1070,7 +1108,7 @@ export default function HomeScreen() {
               style={[styles.menuRow, { backgroundColor: '#FEE2E2', borderRadius: 16, marginBottom: 12, paddingHorizontal: 15, borderBottomWidth: 0 }]} 
               onPress={() => {
                 if (primaryContact) Linking.openURL(`tel:${primaryContact}`);
-                else Alert.alert("No Number", "Primary contact number is not set!S");
+                else Alert.alert("No Number", "Primary contact number is not set.");
               }}
             >
               <View style={[styles.menuIconContainer, { backgroundColor: '#FECACA' }]}>
@@ -1083,7 +1121,7 @@ export default function HomeScreen() {
               style={[styles.menuRow, { backgroundColor: '#FEE2E2', borderRadius: 16, paddingHorizontal: 15, borderBottomWidth: 0 }]} 
               onPress={() => {
                 if (secondaryContact) Linking.openURL(`tel:${secondaryContact}`);
-                else Alert.alert("No Number", "Secondary contact number is not set!");
+                else Alert.alert("No Number", "Secondary contact number is not set.");
               }}
             >
               <View style={[styles.menuIconContainer, { backgroundColor: '#FECACA' }]}>
