@@ -709,7 +709,7 @@ export default function HomeScreen() {
           router.push('/(caregiver)'); 
         } else {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-          Alert.alert("Incorrect PIN", "The PIN entered is incorrect.");
+          Alert.alert("Incorrect PIN", "The PIN entered is incorrect! Please try again.");
           setEnteredPin('');
         }
       } catch (error: any) {
