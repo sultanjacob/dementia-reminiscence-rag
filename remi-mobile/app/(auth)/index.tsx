@@ -44,7 +44,6 @@ export default function HomeScreen() {
   const [isGameActive, setIsGameActive] = useState(false);
   const [wellnessPrompt, setWellnessPrompt] = useState<{type: 'water' | 'meal', title: string, message: string} | null>(null);
 
-  // --- NEW: Reassurance State ---
   const [reassuranceNotes, setReassuranceNotes] = useState<{keywords: string[], audio_url: string, id: string}[]>([]);
 
   const [primaryContact, setPrimaryContact] = useState<string | null>(null);
@@ -352,13 +351,11 @@ export default function HomeScreen() {
         const impMusic = memories.find(m => m.caption?.includes('[MUSIC-IMPORTANT]'));
         if (impMusic) setImportantMusic(impMusic);
 
-        // --- NEW: EXTRACT REASSURANCE TRIGGERS FROM THE DATABASE ---
         const rNotes: any[] = [];
         const standardMemories: any[] = [];
 
         memories.forEach(m => {
           if (m.caption && m.caption.includes('[REASSURANCE:')) {
-             // Extracts words between the brackets using simple regex
              const match = m.caption.match(/\[REASSURANCE:\s*(.+?)\]/i);
              if (match && m.audio_url) {
                 const keywords = match[1].split(',').map((k: string) => k.trim().toLowerCase());
@@ -599,14 +596,9 @@ export default function HomeScreen() {
             detectedVibe = 'Energetic';
         }
 
-        if ((detectedVibe === 'Anxious' || detectedVibe === 'Confused') && !isEvening) {
-            triggerCalmMode(); 
-        }
-
-        // --- NEW: DYNAMIC REASSURANCE INTERCEPTION ---
+        // --- NEW: UPDATED REASSURANCE INTERCEPTION ---
         let foundReassurance = null;
         for (const note of reassuranceNotes) {
-           // If the AI response contains ANY of the trigger words from the database
            if (note.keywords.some(keyword => lowerText.includes(keyword))) {
               foundReassurance = note;
               break;
@@ -617,17 +609,38 @@ export default function HomeScreen() {
             // INTERCEPT!
             const introMsg = "I actually have a message from your family about that. Let's listen.";
             setRemiText("Playing message from family...");
+            
+            // Force disable SOS distress flag
+            setIsDistressed(false); 
+            
+            // Force disable the Piano music if it triggered
+            if (bgMusic) {
+               await bgMusic.pauseAsync();
+               setIsPlayingMusic(false);
+            }
+
             speak(introMsg);
             
-            // Wait 4 seconds for Remi to finish speaking the intro, then play the family audio
             setTimeout(() => {
-                playCustomAudio(foundReassurance.audio_url);
+                // The .trim() guarantees no hidden spaces break the URL
+                const safeUrl = foundReassurance.audio_url.trim();
+                playCustomAudio(safeUrl);
             }, 4000);
 
         } else {
-            // No trigger words found. Proceed normally.
+            // NO TRAP FOUND: Proceed with standard AI behaviors
+            if ((detectedVibe === 'Anxious' || detectedVibe === 'Confused') && !isEvening) {
+                triggerCalmMode(); 
+            }
+            
             setRemiText(aiText);
             speak(aiText);
+            
+            if (lowerText.includes("call family") || lowerText.includes("contact family")) {
+              setIsDistressed(true);
+            } else {
+              setIsDistressed(false); 
+            }
         }
 
         if (user) {
@@ -639,17 +652,12 @@ export default function HomeScreen() {
           });
         }
         
-        if (lowerText.includes("call family") || lowerText.includes("contact family")) {
-          setIsDistressed(true);
-        } else {
-          setIsDistressed(false); 
-        }
       } else {
         throw new Error(`[HTTP ${response.status}]`);
       }
     } catch (error: any) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      const fallbackMessage = "Sorry, I'm having a little trouble connecting to the internet right now. Let's try again in a minute.";
+      const fallbackMessage = "I'm having a little trouble connecting to the internet right now. Let's try again in a minute.";
       setRemiText(fallbackMessage);
       speak(fallbackMessage); 
     } finally {
@@ -709,7 +717,7 @@ export default function HomeScreen() {
           router.push('/(caregiver)'); 
         } else {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-          Alert.alert("Incorrect PIN", "The PIN entered is incorrect! Please try again.");
+          Alert.alert("Incorrect PIN", "The PIN entered is incorrect.");
           setEnteredPin('');
         }
       } catch (error: any) {
