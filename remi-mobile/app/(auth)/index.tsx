@@ -93,7 +93,15 @@ export default function HomeScreen() {
     Speech.speak(cleanText, { language: 'en-GB', pitch: 0.9, rate: speechRate });
   };
 
+  // --- NEW: Safety Catch for Bad Audio URLs ---
   const playCustomAudio = async (url: string) => {
+    if (!url || typeof url !== 'string' || !url.startsWith('http')) {
+      console.warn("Invalid Audio URL blocked:", url);
+      Alert.alert("Link Broken", "The family audio link in the database is broken. Please check the URL.");
+      setRemiText("I tried to play a message, but the link is broken.");
+      return;
+    }
+
     try {
       if (memorySound) {
         await memorySound.unloadAsync().catch(()=>{});
@@ -103,6 +111,8 @@ export default function HomeScreen() {
       await sound.playAsync();
     } catch (error) {
       console.error("Memory playback error:", error);
+      Alert.alert("Playback Error", "The audio file could not be played. It might be an invalid format.");
+      setRemiText("I had trouble playing that message.");
     }
   };
 
@@ -596,7 +606,6 @@ export default function HomeScreen() {
             detectedVibe = 'Energetic';
         }
 
-        // --- NEW: UPDATED REASSURANCE INTERCEPTION ---
         let foundReassurance = null;
         for (const note of reassuranceNotes) {
            if (note.keywords.some(keyword => lowerText.includes(keyword))) {
@@ -622,7 +631,6 @@ export default function HomeScreen() {
             speak(introMsg);
             
             setTimeout(() => {
-                // The .trim() guarantees no hidden spaces break the URL
                 const safeUrl = foundReassurance.audio_url.trim();
                 playCustomAudio(safeUrl);
             }, 4000);
