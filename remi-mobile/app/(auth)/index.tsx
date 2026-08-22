@@ -46,8 +46,16 @@ export default function HomeScreen() {
 
   const [reassuranceNotes, setReassuranceNotes] = useState<{keywords: string[], audio_url: string, id: string}[]>([]);
 
+  // --- DYNAMIC FAMILY CONTACT STATES ---
   const [primaryContact, setPrimaryContact] = useState<string | null>(null);
+  const [primaryContactName, setPrimaryContactName] = useState("Caregiver");
+  const [primaryContactRole, setPrimaryContactRole] = useState("Primary");
+  const [primaryContactAvatar, setPrimaryContactAvatar] = useState("https://i.pravatar.cc/150?u=primary");
+
   const [secondaryContact, setSecondaryContact] = useState<string | null>(null);
+  const [secondaryContactName, setSecondaryContactName] = useState("Caregiver");
+  const [secondaryContactRole, setSecondaryContactRole] = useState("Secondary");
+  const [secondaryContactAvatar, setSecondaryContactAvatar] = useState("https://i.pravatar.cc/150?u=secondary");
 
   const [isMenuVisible, setIsMenuVisible] = useState(false);
   const [isMemoryExpanded, setIsMemoryExpanded] = useState(false);
@@ -93,7 +101,6 @@ export default function HomeScreen() {
     Speech.speak(cleanText, { language: 'en-GB', pitch: 0.9, rate: speechRate });
   };
 
-  // --- NEW: Safety Catch for Bad Audio URLs ---
   const playCustomAudio = async (url: string) => {
     if (!url || typeof url !== 'string' || !url.startsWith('http')) {
       console.warn("Invalid Audio URL blocked:", url);
@@ -349,10 +356,19 @@ export default function HomeScreen() {
           fetchedName = profileData.nickname;
           setUserName(fetchedName);
         }
-        if (profileData.primary_contact) setPrimaryContact(profileData.primary_contact);
-        if (profileData.secondary_contact) setSecondaryContact(profileData.secondary_contact);
         if (profileData.day_message) setCustomDayMessage(profileData.day_message);
         if (profileData.night_message) setCustomNightMessage(profileData.night_message);
+
+        // --- DYNAMIC CONTACT BINDING ---
+        if (profileData.primary_contact) setPrimaryContact(profileData.primary_contact);
+        if (profileData.primary_contact_name) setPrimaryContactName(profileData.primary_contact_name);
+        if (profileData.primary_contact_role) setPrimaryContactRole(profileData.primary_contact_role);
+        if (profileData.primary_contact_avatar) setPrimaryContactAvatar(profileData.primary_contact_avatar);
+
+        if (profileData.secondary_contact) setSecondaryContact(profileData.secondary_contact);
+        if (profileData.secondary_contact_name) setSecondaryContactName(profileData.secondary_contact_name);
+        if (profileData.secondary_contact_role) setSecondaryContactRole(profileData.secondary_contact_role);
+        if (profileData.secondary_contact_avatar) setSecondaryContactAvatar(profileData.secondary_contact_avatar);
       }
 
       const { data: memories } = await supabase.from('memory_vault').select('*');
@@ -615,14 +631,10 @@ export default function HomeScreen() {
         }
 
         if (foundReassurance) {
-            // INTERCEPT!
             const introMsg = "I actually have a message from your family about that. Let's listen.";
             setRemiText("Playing message from family...");
             
-            // Force disable SOS distress flag
             setIsDistressed(false); 
-            
-            // Force disable the Piano music if it triggered
             if (bgMusic) {
                await bgMusic.pauseAsync();
                setIsPlayingMusic(false);
@@ -636,7 +648,6 @@ export default function HomeScreen() {
             }, 4000);
 
         } else {
-            // NO TRAP FOUND: Proceed with standard AI behaviors
             if ((detectedVibe === 'Anxious' || detectedVibe === 'Confused') && !isEvening) {
                 triggerCalmMode(); 
             }
@@ -950,31 +961,39 @@ export default function HomeScreen() {
                 <Text style={[styles.nudgeTitle, isEvening && { color: '#92400E' }]}>Connect with Family:</Text>
                 
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 15, paddingHorizontal: 5 }}>
-                  <TouchableOpacity 
-                    style={[styles.familyCard, { backgroundColor: familyCardBgColor, borderColor: familyCardBorderColor }]} 
-                    activeOpacity={0.7}
-                    onPress={() => handleFamilyCall(primaryContact, "Sarah")}
-                  >
-                     <Image source={{uri: 'https://i.pravatar.cc/150?u=sarah'}} style={styles.familyAvatar} />
-                     <Text style={[styles.familyName, isEvening && { color: '#92400E' }]}>Sarah</Text>
-                     <Text style={[styles.familyRole, isEvening && { color: '#B45309' }]}>Daughter</Text>
-                     <View style={styles.callIconBadge}>
-                       <Ionicons name="call" size={12} color="#FFFFFF" />
-                     </View>
-                  </TouchableOpacity>
+                  
+                  {/* --- DYNAMIC PRIMARY CONTACT CARD --- */}
+                  {primaryContact && (
+                    <TouchableOpacity 
+                      style={[styles.familyCard, { backgroundColor: familyCardBgColor, borderColor: familyCardBorderColor }]} 
+                      activeOpacity={0.7}
+                      onPress={() => handleFamilyCall(primaryContact, primaryContactName)}
+                    >
+                       <Image source={{uri: primaryContactAvatar}} style={styles.familyAvatar} />
+                       <Text style={[styles.familyName, isEvening && { color: '#92400E' }]}>{primaryContactName}</Text>
+                       <Text style={[styles.familyRole, isEvening && { color: '#B45309' }]}>{primaryContactRole}</Text>
+                       <View style={styles.callIconBadge}>
+                         <Ionicons name="call" size={12} color="#FFFFFF" />
+                       </View>
+                    </TouchableOpacity>
+                  )}
 
-                  <TouchableOpacity 
-                    style={[styles.familyCard, { backgroundColor: familyCardBgColor, borderColor: familyCardBorderColor }]} 
-                    activeOpacity={0.7}
-                    onPress={() => handleFamilyCall(secondaryContact, "David")}
-                  >
-                     <Image source={{uri: 'https://i.pravatar.cc/150?u=david'}} style={styles.familyAvatar} />
-                     <Text style={[styles.familyName, isEvening && { color: '#92400E' }]}>David</Text>
-                     <Text style={[styles.familyRole, isEvening && { color: '#B45309' }]}>Son</Text>
-                     <View style={styles.callIconBadge}>
-                       <Ionicons name="call" size={12} color="#FFFFFF" />
-                     </View>
-                  </TouchableOpacity>
+                  {/* --- DYNAMIC SECONDARY CONTACT CARD --- */}
+                  {secondaryContact && (
+                    <TouchableOpacity 
+                      style={[styles.familyCard, { backgroundColor: familyCardBgColor, borderColor: familyCardBorderColor }]} 
+                      activeOpacity={0.7}
+                      onPress={() => handleFamilyCall(secondaryContact, secondaryContactName)}
+                    >
+                       <Image source={{uri: secondaryContactAvatar}} style={styles.familyAvatar} />
+                       <Text style={[styles.familyName, isEvening && { color: '#92400E' }]}>{secondaryContactName}</Text>
+                       <Text style={[styles.familyRole, isEvening && { color: '#B45309' }]}>{secondaryContactRole}</Text>
+                       <View style={styles.callIconBadge}>
+                         <Ionicons name="call" size={12} color="#FFFFFF" />
+                       </View>
+                    </TouchableOpacity>
+                  )}
+
                 </ScrollView>
              </Animated.View>
           )}
@@ -1120,31 +1139,34 @@ export default function HomeScreen() {
               Who would you like to call?
             </Text>
 
-            <TouchableOpacity 
-              style={[styles.menuRow, { backgroundColor: '#FEE2E2', borderRadius: 16, marginBottom: 12, paddingHorizontal: 15, borderBottomWidth: 0 }]} 
-              onPress={() => {
-                if (primaryContact) Linking.openURL(`tel:${primaryContact}`);
-                else Alert.alert("No Number", "Primary contact number is not set.");
-              }}
-            >
-              <View style={[styles.menuIconContainer, { backgroundColor: '#FECACA' }]}>
-                <Ionicons name="call" size={24} color="#DC2626" />
-              </View>
-              <Text style={[styles.menuRowText, { color: '#991B1B', fontWeight: 'bold' }]}>Call Primary Contact</Text>
-            </TouchableOpacity>
+            {/* --- DYNAMIC EMERGENCY CALL MENU --- */}
+            {primaryContact && (
+              <TouchableOpacity 
+                style={[styles.menuRow, { backgroundColor: '#FEE2E2', borderRadius: 16, marginBottom: 12, paddingHorizontal: 15, borderBottomWidth: 0 }]} 
+                onPress={() => {
+                  Linking.openURL(`tel:${primaryContact}`);
+                }}
+              >
+                <View style={[styles.menuIconContainer, { backgroundColor: '#FECACA' }]}>
+                  <Ionicons name="call" size={24} color="#DC2626" />
+                </View>
+                <Text style={[styles.menuRowText, { color: '#991B1B', fontWeight: 'bold' }]}>Call {primaryContactName}</Text>
+              </TouchableOpacity>
+            )}
 
-            <TouchableOpacity 
-              style={[styles.menuRow, { backgroundColor: '#FEE2E2', borderRadius: 16, paddingHorizontal: 15, borderBottomWidth: 0 }]} 
-              onPress={() => {
-                if (secondaryContact) Linking.openURL(`tel:${secondaryContact}`);
-                else Alert.alert("No Number", "Secondary contact number is not set.");
-              }}
-            >
-              <View style={[styles.menuIconContainer, { backgroundColor: '#FECACA' }]}>
-                <Ionicons name="call" size={24} color="#DC2626" />
-              </View>
-              <Text style={[styles.menuRowText, { color: '#991B1B', fontWeight: 'bold' }]}>Call Secondary Contact</Text>
-            </TouchableOpacity>
+            {secondaryContact && (
+              <TouchableOpacity 
+                style={[styles.menuRow, { backgroundColor: '#FEE2E2', borderRadius: 16, paddingHorizontal: 15, borderBottomWidth: 0 }]} 
+                onPress={() => {
+                  Linking.openURL(`tel:${secondaryContact}`);
+                }}
+              >
+                <View style={[styles.menuIconContainer, { backgroundColor: '#FECACA' }]}>
+                  <Ionicons name="call" size={24} color="#DC2626" />
+                </View>
+                <Text style={[styles.menuRowText, { color: '#991B1B', fontWeight: 'bold' }]}>Call {secondaryContactName}</Text>
+              </TouchableOpacity>
+            )}
             
             <TouchableOpacity 
                style={{ marginTop: 25, alignSelf: 'center', padding: 15 }} 
