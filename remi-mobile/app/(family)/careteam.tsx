@@ -36,6 +36,7 @@ export default function CareTeamScreen() {
 
   // Shift Logs
   const [shiftLogs, setShiftLogs] = useState<any[]>([]);
+  const [showAllLogs, setShowAllLogs] = useState(false); // <-- NEW: State to toggle older logs
 
   useEffect(() => {
     Promise.all([fetchProfileData(), fetchShiftLogs()]).finally(() => {
@@ -43,7 +44,6 @@ export default function CareTeamScreen() {
     });
   }, []);
 
-  // Fetches PIN and Contact Details from the same table used by Settings
   const fetchProfileData = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -264,21 +264,38 @@ export default function CareTeamScreen() {
           {shiftLogs.length === 0 && !isLoading ? (
              <Text style={styles.emptyText}>No shift logs recorded yet.</Text>
           ) : (
-             shiftLogs.map((log) => (
-              <View key={log.id} style={styles.logCard}>
-                <View style={styles.logHeader}>
-                  <View>
-                    <Text style={styles.logCaregiver}>{log.caregiver}</Text>
-                    <Text style={styles.logDate}>{log.date}</Text>
+            <>
+              {/* SLICE LOGIC: Render only the first 2 logs, unless showAllLogs is true */}
+              {shiftLogs.slice(0, showAllLogs ? shiftLogs.length : 2).map((log) => (
+                <View key={log.id} style={styles.logCard}>
+                  <View style={styles.logHeader}>
+                    <View>
+                      <Text style={styles.logCaregiver}>{log.caregiver}</Text>
+                      <Text style={styles.logDate}>{log.date}</Text>
+                    </View>
+                    <View style={[styles.vibeBadge, { borderColor: log.iconColor, backgroundColor: `${log.iconColor}15` }]}>
+                      <View style={[styles.vibeDot, { backgroundColor: log.iconColor }]} />
+                      <Text style={[styles.vibeText, { color: log.iconColor }]}>{log.vibe}</Text>
+                    </View>
                   </View>
-                  <View style={[styles.vibeBadge, { borderColor: log.iconColor, backgroundColor: `${log.iconColor}15` }]}>
-                    <View style={[styles.vibeDot, { backgroundColor: log.iconColor }]} />
-                    <Text style={[styles.vibeText, { color: log.iconColor }]}>{log.vibe}</Text>
-                  </View>
+                  <Text style={styles.logNotes}>{log.notes}</Text>
                 </View>
-                <Text style={styles.logNotes}>{log.notes}</Text>
-              </View>
-            ))
+              ))}
+
+              {/* ACCORDION BUTTON: Show if there are more than 2 logs */}
+              {shiftLogs.length > 2 && (
+                <TouchableOpacity 
+                  style={styles.viewMoreButton} 
+                  onPress={() => setShowAllLogs(!showAllLogs)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.viewMoreText}>
+                    {showAllLogs ? "Hide older logs" : `View ${shiftLogs.length - 2} older logs`}
+                  </Text>
+                  <Ionicons name={showAllLogs ? "chevron-up" : "chevron-down"} size={16} color="#8B5CF6" />
+                </TouchableOpacity>
+              )}
+            </>
           )}
 
         </ScrollView>
@@ -340,6 +357,10 @@ const styles = StyleSheet.create({
   vibeDot: { width: 8, height: 8, borderRadius: 4, marginRight: 6 },
   vibeText: { fontSize: 12, fontWeight: 'bold' },
   logNotes: { color: '#D1D5DB', fontSize: 15, lineHeight: 22 },
+
+  // NEW: Accordion Button Styles
+  viewMoreButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 12, marginTop: -5, marginBottom: 20 },
+  viewMoreText: { color: '#8B5CF6', fontSize: 14, fontWeight: 'bold', marginRight: 6 },
 
   addButton: { flexDirection: 'row', backgroundColor: '#8B5CF6', position: 'absolute', bottom: 30, alignSelf: 'center', paddingVertical: 16, paddingHorizontal: 24, borderRadius: 30, alignItems: 'center', shadowColor: '#8B5CF6', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 8 },
   addButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: 'bold', marginLeft: 8 },
