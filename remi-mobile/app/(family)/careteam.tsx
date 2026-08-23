@@ -21,58 +21,63 @@ export default function CareTeamScreen() {
   const router = useRouter();
   
   // --- STATES ---
-  const [team, setTeam] = useState<any[]>([]);
   const [pin, setPin] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Placeholder Shift Logs for the UI prototype
+  // Dynamic Contacts
+  const [primaryName, setPrimaryName] = useState('');
+  const [primaryRole, setPrimaryRole] = useState('');
+  const [primaryPhone, setPrimaryPhone] = useState('');
+  
+  const [secondaryName, setSecondaryName] = useState('');
+  const [secondaryRole, setSecondaryRole] = useState('');
+  const [secondaryPhone, setSecondaryPhone] = useState('');
+
+  // Shift Logs
   const [shiftLogs, setShiftLogs] = useState<any[]>([]);
 
   useEffect(() => {
-    Promise.all([fetchCareTeam(), fetchCaregiverPin(), fetchShiftLogs()]).finally(() => {
+    Promise.all([fetchProfileData(), fetchShiftLogs()]).finally(() => {
       setIsLoading(false);
     });
   }, []);
 
-  const fetchCareTeam = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('care_team')
-        .select('*')
-        .order('created_at', { ascending: true });
-
-      if (error) throw error;
-      if (data) setTeam(data);
-    } catch (error: any) {
-      console.error("Error fetching care team:", error);
-    }
-  };
-
-  const fetchCaregiverPin = async () => {
+  // Fetches PIN and Contact Details from the same table used by Settings
+  const fetchProfileData = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
       const { data, error } = await supabase
         .from('profiles')
-        .select('caregiver_pin')
+        .select('*')
         .eq('id', user.id)
         .single();
 
-      if (data && data.caregiver_pin) {
-        setPin(data.caregiver_pin);
+      if (error) throw error;
+
+      if (data) {
+        setPin(data.caregiver_pin || '');
+        
+        setPrimaryName(data.primary_contact_name || '');
+        setPrimaryRole(data.primary_contact_role || '');
+        setPrimaryPhone(data.primary_contact || '');
+
+        setSecondaryName(data.secondary_contact_name || '');
+        setSecondaryRole(data.secondary_contact_role || '');
+        setSecondaryPhone(data.secondary_contact || '');
       }
     } catch (error) {
-      console.error('Error fetching PIN:', error);
+      console.error('Error fetching profile data:', error);
     }
   };
+
   const fetchShiftLogs = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // 1. Get the patient ID linked to this family member
       const { data: profile } = await supabase
         .from('profiles')
         .select('linked_patient_id')
@@ -80,7 +85,6 @@ export default function CareTeamScreen() {
         .single();
 
       if (profile?.linked_patient_id) {
-        // 2. Fetch the shift logs for that patient
         const { data, error } = await supabase
           .from('shift_logs')
           .select('*')
@@ -89,7 +93,6 @@ export default function CareTeamScreen() {
 
         if (error) throw error;
         
-        // 3. Format the data so the UI renders the correct colors
         if (data) {
           const formattedLogs = data.map(log => {
             let color = '#10B981'; // Calm (Green)
@@ -112,6 +115,7 @@ export default function CareTeamScreen() {
       console.error('Error fetching shift logs:', error);
     }
   };
+
   const handleSavePin = async () => {
     if (pin.length !== 4) {
       Alert.alert("Invalid PIN", "The Caregiver PIN must be exactly 4 digits.");
@@ -143,7 +147,7 @@ export default function CareTeamScreen() {
       <StatusBar barStyle="light-content" backgroundColor="#0B0F19" />
       
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton} hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
           <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Care Team Hub</Text>
@@ -190,43 +194,66 @@ export default function CareTeamScreen() {
             </View>
           </View>
 
-          {/* --- 2. ACTIVE TEAM MEMBERS (Your UI) --- */}
+          {/* --- 2. ACTIVE TEAM MEMBERS (Synced with App Settings) --- */}
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Active Team Members</Text>
           </View>
           
           {isLoading ? (
             <ActivityIndicator size="large" color="#8B5CF6" style={{ marginVertical: 20 }} />
-          ) : team.length === 0 ? (
-            <Text style={styles.emptyText}>No care team members found.</Text>
+          ) : (!primaryName && !secondaryName) ? (
+            <Text style={styles.emptyText}>No care team members found. Add them in App Settings.</Text>
           ) : (
-            team.map((item) => (
-              <View key={item.id} style={styles.memberCard}>
-                <View style={styles.memberHeader}>
-                  <View style={styles.avatarContainer}>
-                    <Text style={styles.avatarText}>{item.name.charAt(0)}</Text>
-                    {item.is_online && <View style={styles.onlineIndicator} />}
+            <>
+              {/* PRIMARY CONTACT CARD */}
+              {primaryName ? (
+                <View style={styles.memberCard}>
+                  <View style={styles.memberHeader}>
+                    <View style={[styles.avatarContainer, { backgroundColor: '#8B5CF6' }]}>
+                      <Text style={styles.avatarText}>{primaryName.charAt(0).toUpperCase()}</Text>
+                      <View style={styles.onlineIndicator} />
+                    </View>
+                    <View style={styles.memberInfo}>
+                      <Text style={styles.memberName}>{primaryName}</Text>
+                      <Text style={styles.memberRole}>{primaryRole}</Text>
+                    </View>
+                    <TouchableOpacity style={styles.iconButton}>
+                      <Ionicons name="call-outline" size={20} color="#8B5CF6" />
+                    </TouchableOpacity>
+                    <TouchableOpacity style={[styles.iconButton, { marginLeft: 8 }]}>
+                      <Ionicons name="ellipsis-vertical" size={20} color="#9CA3AF" />
+                    </TouchableOpacity>
                   </View>
-                  <View style={styles.memberInfo}>
-                    <Text style={styles.memberName}>{item.name}</Text>
-                    <Text style={styles.memberRole}>{item.role}</Text>
+                  <View style={styles.accessRow}>
+                    <View style={styles.accessBadge}>
+                      <Ionicons name="shield-checkmark-outline" size={14} color="#10B981" />
+                      <Text style={styles.accessText}>Full Access</Text>
+                    </View>
                   </View>
-                  <TouchableOpacity style={styles.iconButton}>
-                    <Ionicons name="call-outline" size={20} color="#8B5CF6" />
-                  </TouchableOpacity>
-                  <TouchableOpacity style={[styles.iconButton, { marginLeft: 8 }]}>
-                    <Ionicons name="ellipsis-vertical" size={20} color="#9CA3AF" />
-                  </TouchableOpacity>
                 </View>
-                
-                <View style={styles.accessRow}>
-                  <View style={styles.accessBadge}>
-                    <Ionicons name="shield-checkmark-outline" size={14} color="#10B981" />
-                    <Text style={styles.accessText}>{item.access_level}</Text>
+              ) : null}
+
+              {/* SECONDARY CONTACT CARD */}
+              {secondaryName ? (
+                <View style={styles.memberCard}>
+                  <View style={styles.memberHeader}>
+                    <View style={[styles.avatarContainer, { backgroundColor: '#4B5563' }]}>
+                      <Text style={styles.avatarText}>{secondaryName.charAt(0).toUpperCase()}</Text>
+                    </View>
+                    <View style={styles.memberInfo}>
+                      <Text style={styles.memberName}>{secondaryName}</Text>
+                      <Text style={styles.memberRole}>{secondaryRole}</Text>
+                    </View>
+                    <TouchableOpacity style={styles.iconButton}>
+                      <Ionicons name="call-outline" size={20} color="#8B5CF6" />
+                    </TouchableOpacity>
+                    <TouchableOpacity style={[styles.iconButton, { marginLeft: 8 }]}>
+                      <Ionicons name="ellipsis-vertical" size={20} color="#9CA3AF" />
+                    </TouchableOpacity>
                   </View>
                 </View>
-              </View>
-            ))
+              ) : null}
+            </>
           )}
 
           {/* --- 3. SHIFT LOGS --- */}
@@ -234,21 +261,25 @@ export default function CareTeamScreen() {
             <Text style={styles.sectionTitle}>Recent Shift Logs</Text>
           </View>
             
-          {shiftLogs.map((log) => (
-            <View key={log.id} style={styles.logCard}>
-              <View style={styles.logHeader}>
-                <View>
-                  <Text style={styles.logCaregiver}>{log.caregiver}</Text>
-                  <Text style={styles.logDate}>{log.date}</Text>
+          {shiftLogs.length === 0 && !isLoading ? (
+             <Text style={styles.emptyText}>No shift logs recorded yet.</Text>
+          ) : (
+             shiftLogs.map((log) => (
+              <View key={log.id} style={styles.logCard}>
+                <View style={styles.logHeader}>
+                  <View>
+                    <Text style={styles.logCaregiver}>{log.caregiver}</Text>
+                    <Text style={styles.logDate}>{log.date}</Text>
+                  </View>
+                  <View style={[styles.vibeBadge, { borderColor: log.iconColor, backgroundColor: `${log.iconColor}15` }]}>
+                    <View style={[styles.vibeDot, { backgroundColor: log.iconColor }]} />
+                    <Text style={[styles.vibeText, { color: log.iconColor }]}>{log.vibe}</Text>
+                  </View>
                 </View>
-                <View style={[styles.vibeBadge, { borderColor: log.iconColor, backgroundColor: `${log.iconColor}15` }]}>
-                  <View style={[styles.vibeDot, { backgroundColor: log.iconColor }]} />
-                  <Text style={[styles.vibeText, { color: log.iconColor }]}>{log.vibe}</Text>
-                </View>
+                <Text style={styles.logNotes}>{log.notes}</Text>
               </View>
-              <Text style={styles.logNotes}>{log.notes}</Text>
-            </View>
-          ))}
+            ))
+          )}
 
         </ScrollView>
       </KeyboardAvoidingView>
@@ -289,7 +320,7 @@ const styles = StyleSheet.create({
   sectionHeader: { marginBottom: 15, marginTop: 10 },
   memberCard: { backgroundColor: '#111827', borderRadius: 20, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: '#1F2937' },
   memberHeader: { flexDirection: 'row', alignItems: 'center' },
-  avatarContainer: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#8B5CF6', justifyContent: 'center', alignItems: 'center', marginRight: 12 },
+  avatarContainer: { width: 48, height: 48, borderRadius: 24, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
   avatarText: { color: '#FFFFFF', fontSize: 20, fontWeight: 'bold' },
   onlineIndicator: { position: 'absolute', bottom: 0, right: 0, width: 14, height: 14, borderRadius: 7, backgroundColor: '#10B981', borderWidth: 2, borderColor: '#111827' },
   memberInfo: { flex: 1 },
