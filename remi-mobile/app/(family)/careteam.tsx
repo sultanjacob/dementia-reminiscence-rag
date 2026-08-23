@@ -11,7 +11,6 @@ import {
   StatusBar,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View
 } from 'react-native';
@@ -21,22 +20,18 @@ export default function CareTeamScreen() {
   const router = useRouter();
   
   // --- STATES ---
-  const [pin, setPin] = useState('');
   const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
 
   // Dynamic Contacts
   const [primaryName, setPrimaryName] = useState('');
   const [primaryRole, setPrimaryRole] = useState('');
-  const [primaryPhone, setPrimaryPhone] = useState('');
   
   const [secondaryName, setSecondaryName] = useState('');
   const [secondaryRole, setSecondaryRole] = useState('');
-  const [secondaryPhone, setSecondaryPhone] = useState('');
 
   // Shift Logs
   const [shiftLogs, setShiftLogs] = useState<any[]>([]);
-  const [showAllLogs, setShowAllLogs] = useState(false); // <-- NEW: State to toggle older logs
+  const [showAllLogs, setShowAllLogs] = useState(false);
 
   useEffect(() => {
     Promise.all([fetchProfileData(), fetchShiftLogs()]).finally(() => {
@@ -58,15 +53,11 @@ export default function CareTeamScreen() {
       if (error) throw error;
 
       if (data) {
-        setPin(data.caregiver_pin || '');
-        
         setPrimaryName(data.primary_contact_name || '');
         setPrimaryRole(data.primary_contact_role || '');
-        setPrimaryPhone(data.primary_contact || '');
 
         setSecondaryName(data.secondary_contact_name || '');
         setSecondaryRole(data.secondary_contact_role || '');
-        setSecondaryPhone(data.secondary_contact || '');
       }
     } catch (error) {
       console.error('Error fetching profile data:', error);
@@ -116,32 +107,6 @@ export default function CareTeamScreen() {
     }
   };
 
-  const handleSavePin = async () => {
-    if (pin.length !== 4) {
-      Alert.alert("Invalid PIN", "The Caregiver PIN must be exactly 4 digits.");
-      return;
-    }
-
-    setIsSaving(true);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('No user found');
-
-      const { error } = await supabase
-        .from('profiles')
-        .update({ caregiver_pin: pin })
-        .eq('id', user.id);
-
-      if (error) throw error;
-      
-      Alert.alert("Success", "Caregiver PIN updated securely.");
-    } catch (error: any) {
-      Alert.alert("Error", error.message);
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="light-content" backgroundColor="#0B0F19" />
@@ -160,41 +125,10 @@ export default function CareTeamScreen() {
       >
         <ScrollView style={styles.container} contentContainerStyle={styles.listContainer}>
           <Text style={styles.descriptionText}>
-            Manage device access, active team members, and view daily shift reports.
+            Manage active team members and view daily shift reports.
           </Text>
 
-          {/* --- 1. PIN SETUP CARD --- */}
-          <View style={styles.card}>
-            <View style={styles.cardHeader}>
-              <Ionicons name="lock-closed" size={20} color="#8B5CF6" style={{ marginRight: 8 }} />
-              <Text style={styles.sectionTitle}>Shared Device PIN</Text>
-            </View>
-            <Text style={styles.cardDescription}>
-              Caregivers will use this 4-digit code to unlock the advanced Action Dashboard on Mary's tablet.
-            </Text>
-
-            <View style={styles.pinContainer}>
-              <TextInput
-                style={styles.pinInput}
-                value={pin}
-                onChangeText={(text) => setPin(text.replace(/[^0-9]/g, '').slice(0, 4))}
-                placeholder="0000"
-                placeholderTextColor="#374151"
-                keyboardType="numeric"
-                secureTextEntry={true}
-                maxLength={4}
-              />
-              <TouchableOpacity 
-                style={[styles.savePinButton, (pin.length !== 4 || isSaving) && styles.savePinButtonDisabled]} 
-                onPress={handleSavePin}
-                disabled={pin.length !== 4 || isSaving}
-              >
-                {isSaving ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.savePinButtonText}>Save</Text>}
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* --- 2. ACTIVE TEAM MEMBERS (Synced with App Settings) --- */}
+          {/* --- ACTIVE TEAM MEMBERS --- */}
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Active Team Members</Text>
           </View>
@@ -256,7 +190,7 @@ export default function CareTeamScreen() {
             </>
           )}
 
-          {/* --- 3. SHIFT LOGS --- */}
+          {/* --- SHIFT LOGS --- */}
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Recent Shift Logs</Text>
           </View>
@@ -265,7 +199,6 @@ export default function CareTeamScreen() {
              <Text style={styles.emptyText}>No shift logs recorded yet.</Text>
           ) : (
             <>
-              {/* SLICE LOGIC: Render only the first 2 logs, unless showAllLogs is true */}
               {shiftLogs.slice(0, showAllLogs ? shiftLogs.length : 2).map((log) => (
                 <View key={log.id} style={styles.logCard}>
                   <View style={styles.logHeader}>
@@ -282,7 +215,6 @@ export default function CareTeamScreen() {
                 </View>
               ))}
 
-              {/* ACCORDION BUTTON: Show if there are more than 2 logs */}
               {shiftLogs.length > 2 && (
                 <TouchableOpacity 
                   style={styles.viewMoreButton} 
@@ -322,19 +254,9 @@ const styles = StyleSheet.create({
   listContainer: { paddingHorizontal: 20, paddingBottom: 100 },
   descriptionText: { color: '#9CA3AF', fontSize: 14, lineHeight: 20, marginTop: 20, marginBottom: 20 },
   
-  // PIN Section Styles
-  card: { backgroundColor: '#111827', borderRadius: 20, padding: 20, marginBottom: 30, borderWidth: 1, borderColor: '#1F2937' },
-  cardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
-  sectionTitle: { fontSize: 18, fontWeight: '700', color: '#FFFFFF' },
-  cardDescription: { color: '#9CA3AF', fontSize: 13, marginBottom: 20, lineHeight: 20 },
-  pinContainer: { flexDirection: 'row', alignItems: 'center', gap: 15 },
-  pinInput: { flex: 1, backgroundColor: '#0B0F19', borderWidth: 1, borderColor: '#374151', borderRadius: 16, paddingVertical: 14, color: '#FFFFFF', fontSize: 24, fontWeight: 'bold', textAlign: 'center', letterSpacing: 8 },
-  savePinButton: { backgroundColor: '#8B5CF6', paddingVertical: 16, paddingHorizontal: 24, borderRadius: 16, justifyContent: 'center' },
-  savePinButtonDisabled: { backgroundColor: '#374151' },
-  savePinButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: 'bold' },
-
   // Team Member Styles
   sectionHeader: { marginBottom: 15, marginTop: 10 },
+  sectionTitle: { fontSize: 18, fontWeight: '700', color: '#FFFFFF' },
   memberCard: { backgroundColor: '#111827', borderRadius: 20, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: '#1F2937' },
   memberHeader: { flexDirection: 'row', alignItems: 'center' },
   avatarContainer: { width: 48, height: 48, borderRadius: 24, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
@@ -358,7 +280,7 @@ const styles = StyleSheet.create({
   vibeText: { fontSize: 12, fontWeight: 'bold' },
   logNotes: { color: '#D1D5DB', fontSize: 15, lineHeight: 22 },
 
-  // NEW: Accordion Button Styles
+  // Accordion Button Styles
   viewMoreButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 12, marginTop: -5, marginBottom: 20 },
   viewMoreText: { color: '#8B5CF6', fontSize: 14, fontWeight: 'bold', marginRight: 6 },
 
