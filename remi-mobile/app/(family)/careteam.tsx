@@ -40,6 +40,7 @@ export default function CareTeamScreen() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [newMemberName, setNewMemberName] = useState('');
   const [newMemberRole, setNewMemberRole] = useState('');
+  const [newMemberPin, setNewMemberPin] = useState(''); // <-- NEW: Individual PIN State
   const [isAdding, setIsAdding] = useState(false);
 
   useEffect(() => {
@@ -115,10 +116,10 @@ export default function CareTeamScreen() {
     }
   };
 
-  // --- MANAGEMENT FUNCTIONS ---
+  // --- NEW: UPDATED MANAGEMENT FUNCTIONS ---
   const handleAddCaregiver = async () => {
-    if (!newMemberName.trim() || !newMemberRole.trim()) {
-      Alert.alert("Missing Info", "Please provide a name and role for the caregiver.");
+    if (!newMemberName.trim() || !newMemberRole.trim() || newMemberPin.length !== 4) {
+      Alert.alert("Missing Info", "Please provide a name, role, and a 4-digit PIN for the caregiver.");
       return;
     }
 
@@ -127,13 +128,15 @@ export default function CareTeamScreen() {
       const { error } = await supabase.from('care_team').insert({
         name: newMemberName.trim(),
         role: newMemberRole.trim(),
-        access_level: 'Standard Access'
+        access_level: 'Standard Access',
+        pin: newMemberPin // <-- Saving their individual PIN
       });
 
       if (error) throw error;
       
       setNewMemberName('');
       setNewMemberRole('');
+      setNewMemberPin('');
       setShowAddModal(false);
       fetchCareTeam(); // Refresh the list
     } catch (error: any) {
@@ -263,6 +266,10 @@ export default function CareTeamScreen() {
                     </View>
                     <View style={styles.accessRow}>
                       <View style={[styles.accessBadge, { backgroundColor: '#1F2937' }]}>
+                        <Ionicons name="shield-half-outline" size={14} color="#9CA3AF" />
+                        <Text style={[styles.accessText, { color: '#9CA3AF' }]}>PIN: {item.pin || '****'}</Text>
+                      </View>
+                      <View style={[styles.accessBadge, { backgroundColor: '#1F2937', marginLeft: 10 }]}>
                         <Ionicons name="briefcase-outline" size={14} color="#9CA3AF" />
                         <Text style={[styles.accessText, { color: '#9CA3AF' }]}>{item.access_level || 'Standard Access'}</Text>
                       </View>
@@ -319,7 +326,7 @@ export default function CareTeamScreen() {
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Add Professional Caregiver</Text>
-            <Text style={styles.modalSubtitle}>They will be granted Standard Access to the device task board.</Text>
+            <Text style={styles.modalSubtitle}>Allocate them a unique PIN to access Mary's device.</Text>
             
             <Text style={styles.inputLabel}>Caregiver Name</Text>
             <TextInput 
@@ -339,12 +346,29 @@ export default function CareTeamScreen() {
               onChangeText={setNewMemberRole} 
             />
 
+            {/* --- NEW PIN INPUT --- */}
+            <Text style={styles.inputLabel}>Assign Access PIN</Text>
+            <TextInput 
+              style={[styles.textInput, { letterSpacing: 8, fontSize: 20, textAlign: 'center' }]} 
+              placeholder="••••" 
+              placeholderTextColor="#6B7280" 
+              value={newMemberPin} 
+              onChangeText={(text) => setNewMemberPin(text.replace(/[^0-9]/g, '').slice(0, 4))} 
+              keyboardType="numeric"
+              secureTextEntry={false} // Shown plainly while creating
+              maxLength={4}
+            />
+
             <View style={styles.modalButtons}>
-              <TouchableOpacity style={styles.cancelButton} onPress={() => { setShowAddModal(false); setNewMemberName(''); setNewMemberRole(''); }}>
+              <TouchableOpacity style={styles.cancelButton} onPress={() => { setShowAddModal(false); setNewMemberName(''); setNewMemberRole(''); setNewMemberPin(''); }}>
                 <Text style={styles.cancelButtonText}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.saveButton} onPress={handleAddCaregiver} disabled={isAdding}>
-                {isAdding ? <ActivityIndicator color="#FFF" /> : <Text style={styles.saveButtonText}>Add Team Member</Text>}
+              <TouchableOpacity 
+                style={[styles.saveButton, (newMemberPin.length !== 4) && { opacity: 0.5 }]} 
+                onPress={handleAddCaregiver} 
+                disabled={isAdding || newMemberPin.length !== 4}
+              >
+                {isAdding ? <ActivityIndicator color="#FFF" /> : <Text style={styles.saveButtonText}>Add Member</Text>}
               </TouchableOpacity>
             </View>
           </View>
@@ -384,7 +408,7 @@ const styles = StyleSheet.create({
   memberName: { color: '#FFFFFF', fontSize: 18, fontWeight: '600' },
   memberRole: { color: '#9CA3AF', fontSize: 14, marginTop: 2 },
   iconButton: { backgroundColor: '#1F2937', padding: 10, borderRadius: 12 },
-  accessRow: { marginTop: 16, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#1F2937' },
+  accessRow: { flexDirection: 'row', marginTop: 16, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#1F2937' },
   accessBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(16, 185, 129, 0.1)', alignSelf: 'flex-start', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 12 },
   accessText: { color: '#10B981', fontSize: 13, fontWeight: '600', marginLeft: 6 },
   
