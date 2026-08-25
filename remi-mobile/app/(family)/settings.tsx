@@ -71,7 +71,7 @@ export default function FamilySettingsScreen() {
       }
     } catch (error: any) {
       console.error('Error loading settings:', error);
-      Alert.alert('Error', 'Could not load profile settings.');
+      Alert.alert('Error', 'Could not load profile settings! Please try again later.');
     } finally {
       setLoading(false);
     }
@@ -103,7 +103,7 @@ export default function FamilySettingsScreen() {
       Alert.alert('Success', 'Settings saved successfully! Changes will appear on Mary\'s screen on her next refresh.');
     } catch (error: any) {
       console.error('Save error:', error);
-      Alert.alert('Save Failed', error.message);
+      Alert.alert('Save Failed', 'Could not save settings! Please try again later.');
     } finally {
       setSaving(false);
     }
