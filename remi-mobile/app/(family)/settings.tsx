@@ -38,9 +38,6 @@ export default function FamilySettingsScreen() {
   const [dayMessage, setDayMessage] = useState('');
   const [nightMessage, setNightMessage] = useState('');
 
-  // Security
-  const [pin, setPin] = useState('');
-
   useEffect(() => {
     fetchProfile();
   }, []);
@@ -71,7 +68,6 @@ export default function FamilySettingsScreen() {
 
         setDayMessage(data.day_message || '');
         setNightMessage(data.night_message || '');
-        setPin(data.caregiver_pin || '');
       }
     } catch (error: any) {
       console.error('Error loading settings:', error);
@@ -98,7 +94,6 @@ export default function FamilySettingsScreen() {
         secondary_contact_avatar: secondaryAvatar,
         day_message: dayMessage,
         night_message: nightMessage,
-        caregiver_pin: pin,
         updated_at: new Date(),
       };
 
@@ -209,24 +204,6 @@ export default function FamilySettingsScreen() {
               onChangeText={setNightMessage} 
               placeholder="e.g. It is late. It is time to sleep safely." 
               multiline 
-            />
-          </View>
-
-          {/* SECURITY SECTION */}
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Ionicons name="lock-closed" size={20} color="#8B5CF6" />
-              <Text style={styles.sectionTitle}>Security</Text>
-            </View>
-            <Text style={styles.label}>Caregiver PIN (4 Digits)</Text>
-            <TextInput 
-              style={styles.input} 
-              value={pin} 
-              onChangeText={setPin} 
-              placeholder="e.g. 1234" 
-              keyboardType="number-pad"
-              maxLength={4}
-              secureTextEntry
             />
           </View>
 
