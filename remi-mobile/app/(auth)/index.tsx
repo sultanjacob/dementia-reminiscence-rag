@@ -724,22 +724,48 @@ export default function HomeScreen() {
   
   const verifyCaregiverPin = async (pinAttempt: string) => {
     setEnteredPin(pinAttempt);
+    
     if (pinAttempt.length === 4) {
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
-        const { data } = await supabase.from('profiles').select('caregiver_pin').eq('id', user.id).single();
+
+        // 1. Check if the PIN belongs to the Family Admin
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('caregiver_pin')
+          .eq('id', user.id)
+          .single();
         
-        if (data && data.caregiver_pin === pinAttempt) {
+        if (profileData && profileData.caregiver_pin === pinAttempt) {
           setShowPinModal(false);
           setEnteredPin('');
           router.push('/(caregiver)'); 
-        } else {
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-          Alert.alert("Incorrect PIN", "The PIN entered is incorrect.");
-          setEnteredPin('');
+          return;
         }
+
+        // 2. Check if the PIN belongs to a Professional Caregiver
+        const { data: teamData } = await supabase
+          .from('care_team')
+          .select('pin')
+          .eq('pin', pinAttempt)
+          .maybeSingle(); // maybeSingle prevents an ugly error crash if no PIN is found
+
+        if (teamData && teamData.pin === pinAttempt) {
+          setShowPinModal(false);
+          setEnteredPin('');
+          router.push('/(caregiver)'); 
+          return;
+        }
+
+        // 3. If neither matches, reject the login
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        Alert.alert("Incorrect PIN", "The PIN entered is incorrect.");
+        setEnteredPin('');
+
       } catch (error: any) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        Alert.alert("Error", "Could not verify PIN. Please check your internet connection.");
         setEnteredPin('');
       }
     }
