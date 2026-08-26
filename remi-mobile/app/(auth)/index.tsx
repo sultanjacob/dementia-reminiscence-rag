@@ -1,9 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
 import * as Haptics from 'expo-haptics';
-import { useNavigation, useRouter } from 'expo-router';
+import { useFocusEffect, useNavigation, useRouter } from 'expo-router';
 import * as Speech from 'expo-speech';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Alert,
   Animated,
@@ -46,7 +46,6 @@ export default function HomeScreen() {
 
   const [reassuranceNotes, setReassuranceNotes] = useState<{keywords: string[], audio_url: string, id: string}[]>([]);
 
-  // --- DYNAMIC FAMILY CONTACT STATES ---
   const [primaryContact, setPrimaryContact] = useState<string | null>(null);
   const [primaryContactName, setPrimaryContactName] = useState("Caregiver");
   const [primaryContactRole, setPrimaryContactRole] = useState("Primary");
@@ -89,6 +88,7 @@ export default function HomeScreen() {
 
   useEffect(() => {
     return () => {
+      Speech.stop();
       if (memorySound) memorySound.unloadAsync().catch(()=>{});
       if (bgMusic) bgMusic.unloadAsync().catch(()=>{});
     };
@@ -341,78 +341,89 @@ export default function HomeScreen() {
     }
   };
 
-  useEffect(() => {
-    const initializeHome = async () => {
-      updateClockLogic();
+  // --- NEW: useFocusEffect ENSURES REMI ONLY SPEAKS WHEN THE SCREEN IS ACTIVE ---
+  useFocusEffect(
+    useCallback(() => {
+      let isFocused = true;
 
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      const initializeHome = async () => {
+        updateClockLogic();
 
-      let fetchedName = "John";
-      const { data: profileData } = await supabase.from('profiles').select('*').eq('id', user.id).single();
-      
-      if (profileData) {
-        if (profileData.nickname) {
-          fetchedName = profileData.nickname;
-          setUserName(fetchedName);
-        }
-        if (profileData.day_message) setCustomDayMessage(profileData.day_message);
-        if (profileData.night_message) setCustomNightMessage(profileData.night_message);
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
 
-        // --- DYNAMIC CONTACT BINDING ---
-        if (profileData.primary_contact) setPrimaryContact(profileData.primary_contact);
-        if (profileData.primary_contact_name) setPrimaryContactName(profileData.primary_contact_name);
-        if (profileData.primary_contact_role) setPrimaryContactRole(profileData.primary_contact_role);
-        if (profileData.primary_contact_avatar) setPrimaryContactAvatar(profileData.primary_contact_avatar);
-
-        if (profileData.secondary_contact) setSecondaryContact(profileData.secondary_contact);
-        if (profileData.secondary_contact_name) setSecondaryContactName(profileData.secondary_contact_name);
-        if (profileData.secondary_contact_role) setSecondaryContactRole(profileData.secondary_contact_role);
-        if (profileData.secondary_contact_avatar) setSecondaryContactAvatar(profileData.secondary_contact_avatar);
-      }
-
-      const { data: memories } = await supabase.from('memory_vault').select('*');
-      
-      if (memories && memories.length > 0) {
-        const impMusic = memories.find(m => m.caption?.includes('[MUSIC-IMPORTANT]'));
-        if (impMusic) setImportantMusic(impMusic);
-
-        const rNotes: any[] = [];
-        const standardMemories: any[] = [];
-
-        memories.forEach(m => {
-          if (m.caption && m.caption.includes('[REASSURANCE:')) {
-             const match = m.caption.match(/\[REASSURANCE:\s*(.+?)\]/i);
-             if (match && m.audio_url) {
-                const keywords = match[1].split(',').map((k: string) => k.trim().toLowerCase());
-                rNotes.push({ keywords, audio_url: m.audio_url, id: m.id });
-             }
-          } else if (!m.caption?.includes('[MUSIC')) {
-             standardMemories.push(m);
+        let fetchedName = "John";
+        const { data: profileData } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+        
+        if (profileData && isFocused) {
+          if (profileData.nickname) {
+            fetchedName = profileData.nickname;
+            setUserName(fetchedName);
           }
-        });
+          if (profileData.day_message) setCustomDayMessage(profileData.day_message);
+          if (profileData.night_message) setCustomNightMessage(profileData.night_message);
 
-        setReassuranceNotes(rNotes);
+          if (profileData.primary_contact) setPrimaryContact(profileData.primary_contact);
+          if (profileData.primary_contact_name) setPrimaryContactName(profileData.primary_contact_name);
+          if (profileData.primary_contact_role) setPrimaryContactRole(profileData.primary_contact_role);
+          if (profileData.primary_contact_avatar) setPrimaryContactAvatar(profileData.primary_contact_avatar);
 
-        if (standardMemories.length > 0) {
-          setDailyMemory(standardMemories[Math.floor(Math.random() * standardMemories.length)]); 
+          if (profileData.secondary_contact) setSecondaryContact(profileData.secondary_contact);
+          if (profileData.secondary_contact_name) setSecondaryContactName(profileData.secondary_contact_name);
+          if (profileData.secondary_contact_role) setSecondaryContactRole(profileData.secondary_contact_role);
+          if (profileData.secondary_contact_avatar) setSecondaryContactAvatar(profileData.secondary_contact_avatar);
         }
-      }
 
-      const h = new Date().getHours();
-      if (h >= 17 || h < 6) {
-        const defaultGreeting = `Good evening, ${fetchedName}. It's getting late. I am here to help you relax.`;
-        setRemiText(defaultGreeting);
-        speak(defaultGreeting);
-      } else {
-        const defaultGreeting = `Hello ${fetchedName}! I am Remi. How can I help you today?`;
-        setRemiText(defaultGreeting);
-        speak(defaultGreeting);
-      }
-    };
-    
-    initializeHome();
-  }, []);
+        const { data: memories } = await supabase.from('memory_vault').select('*');
+        
+        if (memories && memories.length > 0 && isFocused) {
+          const impMusic = memories.find(m => m.caption?.includes('[MUSIC-IMPORTANT]'));
+          if (impMusic) setImportantMusic(impMusic);
+
+          const rNotes: any[] = [];
+          const standardMemories: any[] = [];
+
+          memories.forEach(m => {
+            if (m.caption && m.caption.includes('[REASSURANCE:')) {
+               const match = m.caption.match(/\[REASSURANCE:\s*(.+?)\]/i);
+               if (match && m.audio_url) {
+                  const keywords = match[1].split(',').map((k: string) => k.trim().toLowerCase());
+                  rNotes.push({ keywords, audio_url: m.audio_url, id: m.id });
+               }
+            } else if (!m.caption?.includes('[MUSIC')) {
+               standardMemories.push(m);
+            }
+          });
+
+          setReassuranceNotes(rNotes);
+
+          if (standardMemories.length > 0) {
+            setDailyMemory(standardMemories[Math.floor(Math.random() * standardMemories.length)]); 
+          }
+        }
+
+        if (isFocused) {
+          const h = new Date().getHours();
+          if (h >= 17 || h < 6) {
+            const defaultGreeting = `Good evening, ${fetchedName}. It's getting late. I am here to help you relax.`;
+            setRemiText(defaultGreeting);
+            speak(defaultGreeting);
+          } else {
+            const defaultGreeting = `Hello ${fetchedName}! I am Remi. How can I help you today?`;
+            setRemiText(defaultGreeting);
+            speak(defaultGreeting);
+          }
+        }
+      };
+      
+      initializeHome();
+
+      return () => {
+        isFocused = false;
+        Speech.stop(); // Instantly kill the audio if the user navigates away or logs out
+      };
+    }, [])
+  );
 
   useEffect(() => {
     const globalCheck = () => {
@@ -542,13 +553,6 @@ export default function HomeScreen() {
       resetRemi();
     }
   };
-
-  useEffect(() => {
-    const unsubscribe = navigation.addListener('tabPress', (e) => {
-      resetRemi();
-    });
-    return unsubscribe;
-  }, [navigation, dailyMemory, userName, isEvening, importantMusic]);
 
   const startRecording = async () => {
     try {
@@ -691,6 +695,12 @@ export default function HomeScreen() {
 
   const handleSignOut = async () => {
     setIsMenuVisible(false);
+    
+    // INSTANT AUDIO KILL SWITCH
+    Speech.stop(); 
+    if (memorySound) await memorySound.stopAsync().catch(()=>{});
+    if (bgMusic) await bgMusic.stopAsync().catch(()=>{});
+    
     setTimeout(async () => {
       const { error } = await supabase.auth.signOut();
       if (error) Alert.alert("Sign Out Error", error.message);
@@ -724,19 +734,12 @@ export default function HomeScreen() {
   
   const verifyCaregiverPin = async (pinAttempt: string) => {
     setEnteredPin(pinAttempt);
-    
     if (pinAttempt.length === 4) {
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
-        // 1. Check if the PIN belongs to the Family Admin
-        const { data: profileData } = await supabase
-          .from('profiles')
-          .select('caregiver_pin')
-          .eq('id', user.id)
-          .single();
-        
+        const { data: profileData } = await supabase.from('profiles').select('caregiver_pin').eq('id', user.id).single();
         if (profileData && profileData.caregiver_pin === pinAttempt) {
           setShowPinModal(false);
           setEnteredPin('');
@@ -744,13 +747,7 @@ export default function HomeScreen() {
           return;
         }
 
-        // 2. Check if the PIN belongs to a Professional Caregiver
-        const { data: teamData } = await supabase
-          .from('care_team')
-          .select('pin')
-          .eq('pin', pinAttempt)
-          .maybeSingle(); // maybeSingle prevents an ugly error crash if no PIN is found
-
+        const { data: teamData } = await supabase.from('care_team').select('pin').eq('pin', pinAttempt).maybeSingle(); 
         if (teamData && teamData.pin === pinAttempt) {
           setShowPinModal(false);
           setEnteredPin('');
@@ -758,7 +755,6 @@ export default function HomeScreen() {
           return;
         }
 
-        // 3. If neither matches, reject the login
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
         Alert.alert("Incorrect PIN", "The PIN entered is incorrect.");
         setEnteredPin('');
@@ -1165,7 +1161,6 @@ export default function HomeScreen() {
               Who would you like to call?
             </Text>
 
-            {/* --- DYNAMIC EMERGENCY CALL MENU --- */}
             {primaryContact && (
               <TouchableOpacity 
                 style={[styles.menuRow, { backgroundColor: '#FEE2E2', borderRadius: 16, marginBottom: 12, paddingHorizontal: 15, borderBottomWidth: 0 }]} 
