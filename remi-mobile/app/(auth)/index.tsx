@@ -967,14 +967,14 @@ export default function HomeScreen() {
           >
             <Ionicons name={isRecording ? "stop-circle" : (isProcessing ? "hourglass" : "mic")} size={28} color="#FFFFFF" />
             <Text style={styles.primaryButtonText}>
-              {isRecording ? "Tap to Stop" : (isProcessing ? "Remi is thinking..." : "Tap to Talk")}
+              {isRecording ? "Tap to Stop!" : (isProcessing ? "Remi is thinking..." : "Tap to Talk")}
             </Text>
           </TouchableOpacity>
 
           <View style={styles.bottomStatus}>
             <View style={[styles.statusDot, isRecording && { backgroundColor: '#EF4444' }]} />
             <Text style={styles.statusText}>
-              {isRecording ? "Recording your voice..." : "Remi is listening..."}
+              {isRecording ? "Please record your voice..." : "Remi is listening..."}
             </Text>
           </View>
 
