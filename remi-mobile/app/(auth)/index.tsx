@@ -635,7 +635,7 @@ export default function HomeScreen() {
         }
 
         if (foundReassurance) {
-            const introMsg = "I actually have a message from your family about that. Let's listen.";
+            const introMsg = "I actually have a message from your family about that. Let's listen to this";
             setRemiText("Playing message from family...");
             
             setIsDistressed(false); 
