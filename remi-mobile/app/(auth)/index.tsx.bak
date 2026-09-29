@@ -596,14 +596,7 @@ export default function HomeScreen() {
 
   const sendAudioToBackend = async (fileUri: string) => {
     try {
-      const { data: { session }, error: sessionError } =
-        await supabase.auth.getSession();
-
-      if (sessionError || !session?.access_token || !session.user) {
-        throw new Error('Authentication required. Please sign in again.');
-      }
-
-      const user = session.user;
+      const { data: { user } } = await supabase.auth.getUser();
       const formData = new FormData();
       formData.append('file', { uri: fileUri, name: 'recording.m4a', type: 'audio/m4a' } as any);
       if (user) formData.append('user_id', user.id);
@@ -611,10 +604,7 @@ export default function HomeScreen() {
       const response = await fetch(`${API_URL}/voice-chat`, {
         method: 'POST',
         body: formData,
-        headers: {
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`
-        },
+        headers: { 'Content-Type': 'multipart/form-data', 'Accept': 'application/json' },
       });
 
       const responseText = await response.text();
@@ -1142,7 +1132,7 @@ export default function HomeScreen() {
               secureTextEntry={true}
               maxLength={4}
               autoFocus={true}
-              placeholder="â€¢â€¢â€¢â€¢"
+              placeholder="••••"
               placeholderTextColor="#6B7280"
             />
             <TouchableOpacity style={{ paddingVertical: 15 }} onPress={() => { setShowPinModal(false); setEnteredPin(''); }}>
